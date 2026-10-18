@@ -106,7 +106,8 @@ flowchart TD
 18. Each unpriced call **MUST** log one line at level `warn` with the call id, the model, the upstream, the reason, and the fix: run `.agents/scripts/prices.vendor.sh` and rebuild. The line **MUST** also state that new prices apply only to new calls and to calls with a null `price_commit`.
 19. The price fields that the binary reads **MUST** use the names that the vendored schema defines. A test **MUST** fail if one of the names in requirements 7 to 9 is not a property of the schema.
 20. A test **MUST** validate the embedded price file against the embedded schema. The test **MUST** use a JSON Schema validator whose regex dialect accepts the Python inline flag `(?i)`. The chosen approach is the `jsonschema` crate as a dev-dependency with its Rust regex engine, because the Rust `regex` syntax accepts inline flags such as `(?i)`. The implementer **MUST** confirm at tier 1 (the installed crate source) that the pinned version compiles every `pattern` of the schema. If one pattern does not compile, the test **MUST** fail with an actionable error that names the pattern; the test **MUST NOT** skip or rewrite it.
-21. The refresh path **MUST** stay: run `.agents/scripts/prices.vendor.sh`, rebuild, run the verdict. This CR **MUST NOT** change `prices.vendor.sh` or the files in `vendor/litellm/`.
+21. The refresh path **MUST** stay: run `.agents/scripts/prices.vendor.sh`, rebuild, run the verdict. This CR **MUST NOT** change the files in `vendor/litellm/` by hand. The only change to `prices.vendor.sh` is the check of requirement 23.
+23. **The required model.** The pinned LiteLLM commit **MUST** hold an entry `claude-haiku-5-5` with `litellm_provider` `anthropic` and with each price field of rules 2 to 4 that a Haiku call reads: `input_cost_per_token`, `output_cost_per_token`, `cache_read_input_token_cost`, `cache_creation_input_token_cost`, and `cache_creation_input_token_cost_above_1hr`. The tier fields of rules 3 and 4 are required only if the upstream entry of that commit has them. A build test **MUST** fail with an actionable error if the embedded file does not meet this rule; the error **MUST** name the model, the missing field, and the fix (`.agents/scripts/prices.vendor.sh --ref <commit>` with a commit that holds the entry). `prices.vendor.sh` **MUST** check the same rule after the schema validation and before it writes. If the rule fails, it **MUST** write nothing, print an actionable error on stderr, and exit with the code for a failed validation (4). The default commit selection **MUST** stay; a commit that fails the rule is rejected, not replaced by a guess. The vendored file at the date of this CR holds the entry, so no refresh is necessary now. The list of required models **MUST** be one constant in each of the two places (the test and the script), so the definition of done of CR-0010 (`cost_usd` above 0 and `unpriced_calls` 0 for `claude-haiku-5-5`) cannot fail because of the pin.
 22. The Layer 2 document `docs/specification/cost.md` **MUST** describe the embedding, the provider match, the six rules, the order of tiers, the unpriced reasons, and the refresh path before the code lands. `docs/specification/parser.md` **MUST** link to it.
 
 ### Non-Functional Requirements
@@ -132,7 +133,8 @@ flowchart TD
 
 * New: `build.rs`, `src/price/`, `src/cli/price.rs`, a migration for the three `calls` columns, `docs/specification/cost.md`, `tests/price.*.rs`, fixtures under `tests/fixtures/price/`, `.agents/scripts/cost.bench.sh`, `.agents/scenarios/cost.call.md`.
 * Changed: the parser worker (one call to the pricing function), `upstreams.toml` and its loader (entry shape changes from a string to a table with `base_url` and `litellm_provider`), `docs/specification/proxy.md` (the entry shape), the test fixtures that write `upstreams.toml`, `loupe config show`, `Cargo.toml` (`rust_decimal`, `serde_json`, dev-dependency `jsonschema`), `.taxonomy`, `docs/specification/parser.md`, `docs/specification/operations.md`.
-* Not changed: `vendor/litellm/`, `.agents/scripts/prices.vendor.sh`, `README.md`.
+* Changed: `.agents/scripts/prices.vendor.sh` (the required-model check of requirement 23 only).
+* Not changed: `vendor/litellm/`, `README.md`.
 
 ## Scope Boundaries
 
@@ -223,7 +225,9 @@ flowchart LR
 | `src/price/tier.rs` (unit) | `service_then_size_tier` | Requirement 10 | priority and large prompt | the priority tier field of that size |
 | `src/price/unpriced.rs` (unit) | `missing_field_nonzero_is_unpriced` | Rule 5 | `cache_write_1h > 0`, no 1hr field | null, `missing_field:cache_creation_input_token_cost_above_1hr` |
 | `src/price/unpriced.rs` (unit) | `missing_field_zero_is_priced` | Rule 5 edge | same field missing, count 0 | priced |
-| `tests/price.fixtures.rs` | `fixture_calls_match_hand_costs` | Real vendored prices | three Anthropic fixtures including `claude-haiku-5-5` if present in the file | the hand-computed costs or `no_entry` |
+| `tests/price.fixtures.rs` | `fixture_calls_match_hand_costs` | Real vendored prices | three Anthropic fixtures including `claude-haiku-5-5` | the hand-computed costs, never `no_entry` |
+| `tests/price.required.rs` | `required_model_entry_is_complete` | Requirement 23 | embedded file | entry `claude-haiku-5-5` under `anthropic` with every required field; else an actionable failure that names the field |
+| `.agents/scripts/prices.vendor.sh` (shell test in the verdict) | `vendor_rejects_commit_without_required_model` | Requirement 23 | `--dry-run` against a local fixture file without the entry | exit 4, nothing written, stderr names the model |
 | `tests/price.worker.rs` | `worker_writes_cost_in_same_transaction` | Rule 6 | fake upstream call through proxy | call row with `cost_usd` and `price_commit` |
 | `tests/price.worker.rs` | `backfill_twice_prices_nothing_new` | Idempotence | rows with null commit, run twice | `calls_priced: 0` on the second run |
 | `tests/price.worker.rs` | `backfill_dry_run_writes_nothing` | Dry run | rows with null commit | counts printed, rows unchanged |
@@ -249,7 +253,7 @@ Not applicable. This CR adds behaviour and removes none.
 
 | Scenario | User Goal | User Surface | Success Condition | Criteria Proved | Scenario Record |
 |----------|-----------|--------------|-------------------|-----------------|-----------------|
-| A real Haiku call gets a cost | The operator sees the API-equivalent cost of a call that Claude Code made | command line | after `claude -p` through the proxy and `loupe parse --once`, `sqlite3` shows the call with a non-null `cost_usd` equal to the value from `loupe price show` and the token counts, or `unpriced_reason` `no_entry` if the vendored file has no entry for the model | AC-4, AC-6 | `.agents/scenarios/cost.call.md` |
+| A real Haiku call gets a cost | The operator sees the API-equivalent cost of a call that Claude Code made | command line | after `claude -p` through the proxy and `loupe parse --once`, `sqlite3` shows the call with a non-null `cost_usd` above 0 equal to the value from `loupe price show` and the token counts, and a null `unpriced_reason` | AC-4, AC-6, AC-9 | `.agents/scenarios/cost.call.md` |
 
 ## Acceptance Criteria
 
@@ -315,6 +319,17 @@ Then the exit code is 0
   And "loupe config show" prints the Commit value of vendor/litellm/SOURCE.md as price_commit
 ```
 
+### AC-9: The pinned prices hold the required model
+
+```gherkin
+Given the repository at the commit of this change
+When the operator runs "cargo test --test price.required"
+Then the test passes
+  And "loupe price show --model claude-haiku-5-5 --upstream anthropic" prints a match with a non-empty input_cost_per_token and output_cost_per_token
+When the operator runs ".agents/scripts/prices.vendor.sh --dry-run" against a commit with no claude-haiku-5-5 entry
+Then the exit code is 4, nothing is written, and stderr names claude-haiku-5-5 and the fix
+```
+
 ### AC-8: The verdict passes
 
 ```gherkin
@@ -370,9 +385,9 @@ loupe config show | grep price_commit
 
 ### Risk 2: The vendored file has no entry for `claude-haiku-5-5`
 
-**Likelihood:** medium
-**Impact:** medium
-**Mitigation:** Rule 5 gives `null` and `no_entry`, which CR-0007 counts in `unpriced_calls`. The fix is a refresh through `prices.vendor.sh` and a rebuild; the calls with a stored commit keep their null cost by rule 6.
+**Likelihood:** low
+**Impact:** high
+**Mitigation:** This is not acceptable, because CR-0010 needs a cost above 0 for this model. Requirement 23 makes the build test fail and makes `prices.vendor.sh` reject a commit with no complete entry, so the pin cannot lose the model. The vendored file at the date of this CR holds the entry. Rule 5 stays as the behaviour for other models only.
 
 ### Risk 3: The tier field names change upstream
 
