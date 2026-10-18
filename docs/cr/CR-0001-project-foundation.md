@@ -2,7 +2,7 @@
 name: cr-0001-project-foundation
 description: Project foundation for the loupe binary, with the crate, configuration, logging, storage, container, and verdict pipeline.
 id: "CR-0001"
-status: "proposed"
+status: "approved"
 date: 2026-10-18
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
@@ -462,6 +462,8 @@ About one working day of agent time, in nine coherent commits.
 ## Decision Outcome
 
 Chosen approach: "one small foundation CR with no product behaviour", because it fixes the shared names, the container, and the verdict command one time, and lets each later CR add only its own feature.
+
+Reviewed and approved by an independent reviewer agent on 2026-10-18.
 
 ## Open Questions
 
