@@ -430,3 +430,5 @@ Chosen approach: "embed the vendored file, match by model and the provider in `u
 ## More Information
 
 Reviewed and approved by an independent reviewer agent on 2026-10-18.
+
+Reviewed and approved by an independent reviewer agent on 2026-10-18, after the revision in commit 907608d.
