@@ -1,0 +1,15 @@
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Run logs of the agent scripts
+.agents/logs/
+
+# Build output and local data
+/target/
+*.db
+*.db-*
+
+# OS files
+.DS_Store
