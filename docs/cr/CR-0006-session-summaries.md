@@ -108,7 +108,7 @@ stateDiagram-v2
 
 **Summary worker**
 
-1. `loupe serve` **MUST** start one summary worker. The worker **MUST** wake at an interval of `LOUPE_SUMMARY_INTERVAL_SECS` (default `30`) and **MUST** read segments with `state = closed` that have no `session_summaries` row in status `done`, `skipped`, `failed`, or `disabled`, oldest `closed_at` first, in batches of at most 20.
+1. `loupe serve` **MUST** start one summary worker. The worker **MUST** wake at an interval of `LOUPE_SUMMARY_INTERVAL_SECS` (default `30`) and **MUST** read segments with `state = closed` that have no `session_summaries` row in status `done`, `skipped`, `failed`, or `disabled`, and a segment with a `pending` row only when its `next_attempt_at` is null or in the past, oldest `closed_at` first, in batches of at most 20.
 2. A new table `session_summaries` **MUST** hold one row per segment: `session_id` (unique, references `sessions.id`), `status` (`pending`, `done`, `skipped`, `failed`, `disabled`), `line` (null unless `done`), `model`, `attempts`, `last_error_kind`, `next_attempt_at`, `created_at`, `updated_at`. A new migration **MUST** add it.
 3. The worker **MUST** be idempotent. A segment with a final status (`done`, `skipped`, `failed`, `disabled`) **MUST NOT** get a second model request from the worker.
 4. The day of a session line **MUST** be the date of `sessions.started_at` in `LOUPE_TZ`.
@@ -151,7 +151,7 @@ stateDiagram-v2
 **Scrubber**
 
 28. The scrubber **MUST** take the first line of the text, and **MUST** remove URLs, email addresses, file paths (a token with `/` or `\`, or a token with a dot and a file extension of 1 to 5 letters), and every token with a digit.
-29. The scrubber **MUST** collapse whitespace, remove quote marks and backticks, cut the line to at most 12 words, and remove trailing words from the list `at in on for to from with of into via and the a`, and trailing punctuation.
+29. The scrubber **MUST** collapse whitespace, remove quote marks and backticks, cut the line to at most 12 words, and remove trailing words from the list `at in on for to from with of into via and the a`, and trailing punctuation, and **MUST** then lowercase the first character of the line. The scrubber removes trailing words again after each token removal, until the last word is not in the list.
 30. A line with fewer than 2 words after the scrub **MUST** give status `skipped`.
 31. The scrubber **MUST** run on every line before storage, also on the day line, and the stored line **MUST** be the scrubbed line only.
 
@@ -316,7 +316,7 @@ Not applicable: this CR removes no behaviour.
 
 ```gherkin
 Given loupe serve runs with LOUPE_IDLE_SECS=60 and the fake upstream as LOUPE_SUMMARY_BASE_URL
-  And the fake upstream returns "Fixed the parser in src/main.rs at https://x.io for 3 users"
+  And the fake upstream returns "Fixed the parser in src/main.rs for https://x.io"
   And one call through the proxy made a segment that is now closed
 When the operator runs "loupe summarize --once"
 Then stdout shows "done: 1"
