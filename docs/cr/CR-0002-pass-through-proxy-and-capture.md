@@ -92,7 +92,7 @@ sequenceDiagram
 9. The forwarder **MUST** return the upstream status code and the upstream response headers unchanged, minus the hop-by-hop headers.
 10. The forwarder **MUST** use a connect timeout of 10 seconds (connect and TLS) and a timeout of 120 seconds from the end of the request send to the response headers. The configuration values `LOUPE_UPSTREAM_CONNECT_TIMEOUT_SECS` (default 10) and `LOUPE_UPSTREAM_HEADERS_TIMEOUT_SECS` (default 120) **MUST** override them. A slow first byte that arrives under the timeout **MUST** pass with no change. After the response headers arrive, the forwarder **MUST NOT** apply a timeout to the response body, because a model can stream for a long time. If the upstream cannot be reached (DNS, connect, TLS, or a timeout before the response headers), the proxy **MUST** return status 502 with a JSON error body that names the upstream and the cause, and it **MUST** store an exchange with the status `502` and an error field.
 11. The proxy **MUST** store one exchange for each forwarded request in a new table `exchanges`, added by a new migration. The row **MUST** hold: a unique id, the start time and the end time in UTC with millisecond resolution, the time to the first response byte, the agent label, the upstream name, the method, the path, the query, the response status, the request body size and the response body size in bytes as forwarded, the redacted request headers and response headers as JSON, the encrypted request body, the encrypted response body, the credential hash and the credential source of requirement 22, an outcome (`complete`, `client_aborted`, `upstream_aborted`, or `upstream_unreachable`), and a flag for each body that shows whether the capture truncated it.
-12. The capture **MUST** redact the value of each request header whose lowercase name is `authorization`, `proxy-authorization`, `x-api-key`, or `cookie`, or contains `key`, `token`, `secret`, or `session`. On the response side, the capture **MUST** redact the value of `set-cookie` and of each header whose lowercase name contains `key`, `secret`, or `session`, and **MUST NOT** apply the substring `token` to response headers. The rate-limit headers (each response header whose lowercase name starts with `anthropic-ratelimit-` or `x-ratelimit-`) **MUST** stay unredacted, because they hold counts and not credentials. The stored value **MUST** be the literal `redacted`. The header name **MUST** stay, because CR-0004 reads which credential type a request used.
+12. The capture **MUST** redact the value of each request header whose lowercase name is `authorization`, `proxy-authorization`, `x-api-key`, `cookie`, or `chatgpt-account-id`, or contains `key`, `token`, `secret`, or `session`. On the response side, the capture **MUST** redact the value of `set-cookie` and of each header whose lowercase name contains `key`, `secret`, or `session`, and **MUST NOT** apply the substring `token` to response headers. The rate-limit headers (each response header whose lowercase name starts with `anthropic-ratelimit-` or `x-ratelimit-`) **MUST** stay unredacted, because they hold counts and not credentials. The stored value **MUST** be the literal `redacted`. The header name **MUST** stay, because CR-0004 reads which credential type a request used.
 13. The capture **MUST** encrypt each body with AES-256-GCM under `LOUPE_DATA_KEY`, with a new random 96-bit nonce for each body. The additional authenticated data **MUST** be the exchange id plus the part name (`request` or `response`), so a body cannot be moved to another row without a decryption failure. The stored value **MUST** be one versioned blob: a version byte, the nonce, and the ciphertext with its tag.
 14. The source **MUST** have one decrypt function that a later CR uses to read a body. A test **MUST** prove that the decrypt of a stored body gives the bytes that the client and the upstream sent.
 15. Capture **MUST NOT** delay, block, change, or fail the forwarded stream. The tap **MUST** copy each chunk into a bounded buffer for each body. If a body is larger than the capture limit, the tap **MUST** stop the copy, set the truncated flag, and keep the size count. The capture limit **MUST** be the configuration value `LOUPE_CAPTURE_MAX_BYTES`, with the default 33554432 (32 MiB).
@@ -104,6 +104,7 @@ sequenceDiagram
 21. The Layer 2 document `docs/specification/proxy.md` **MUST** describe the routes, the allowlist, the forward rules, the capture record, the redaction rules, the encryption blob format, and the failure rules before the code is written.
 22. Before the capture redacts the request headers, it **MUST** compute the HMAC-SHA256 under `LOUPE_ACCOUNT_KEY` of the credential, as the README section "Accounts" states. The input **MUST** be the value after `Bearer ` of `authorization` if that header is present, else the value of `x-api-key`. The row **MUST** store the hash as lowercase hex in the column `credential_hash` and the header name in the column `credential_source` (`authorization` or `x-api-key`). If no credential header is present, both columns **MUST** be null. The raw credential **MUST NOT** be stored in any form other than this hash. CR-0004 reads these columns as the credential fallback for accounts and does not compute the hash again.
 23. `.taxonomy` **MUST** update the rows for exchange, upstream, and agent label so that their `Lives in` column names the new source files, and **MUST** add a row for the new noun capture limit.
+24. Each request header that the README section "Accounts" lists as an account ID source (now `chatgpt-account-id`) **MUST** be redacted in the stored request headers JSON. Before the redaction, the capture **MUST** compute the HMAC-SHA256 under `LOUPE_ACCOUNT_KEY` of that header value and store it as lowercase hex in the column `account_id_hash`, and the lowercase header name in the column `account_id_source`. If no such header is present, both columns **MUST** be null. CR-0004 **MUST** get a header account ID only from these columns, never from the stored headers. An account ID in the body, for example `metadata.user_id`, stays in the encrypted body, and CR-0004 reads it from there.
 
 ### Non-Functional Requirements
 
@@ -134,7 +135,7 @@ sequenceDiagram
 ### Out of Scope ("Here, But Not Further")
 
 * Proxy tokens, the `/<token>/` segment, `loupe token`, and `LOUPE_BOOTSTRAP_TOKEN` behaviour: CR-0003. The `exchanges` table has no token column in this CR; CR-0003 adds it.
-* The parser of model calls, the `calls` table, sessions, and the derivation of provider accounts from the stored `credential_hash` and from the account IDs in the bodies: CR-0004. This CR computes only the credential hash of requirement 22.
+* The parser of model calls, the `calls` table, sessions, and the derivation of provider accounts from the stored `credential_hash` and from the account IDs in the bodies: CR-0004. This CR computes only the credential hash of requirement 22 and the account ID header hash of requirement 24.
 * Cost: CR-0005.
 * Summaries and deletion of raw bodies after `LOUPE_RAW_RETENTION_HOURS`: CR-0006. Bodies stay until then.
 * Day records, publishing, `/v1/days`, and CORS: CR-0007. The `/v1/` prefix is only reserved here.
@@ -204,9 +205,10 @@ flowchart LR
 | `src/proxy/upstreams.rs` (unit) | `rejects_http_except_loopback` | Allowlist validation | `http://example.com`, `http://127.0.0.1:9` | error, accepted |
 | `src/proxy/upstreams.rs` (unit) | `invalid_file_is_actionable` | Error content | bad TOML | error names the file, the fix, and `loupe config show` |
 | `src/proxy/headers.rs` (unit) | `drops_hop_by_hop_and_accept_encoding` | Header rules | headers with `connection: x-foo`, `x-foo`, `accept-encoding`, `te` | all four removed, others unchanged |
-| `src/capture/redact.rs` (unit) | `redacts_credential_headers` | Redaction | `authorization`, `x-api-key`, `cookie`, `anthropic-session-id`, `x-goog-api-key` | value `redacted`, names kept |
+| `src/capture/redact.rs` (unit) | `redacts_credential_headers` | Redaction | `authorization`, `x-api-key`, `cookie`, `chatgpt-account-id`, `anthropic-session-id`, `x-goog-api-key` | value `redacted`, names kept |
 | `src/capture/redact.rs` (unit) | `keeps_rate_limit_response_headers` | Redaction exceptions | response `anthropic-ratelimit-tokens-remaining: 9000`, `x-ratelimit-remaining-tokens: 5`, `set-cookie: a=b` | the two rate-limit values kept, `set-cookie` value `redacted` |
 | `src/capture/credential.rs` (unit) | `hashes_bearer_then_api_key` | Credential hash | `authorization: Bearer abc`; only `x-api-key: xyz`; none | HMAC-SHA256 of `abc` with source `authorization`; of `xyz` with source `x-api-key`; both null |
+| `src/capture/credential.rs` (unit) | `hashes_account_id_header` | Account ID hash | `chatgpt-account-id: acct-1`; none | HMAC-SHA256 of `acct-1` with source `chatgpt-account-id`; both null |
 | `src/capture/writer.rs` (unit) | `full_queue_drops_and_counts` | Queue bound | `LOUPE_CAPTURE_QUEUE=2`, writer paused, 5 exchanges | 3 drops on the counter, one warning line with the count, each response unchanged |
 | `src/capture/seal.rs` (unit) | `seal_then_open_round_trips` | Encryption | random bytes, id, part | same bytes |
 | `src/capture/seal.rs` (unit) | `open_fails_on_wrong_id_or_part` | AAD binding | blob opened with another id or part | error |
@@ -290,9 +292,11 @@ Then the client gets the first chunk before 300 ms
 ### AC-5: Credentials are redacted and bodies are encrypted
 
 ```gherkin
-Given a request through the proxy carries "x-api-key: sk-test-123" and a body with the text "secret-prompt"
+Given a request through the proxy carries "x-api-key: sk-test-123", "chatgpt-account-id: acct-test-9", and a body with the text "secret-prompt"
 When the exchange is stored
-Then the stored request headers show "x-api-key" with the value "redacted"
+Then the stored request headers show "x-api-key" and "chatgpt-account-id" with the value "redacted"
+  And the row has "account_id_source" "chatgpt-account-id" and "account_id_hash" equal to the HMAC-SHA256 hex of "acct-test-9" under LOUPE_ACCOUNT_KEY
+  And "grep -c acct-test-9" over the database file and the log file returns 0
   And "grep -c sk-test-123" and "grep -c secret-prompt" over the database file and the log file return 0
   And the decrypt function returns the body with "secret-prompt"
 ```
@@ -334,6 +338,24 @@ Then the exit code is not 0 and the port is not bound
   And stderr names the file, the entry "evil", the fix, and "loupe config show"
 ```
 
+### AC-10: The latency target holds
+
+```gherkin
+Given the release build
+When the reader runs ".agents/scripts/proxy.latency.sh --requests 200"
+Then the output has the field "p95_added_ms" with a value of at most 20
+```
+
+### AC-11: The verdict passes and the identifier rules hold
+
+```gherkin
+Given the change is complete
+When the reader runs ".agents/scripts/pipeline.verdict.sh"
+Then every stage shows "status: passed"
+When the reader runs "grep -rnE 'CR-[0-9]{4}|AC-[0-9]+' src tests migrations config docs/specification"
+Then the output is empty
+```
+
 ### AC-12: The credential hash is stored and the raw value is not
 
 ```gherkin
@@ -369,24 +391,6 @@ When the slow route waits 1 second before its headers
 Then the client gets status 200
 When the slow route waits 3 seconds before its headers
 Then the client gets status 502 and the row has outcome "upstream_unreachable"
-```
-
-### AC-10: The latency target holds
-
-```gherkin
-Given the release build
-When the reader runs ".agents/scripts/proxy.latency.sh --requests 200"
-Then the output has the field "p95_added_ms" with a value of at most 20
-```
-
-### AC-11: The verdict passes and the identifier rules hold
-
-```gherkin
-Given the change is complete
-When the reader runs ".agents/scripts/pipeline.verdict.sh"
-Then every stage shows "status: passed"
-When the reader runs "grep -rnE 'CR-[0-9]{4}|AC-[0-9]+' src tests migrations config docs/specification"
-Then the output is empty
 ```
 
 ## Quality Standards Compliance
