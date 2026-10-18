@@ -123,6 +123,7 @@ stateDiagram-v2
 19. After a request passes the gate, `last_used_at` of its token **MUST** be updated. To keep the write load low, the update **MUST** happen at most one time per minute for each token, and **MUST NOT** delay or fail the forwarded request.
 20. A new migration **MUST** add the column `proxy_token_id` (integer, nullable, a reference to `proxy_tokens.id`) to `exchanges`. The capture **MUST** store the ID of the token that passed the gate, and null for a request accepted in the no-token mode of requirement 15. CR-0004 reads this column; this CR adds no other column.
 21. The log line of an exchange **MUST** add the token name, or `none`, and **MUST NOT** add the raw token or the hash.
+21a. Every log line **MUST** use the request path without the leading `/<token>/` segment. This includes the path in the exchange log line of CR-0002 requirement 19, any access log, and any trace or span event of `tower`, `tower-http`, or `hyper`. The binary **MUST** remove the token segment from the request path before any log or trace layer records it, or **MUST** turn off the path field in that layer. The path that the capture stores in `exchanges.path` **MUST** also exclude the token segment. A line or a row that holds `lpt_` is a defect.
 22. The public API and the dashboard **MUST NOT** show a token name, a tag, a token ID, or a hash. No route under `/v1/` **MUST** read `proxy_tokens`.
 23. `.taxonomy` **MUST** update the row for proxy token so that its `Lives in` column names the new source files, and **MUST** add rows for the new nouns bootstrap token and token gate.
 24. `.env.example` **MUST** keep `LOUPE_BOOTSTRAP_TOKEN` with no value and a comment that names `loupe token generate`.
@@ -241,6 +242,7 @@ flowchart LR
 | `tests/token.proxy.rs` (integration) | `refused_request_is_401_without_exchange` | Gate | missing, unknown, revoked token | 401 JSON with the code, no echo of the token, no row |
 | `tests/token.proxy.rs` (integration) | `revoke_applies_without_restart` | Live state | `serve` runs, `loupe token revoke` from a second process | next request after 5 seconds is 401 |
 | `tests/token.proxy.rs` (integration) | `no_token_mode_warns_and_forwards` | Open mode | no token | warning line at start, 200, `proxy_token_id` null |
+| `tests/token.secrets.rs` (integration) | `token_segment_absent_from_logs_and_path` | Path redaction | `RUST_LOG=trace`, active token, one request on `/<token>/claude-code/anthropic/v1/messages` | no `lpt_` in `<LOUPE_DATA_DIR>/logs/loupe.log`, on stderr, or in `exchanges.path`; `exchanges.path` is `/v1/messages` |
 | `tests/token.secrets.rs` (integration) | `raw_token_absent_from_disk` | Leak | create, use, bootstrap | no raw token in the data dir or stderr |
 | `tests/api.privacy.rs` (integration) | `public_routes_have_no_token_data` | Privacy | tokens with tags, `GET /v1/...` routes that exist | no name, tag, or hash in a body |
 
@@ -368,6 +370,8 @@ Then no body holds a token name, a tag key, a tag value, or a token hash
 Given the reader made T with "loupe token create" and sent 10 requests with it
 When the reader runs "grep -rc T <data dir>"
 Then every count is 0
+And "grep -c lpt_ <data dir>/logs/loupe.log" prints 0
+And "sqlite3 <data dir>/loupe.db \"select count(*) from exchanges where path like '%lpt_%'\"" prints 0
 ```
 
 ### AC-12: The latency target and the verdict pass
