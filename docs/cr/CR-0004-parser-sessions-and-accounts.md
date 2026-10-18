@@ -121,7 +121,7 @@ stateDiagram-v2
    - OpenAI Responses: path ends with `/responses`, JSON or SSE. The usage **MUST** come from the `response.completed` event or the top-level `usage`.
    - OpenAI Chat Completions: path ends with `/chat/completions`, JSON or SSE. The usage **MUST** come from the `usage` object of the body or of the last chunk that has one.
 8. An exchange with no usage block (for example `count_tokens`, a model list, an error, a truncated body) **MUST NOT** make a call. The worker **MUST** advance the cursor past it and **MUST** record the reason in a column `exchanges.parse_outcome` (`call`, `no_usage`, `truncated`, `decrypt_failed`, `unknown_format`).
-9. Each call row **MUST** hold: id, exchange id, call index, the time of the exchange start, agent label, upstream name, proxy token ID, session id, account id, model, service tier, response status, and the token counts of requirement 10.
+9. Each call row **MUST** hold these columns: `id`, `exchange_id`, `call_index`, `started_at` (the time of the exchange start), `agent_label`, `upstream`, `proxy_token_id`, `session_id`, `account_id`, `model`, `service_tier`, `status` (the response status), and the token counts of requirement 10.
 10. The token counts **MUST** be separate integer columns: `input` (not cached), `cache_read`, `cache_write_5m`, `cache_write_1h`, and `output`. For Anthropic, `cache_write_5m` and `cache_write_1h` **MUST** come from `usage.cache_creation.ephemeral_5m_input_tokens` and `ephemeral_1h_input_tokens`. If only `cache_creation_input_tokens` is present, the whole value **MUST** go to `cache_write_5m`. For OpenAI, `cache_read` **MUST** be the cached tokens of the input details, `input` **MUST** be the input total minus `cache_read`, and both cache write columns **MUST** be 0.
 11. The model **MUST** be the `model` field of the response. If it is absent, the model **MUST** be the `model` field of the request. The service tier **MUST** be `usage.service_tier` or the top-level `service_tier`, else null.
 12. A decrypt failure **MUST** log one actionable error line with the exchange id, the fix (check `LOUPE_DATA_KEY` against the key of the stored rows), and the check (`loupe config show`), and **MUST NOT** stop the worker.
@@ -131,10 +131,10 @@ stateDiagram-v2
 13. The session key **MUST** be the first present source, in this order: (a) `session_hint_hash` with source `header`; (b) the session ID in `metadata.user_id` of the request body, with source `metadata`; (c) `prompt_cache_key` of the request body, with source `cache_key`; (d) the SHA-256 of the system prompt or `instructions` plus the first message of the request, with source `opening`.
 14. The worker **MUST** store the key as an HMAC-SHA256 under `LOUPE_ACCOUNT_KEY` of the value of the source. The raw session ID, cache key, or prompt **MUST NOT** be stored outside the encrypted bodies.
 15. The scope of a session **MUST** be (agent label, proxy token ID, key). Two calls with the same key but a different agent label or a different proxy token ID **MUST** be in different sessions. A session **MUST NOT** hold calls of two proxy tokens.
-16. Each `sessions` row **MUST** be one segment and **MUST** hold: id, agent label, proxy token ID, key hash, key source, segment number (1 for the first), start time, time of the last call, closed time (null while open), state (`open` or `closed`), call count, and the account id of the first call.
+16. Each `sessions` row **MUST** be one segment and **MUST** hold these columns: `id`, `agent_label`, `proxy_token_id`, `key_hash`, `key_source`, `segment` (1 for the first), `started_at`, `last_call_at`, `closed_at` (null while open), `state` (`open` or `closed`), `call_count`, and `account_id` (the account of the first call).
 17. A call **MUST** join the open segment of its scope. If no segment is open, the worker **MUST** start a new segment with the next segment number for that scope. A resumed conversation after a close **MUST** therefore start a new segment, and never reopen a closed one.
-18. An idle step **MUST** run with the parser worker and **MUST** close each open segment whose last call is older than `LOUPE_IDLE_SECS`. The idle time **MUST** be read from configuration, so a short value (for example `60`) closes sessions quickly for a test.
-19. The idle step **MUST** compare against the time of the last call, not the time of the parse, so a backlog that the worker parses late gives the same segments as a live parse.
+18. Close on a gap: when the parser appends a call to its scope and the gap from `last_call_at` of the open segment to the `started_at` of the call is more than `LOUPE_IDLE_SECS`, the parser **MUST** close that segment with `closed_at = last_call_at + LOUPE_IDLE_SECS` and **MUST** start a new segment for the call. The idle time **MUST** be read from configuration, so a short value (for example `60`) closes sessions quickly for a test.
+19. Close on idle: an idle step **MUST** run with the parser worker. It **MUST** close an open segment only when `last_call_at + LOUPE_IDLE_SECS` is before the parse watermark, and **MUST** set `closed_at = last_call_at + LOUPE_IDLE_SECS`. The parse watermark is the `started_at` of the oldest unparsed exchange, or the current time when no backlog exists. Thus a backlog that the worker parses late gives the same segments as a live parse.
 20. The close of a segment **MUST** be the only event that a later CR (CR-0006 summaries) reads to start its work. This CR **MUST** add a column `sessions.closed_at` and an index on (state, closed_at), and **MUST NOT** add the summary step.
 
 **Provider accounts**
@@ -143,7 +143,7 @@ stateDiagram-v2
 22. The worker **MUST NOT** compute a credential hash again. It **MUST** use only the columns that the capture wrote (CR-0002 requirements 22 and 24).
 23. A new table `accounts` **MUST** hold one row per (hash, source): id, hash, source, first seen, last seen. Each call **MUST** store the account id. A call with no source **MUST** store a null account id.
 24. The proxy token ID and the account id **MUST** be independent columns on `calls`, so an analysis can group by token, by account, or both.
-25. No route under `/v1/` **MUST** read `accounts`, a key hash, or a proxy token ID.
+25. A route under `/v1/` **MUST NOT** read `accounts`, a key hash, or a proxy token ID.
 
 **Commands and configuration**
 
@@ -164,7 +164,7 @@ stateDiagram-v2
 
 1. The parse of 1000 stored exchanges (mixed JSON and SSE) **MUST** finish in at most 10 seconds in the container on this machine, measured with `.agents/scripts/parser.bench.sh`.
 2. The parser **MUST NOT** hold more than one decrypted body pair in memory per exchange in the batch, and **MUST** drop the plain bytes after the parse.
-3. No log line of the parser **MUST** hold a body, a header value, a session ID, an account ID, or a hash. A log line **MUST** hold only the exchange id, the format, the parse outcome, and the counts.
+3. A log line of the parser **MUST NOT** hold a body, a header value, a session ID, an account ID, or a hash. A log line **MUST** hold only the exchange id, the format, the parse outcome, and the counts.
 4. The parser **MUST NOT** change the time to first byte of the proxy. The proxy latency target of CR-0002 **MUST** still pass.
 5. Source files **MUST** follow the small-file rule with hierarchical names, for example `src/parse/worker.rs`, `src/parse/format.rs`, `src/parse/anthropic.json.rs`, `src/parse/anthropic.sse.rs`, `src/parse/openai.responses.rs`, `src/parse/openai.chat.rs`, `src/session/key.rs`, `src/session/segment.rs`, `src/session/idle.rs`, `src/account/source.rs`, `src/account/store.rs`, `src/capture/session_hint.rs`, `src/cli/parse.rs`. Each file **MUST** carry one `@agents-index` line.
 6. Governance identifiers **MUST NOT** appear in code, test names, or `docs/specification/`.
@@ -271,6 +271,7 @@ flowchart LR
 | `src/session/segment.rs` (unit) | `resume_after_close_starts_new_segment` | Segments | key, close, same key | segment 2, segment 1 stays closed |
 | `src/session/segment.rs` (unit) | `same_key_other_token_is_other_session` | Token scope | same key, two token IDs | two sessions |
 | `src/session/idle.rs` (unit) | `idle_uses_last_call_time` | Backlog | calls 2 hours old, parse now | segment closed at last call plus idle |
+| `src/session/idle.rs` (unit) | `backlog_gap_within_idle_keeps_one_segment` | Watermark | two calls 30 s apart, idle 60 s, the second unparsed, now 2 hours later | the idle step does not close; after the parse, one segment with 2 calls |
 | `src/account/source.rs` (unit) | `account_source_order` | Account order | header hash, metadata uuid, credential | sources in README order |
 | `src/capture/session_hint.rs` (unit) | `hashes_first_session_header` | Session hint | two session headers; none | hash of the first; null |
 | `tests/parse.worker.rs` | `restart_does_not_lose_or_repeat_calls` | Cursor transaction | kill the worker mid batch, restart | each call once |
@@ -334,9 +335,15 @@ When the idle step runs
 Then the session state is closed and closed_at is set
 When a new call with the same key arrives
 Then a new sessions row exists with segment number 2
+
+Given LOUPE_IDLE_SECS is 60
+  And two stored exchanges with the same key start 30 seconds apart, two hours ago
+  And only the first exchange is parsed
+When the idle step runs and then "loupe parse --once" runs
+Then "select segment, call_count from sessions" shows one row with segment 1 and call_count 2
 ```
 
-### AC-5: Parse is idempotent and survives a restart
+### AC-5: Parse is idempotent
 
 ```gherkin
 Given 50 stored exchanges
@@ -360,7 +367,7 @@ Then the accounts rows have sources "header:chatgpt-account-id", "metadata.user_
 Given the container runs with one proxy token and LOUPE_IDLE_SECS 60
 When the operator runs "claude -p" and "pi -p" with model claude-haiku-5-5 through the proxy
   And runs "loupe parse --once"
-Then "select agent, count(*) from calls group by agent" shows claude-code and pi with 1 or more rows each
+Then "select agent_label, count(*) from calls group by agent_label" shows claude-code and pi with 1 or more rows each
   And docs/specification/parser.md records the verified session and account sources per agent version
   And the report to the human contains a proposed text for the README section "Accounts"
 ```
@@ -453,6 +460,7 @@ Chosen approach: "a separate parser worker with a transactional cursor, HMAC ses
 1. **Session hint header list.** The initial list comes from the prototype and is not verified. Provisional default: the list of requirement 1, corrected by the verification of requirement 30.
 2. **The shape of `metadata.user_id` in Claude Code 2.1.302.** It can hold an account UUID and a session ID. Provisional default: parse it as JSON first, then as the `user_<hash>_account_<uuid>_session_<uuid>` string, and record the verified shape.
 3. **README change.** The README "Accounts" section must change after the verification. Provisional default: this CR proposes the text to the human and does not edit README.md.
+4. **Pi credential for the verification.** The human can hold the Anthropic credential only in `~/.pi/agent/auth.json`, and the isolated agent dir has no `auth.json`. Provisional default: if neither `ANTHROPIC_API_KEY` nor `ANTHROPIC_OAUTH_TOKEN` is exported, the implementer asks the human through the structured question tool to export one (for example a token from `claude setup-token`). The implementer **MUST NOT** read or copy `auth.json`.
 
 ## Related Items
 
