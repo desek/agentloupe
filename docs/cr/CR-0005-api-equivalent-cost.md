@@ -34,7 +34,7 @@ The README section "Cost" states that Agentloupe shows what each call costs at t
 * `.agents/scripts/prices.vendor.sh` refreshes the four files from one pinned commit and validates them with `check-jsonschema==0.33.0 --regex-variant python` before it writes.
 * The binary does not read the price file. `calls` has no cost column (CR-0004, out of scope list).
 * `calls` already holds `model`, `upstream`, `service_tier`, `input`, `cache_read`, `cache_write_5m`, `cache_write_1h`, and `output` (CR-0004 requirements 9 and 10).
-* `upstreams.toml` maps each upstream name to a base URL (CR-0002). It does not name a LiteLLM provider.
+* `upstreams.toml` maps each upstream name to a base URL string (CR-0002 requirement 4). It does not name a LiteLLM provider.
 
 ### Current State Diagram
 
@@ -48,7 +48,7 @@ flowchart LR
 
 1. Embed the price file and the commit from `SOURCE.md` in the binary at compile time.
 2. Load the embedded file one time at start into an index by model name and provider.
-3. Add a field `litellm_provider` to each upstream in `upstreams.toml`, so the parser can match an entry to the upstream of the call.
+3. Change each entry of `upstreams.toml` from a string to a table with `base_url` and `litellm_provider`, so the parser can match a price entry to the upstream of the call. This changes CR-0002 requirements 4 and 5 (see requirement 5).
 4. Add a pricing function that applies the six rules to one call and returns either a cost or the reason why the call has no price.
 5. Call the pricing function in the parser worker, in the same transaction that writes the call row.
 6. Add the columns `cost_usd`, `price_commit`, and `unpriced_reason` to `calls`.
@@ -90,7 +90,7 @@ flowchart TD
 2. The build **MUST** embed the value of the `Commit` row of `vendor/litellm/SOURCE.md` as the price commit. The build **MUST** fail with an actionable error if `SOURCE.md` has no `Commit` row of 40 lowercase hex characters. The error **MUST** name `.agents/scripts/prices.vendor.sh` as the fix.
 3. The build **MUST** be rerun when a file in `vendor/litellm/` changes (a `cargo:rerun-if-changed` line for each file).
 4. At start, `loupe serve` **MUST** parse the embedded file one time into a price index keyed by model name and `litellm_provider`. The key `sample_spec` **MUST** be skipped.
-5. Each entry of `upstreams.toml` **MUST** have a field `litellm_provider`. The shipped file **MUST** set `anthropic` for the upstream `anthropic` and `openai` for each OpenAI upstream. A missing field **MUST** stop the start with an actionable error that names the upstream and the field.
+5. **Change of the `upstreams.toml` format.** CR-0002 requirement 4 makes each entry a string (`anthropic = "https://api.anthropic.com"`). A string cannot carry a second field, so this CR **MUST** change each entry to a table with two keys: `base_url` and `litellm_provider`, for example `[anthropic]` with `base_url = "https://api.anthropic.com"` and `litellm_provider = "anthropic"`. An inline table (`anthropic = { base_url = "...", litellm_provider = "anthropic" }`) is the same TOML value and **MUST** also load. This replaces the entry shape of CR-0002 requirement 4; the names and the URLs of that requirement do not change. The shipped file **MUST** set `litellm_provider = "anthropic"` for `anthropic`, and `litellm_provider = "openai"` for `openai` and for `chatgpt`. The loader of CR-0002 requirement 5 **MUST** also reject, before the port opens, an entry that is a string (the old shape), an entry with no `base_url` or no `litellm_provider`, an entry with an unknown key, and a `litellm_provider` that is not a non-empty string. Each rejection **MUST** be an actionable error that names the file, the upstream, the key, the expected shape, and the check (`loupe config show`). The `https` rule and the localhost exception of CR-0002 requirement 5 **MUST** apply to `base_url` unchanged. The same change **MUST** be made in the test fixtures that write an `upstreams.toml` for the fake upstream.
 6. **Find the entry.** The pricing function **MUST** look up the model name of the call with the `litellm_provider` of its upstream. If no entry matches, it **MUST** remove one trailing `-YYYYMMDD` (a hyphen and eight digits) from the name and look up again. It **MUST NOT** match an entry of a different provider, and it **MUST NOT** match by prefix or by similarity.
 7. **Add the token costs.** The cost **MUST** be the sum of: `input` × `input_cost_per_token`; `cache_read` × `cache_read_input_token_cost`; `cache_write_5m` × `cache_creation_input_token_cost`; `cache_write_1h` × `cache_creation_input_token_cost_above_1hr`; `output` × `output_cost_per_token`. The `output` column already includes the reasoning tokens (CR-0004), so the function **MUST NOT** add them a second time.
 8. **Apply the prompt-size tier.** The prompt size **MUST** be `input + cache_read + cache_write_5m + cache_write_1h`. For each field with the suffix `_above_<N>k_tokens`, the threshold **MUST** be N × 1000 tokens. For each token term, the function **MUST** select the field of the highest threshold that the prompt size is above, and use it in place of the base field. If the prompt size is above no threshold of that term, the term **MUST** use its base price. A term with no tier field **MUST** keep its base price.
@@ -131,7 +131,7 @@ flowchart TD
 ## Affected Components
 
 * New: `build.rs`, `src/price/`, `src/cli/price.rs`, a migration for the three `calls` columns, `docs/specification/cost.md`, `tests/price.*.rs`, fixtures under `tests/fixtures/price/`, `.agents/scripts/cost.bench.sh`, `.agents/scenarios/cost.call.md`.
-* Changed: the parser worker (one call to the pricing function), `upstreams.toml` and its loader (`litellm_provider`), `loupe config show`, `Cargo.toml` (`rust_decimal`, `serde_json`, dev-dependency `jsonschema`), `.taxonomy`, `docs/specification/parser.md`, `docs/specification/operations.md`.
+* Changed: the parser worker (one call to the pricing function), `upstreams.toml` and its loader (entry shape changes from a string to a table with `base_url` and `litellm_provider`), `docs/specification/proxy.md` (the entry shape), the test fixtures that write `upstreams.toml`, `loupe config show`, `Cargo.toml` (`rust_decimal`, `serde_json`, dev-dependency `jsonschema`), `.taxonomy`, `docs/specification/parser.md`, `docs/specification/operations.md`.
 * Not changed: `vendor/litellm/`, `.agents/scripts/prices.vendor.sh`, `README.md`.
 
 ## Scope Boundaries
@@ -184,7 +184,7 @@ No cost. All work runs locally. The figure is an estimate at list price, not a b
 2. Add `build.rs` for the price commit and the rerun lines. Add `src/price/embed.rs`.
 3. Add the schema validation test and the schema field-name test. Confirm the regex engine at tier 1.
 4. Add the index, the lookup, the tiers, and the compute function with unit tests from hand-computed fixtures.
-5. Add `litellm_provider` to `upstreams.toml` and its loader.
+5. Change the entries of `upstreams.toml` to tables with `base_url` and `litellm_provider`, update the loader, its tests, and the test fixtures, and update `docs/specification/proxy.md`.
 6. Add the migration and the call from the parser worker.
 7. Add `loupe price backfill`, `loupe price show`, and the `config show` lines.
 8. Add `cost.bench.sh`, write the scenario, run it, and run the verdict.
@@ -228,12 +228,17 @@ flowchart LR
 | `tests/price.worker.rs` | `backfill_twice_prices_nothing_new` | Idempotence | rows with null commit, run twice | `calls_priced: 0` on the second run |
 | `tests/price.worker.rs` | `backfill_dry_run_writes_nothing` | Dry run | rows with null commit | counts printed, rows unchanged |
 | `tests/upstreams.rs` | `missing_litellm_provider_is_actionable` | Config error | entry with no field | error names upstream and field |
+| `tests/upstreams.rs` | `string_entry_is_actionable` | Config error | entry in the old string shape | error names upstream and the table shape |
+| `tests/upstreams.rs` | `inline_table_entry_loads` | Format | inline table entry | loads with both keys |
+| `tests/upstreams.rs` | `unknown_key_is_actionable` | Config error | entry with an extra key | error names upstream and key |
 
 ### Tests to Modify
 
 | Test File | Test Name | Current Behavior | New Behavior | Reason for Change |
 |-----------|-----------|------------------|--------------|-------------------|
 | `tests/parse.end_to_end.rs` | `proxied_sse_call_becomes_call_row` | checks tokens, token ID, session, account | also checks `price_commit` is set | the worker prices each call |
+| `tests/upstreams.rs` | the CR-0002 loader tests (valid file, invalid TOML, bad name, non-`https` URL, localhost exception) | entries are strings | entries are tables with `base_url` and `litellm_provider` | the entry shape changes (requirement 5) |
+| test fixtures and helpers that write `upstreams.toml` for the fake upstream (CR-0002 proxy, capture, and parse tests) | write `name = "http://127.0.0.1:<port>"` | write a table with `base_url` and `litellm_provider` | the old shape now fails the start |
 | `src/config/show.rs` (unit) | the CR-0001 masking test | checks masked secrets | also checks `price_commit` and the entry count lines | new output |
 
 ### Tests to Remove
@@ -338,6 +343,7 @@ Then every stage prints "status: passed" and the exit code is 0
 ### Documentation
 
 - [ ] `docs/specification/cost.md` lands before the code
+- [ ] `docs/specification/proxy.md` shows the new entry shape of `upstreams.toml` before the code
 - [ ] `@agents-index` on every new file
 - [ ] `.taxonomy` updated in the same change
 
@@ -383,7 +389,7 @@ loupe config show | grep price_commit
 ## Dependencies
 
 * CR-0001: crate, configuration loader, migrations, logging, verdict pipeline.
-* CR-0002: `upstreams.toml` and its loader.
+* CR-0002: `upstreams.toml` and its loader. This CR changes the entry shape of CR-0002 requirement 4 and extends the validation of requirement 5.
 * CR-0004: the `calls` table, its token columns, `service_tier`, the parser worker, and `loupe parse --once`.
 * The vendored files in `vendor/litellm/` at the commit in `SOURCE.md`.
 
@@ -397,7 +403,7 @@ Chosen approach: "embed the vendored file, match by model and the provider in `u
 
 ## Open Questions
 
-1. **Provider for the `chatgpt.com` upstream.** The README lists `chatgpt.com` as an OpenAI upstream that a subscription uses. Provisional default: `litellm_provider = "openai"`, so the call gets the API-equivalent cost of the OpenAI API.
+1. **Provider for the upstream `chatgpt` (https://chatgpt.com).** The README lists it as an OpenAI upstream that a subscription uses. Provisional default: `litellm_provider = "openai"`, so the call gets the API-equivalent cost of the OpenAI API.
 2. **Unit and precision of `cost_usd`.** Provisional default: US dollars as decimal text with at most 12 fraction digits (requirement 12).
 
 ## Related Items
