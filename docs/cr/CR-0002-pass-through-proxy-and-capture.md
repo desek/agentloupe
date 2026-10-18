@@ -90,32 +90,33 @@ sequenceDiagram
 7. The forwarder **MUST** send the request to `<base URL><rest of the path>?<query>` with the same method, the same path bytes, the same query bytes, the same headers, and the same body bytes. The only header changes **MUST** be: remove `accept-encoding`, remove the hop-by-hop headers (`connection`, `keep-alive`, `proxy-connection`, `te`, `trailer`, `transfer-encoding`, `upgrade`, and each header that `connection` names), and set `host` to the host of the base URL.
 8. The forwarder **MUST** stream the request body to the upstream and the response body to the client chunk by chunk, with no buffer of the full body. Server-sent events (`text/event-stream`) **MUST** reach the client as each chunk arrives.
 9. The forwarder **MUST** return the upstream status code and the upstream response headers unchanged, minus the hop-by-hop headers.
-10. If the upstream cannot be reached (DNS, connect, TLS, or timeout before the response headers), the proxy **MUST** return status 502 with a JSON error body that names the upstream and the cause, and it **MUST** store an exchange with the status `502` and an error field.
-11. The proxy **MUST** store one exchange for each forwarded request in a new table `exchanges`, added by a new migration. The row **MUST** hold: a unique id, the start time and the end time in UTC with millisecond resolution, the time to the first response byte, the agent label, the upstream name, the method, the path, the query, the response status, the request body size and the response body size in bytes as forwarded, the redacted request headers and response headers as JSON, the encrypted request body, the encrypted response body, an outcome (`complete`, `client_aborted`, `upstream_aborted`, or `upstream_unreachable`), and a flag for each body that shows whether the capture truncated it.
-12. The capture **MUST** redact the value of each header whose lowercase name is `authorization`, `proxy-authorization`, `x-api-key`, `cookie`, `set-cookie`, or contains `key`, `token`, `secret`, or `session`. The stored value **MUST** be the literal `redacted`. The header name **MUST** stay, because CR-0004 reads which credential type a request used.
+10. The forwarder **MUST** use a connect timeout of 10 seconds (connect and TLS) and a timeout of 120 seconds from the end of the request send to the response headers. The configuration values `LOUPE_UPSTREAM_CONNECT_TIMEOUT_SECS` (default 10) and `LOUPE_UPSTREAM_HEADERS_TIMEOUT_SECS` (default 120) **MUST** override them. A slow first byte that arrives under the timeout **MUST** pass with no change. After the response headers arrive, the forwarder **MUST NOT** apply a timeout to the response body, because a model can stream for a long time. If the upstream cannot be reached (DNS, connect, TLS, or a timeout before the response headers), the proxy **MUST** return status 502 with a JSON error body that names the upstream and the cause, and it **MUST** store an exchange with the status `502` and an error field.
+11. The proxy **MUST** store one exchange for each forwarded request in a new table `exchanges`, added by a new migration. The row **MUST** hold: a unique id, the start time and the end time in UTC with millisecond resolution, the time to the first response byte, the agent label, the upstream name, the method, the path, the query, the response status, the request body size and the response body size in bytes as forwarded, the redacted request headers and response headers as JSON, the encrypted request body, the encrypted response body, the credential hash and the credential source of requirement 22, an outcome (`complete`, `client_aborted`, `upstream_aborted`, or `upstream_unreachable`), and a flag for each body that shows whether the capture truncated it.
+12. The capture **MUST** redact the value of each request header whose lowercase name is `authorization`, `proxy-authorization`, `x-api-key`, or `cookie`, or contains `key`, `token`, `secret`, or `session`. On the response side, the capture **MUST** redact the value of `set-cookie` and of each header whose lowercase name contains `key`, `secret`, or `session`, and **MUST NOT** apply the substring `token` to response headers. The rate-limit headers (each response header whose lowercase name starts with `anthropic-ratelimit-` or `x-ratelimit-`) **MUST** stay unredacted, because they hold counts and not credentials. The stored value **MUST** be the literal `redacted`. The header name **MUST** stay, because CR-0004 reads which credential type a request used.
 13. The capture **MUST** encrypt each body with AES-256-GCM under `LOUPE_DATA_KEY`, with a new random 96-bit nonce for each body. The additional authenticated data **MUST** be the exchange id plus the part name (`request` or `response`), so a body cannot be moved to another row without a decryption failure. The stored value **MUST** be one versioned blob: a version byte, the nonce, and the ciphertext with its tag.
 14. The source **MUST** have one decrypt function that a later CR uses to read a body. A test **MUST** prove that the decrypt of a stored body gives the bytes that the client and the upstream sent.
 15. Capture **MUST NOT** delay, block, change, or fail the forwarded stream. The tap **MUST** copy each chunk into a bounded buffer for each body. If a body is larger than the capture limit, the tap **MUST** stop the copy, set the truncated flag, and keep the size count. The capture limit **MUST** be the configuration value `LOUPE_CAPTURE_MAX_BYTES`, with the default 33554432 (32 MiB).
-16. The hand-off from the forwarder to the capture writer **MUST** use a bounded queue that never waits. If the queue is full, the proxy **MUST** drop the exchange record, log one warning line with the count of dropped records, and increment a counter. The forwarded response **MUST** stay unchanged.
+16. The hand-off from the forwarder to the capture writer **MUST** use a bounded queue that never waits. The queue size **MUST** be the configuration value `LOUPE_CAPTURE_QUEUE`, with the default 256 exchange records, and `loupe config show` **MUST** print it with its source. If the queue is full, the proxy **MUST** drop the exchange record, log one warning line with the count of dropped records, and increment a counter. The forwarded response **MUST** stay unchanged.
 17. A failure of the capture writer (encryption, database, disk) **MUST** log an actionable error and **MUST NOT** stop `loupe serve` or change any later forwarded request.
 18. If the client closes the connection during a streamed response, the proxy **MUST** close the upstream request and store the exchange with the bytes that it received and the outcome `client_aborted`. If the upstream closes during the response, the proxy **MUST** end the client stream and store the outcome `upstream_aborted`.
 19. The proxy **MUST NOT** write a header value, a body, or a part of a body to a log line. A log line for an exchange **MUST** hold only the exchange id, the agent label, the upstream name, the method, the path, the status, the sizes, the timing, and the outcome.
 20. The repository **MUST** contain a fake upstream for the tests, written in Rust inside the test tree, that serves a JSON response, an SSE stream of chunks with a set delay, a stream that it closes in the middle, a slow response, and an echo of the request method, path, query, headers, and body.
 21. The Layer 2 document `docs/specification/proxy.md` **MUST** describe the routes, the allowlist, the forward rules, the capture record, the redaction rules, the encryption blob format, and the failure rules before the code is written.
-22. `.taxonomy` **MUST** update the rows for exchange, upstream, and agent label so that their `Lives in` column names the new source files, and **MUST** add a row for the new noun capture limit.
+22. Before the capture redacts the request headers, it **MUST** compute the HMAC-SHA256 under `LOUPE_ACCOUNT_KEY` of the credential, as the README section "Accounts" states. The input **MUST** be the value after `Bearer ` of `authorization` if that header is present, else the value of `x-api-key`. The row **MUST** store the hash as lowercase hex in the column `credential_hash` and the header name in the column `credential_source` (`authorization` or `x-api-key`). If no credential header is present, both columns **MUST** be null. The raw credential **MUST NOT** be stored in any form other than this hash. CR-0004 reads these columns as the credential fallback for accounts and does not compute the hash again.
+23. `.taxonomy` **MUST** update the rows for exchange, upstream, and agent label so that their `Lives in` column names the new source files, and **MUST** add a row for the new noun capture limit.
 
 ### Non-Functional Requirements
 
 1. The added time to the first byte of a streamed response through the proxy **MUST** be at most 20 milliseconds at the 95th percentile against the local fake upstream, measured by the command in "Measurable Targets".
-2. The memory that capture uses **MUST** be bounded by the capture limit times the number of concurrent exchanges plus the queue size. No code path **MUST** hold a full body in memory outside the capture buffer.
-3. No secret (`LOUPE_DATA_KEY`, a credential header value) **MUST** appear in the database file outside the encrypted blobs, in a log file, or on stderr.
+2. The memory that capture uses **MUST** be bounded by the capture limit times the number of concurrent exchanges plus the queue size. A code path **MUST NOT** hold a full body in memory outside the capture buffer.
+3. A secret (`LOUPE_DATA_KEY`, `LOUPE_ACCOUNT_KEY`, a credential header value) **MUST NOT** appear in the database file outside the encrypted blobs, in a log file, or on stderr.
 4. The source files **MUST** follow the small-file rule with hierarchical names, for example `src/proxy/route.rs`, `src/proxy/upstreams.rs`, `src/proxy/forward.rs`, `src/proxy/headers.rs`, `src/capture/tap.rs`, `src/capture/redact.rs`, `src/capture/seal.rs`, `src/capture/writer.rs`, `src/serve/router.rs`.
-5. Each new file **MUST** carry one `@agents-index` line. No governance identifier **MUST** appear in source, comments, test names, or `docs/specification/`.
+5. Each new file **MUST** carry one `@agents-index` line. A governance identifier **MUST NOT** appear in source, comments, test names, or `docs/specification/`.
 
 ## Affected Components
 
 * New: `upstreams.toml`, `src/proxy/`, `src/capture/`, `src/serve/router.rs`, one migration in `migrations/` for `exchanges`, `tests/` files and the fake upstream, `docs/specification/proxy.md`, `.agents/scenarios/proxy.*.md`, `.agents/scripts/proxy.latency.sh`.
-* Changed: `src/serve/` (mount the router), the configuration loader (`LOUPE_UPSTREAMS_FILE`, `LOUPE_CAPTURE_MAX_BYTES`), `Dockerfile` (copy `upstreams.toml`), `.env.example` (no new secret, only comments), `.taxonomy`.
+* Changed: `src/serve/` (mount the router), the configuration loader (`LOUPE_UPSTREAMS_FILE`, `LOUPE_CAPTURE_MAX_BYTES`, `LOUPE_CAPTURE_QUEUE`, `LOUPE_UPSTREAM_CONNECT_TIMEOUT_SECS`, `LOUPE_UPSTREAM_HEADERS_TIMEOUT_SECS`), `Dockerfile` (copy `upstreams.toml`), `.env.example` (no new secret, only comments), `.taxonomy`.
 * Not changed: `README.md`, `vendor/litellm/`, `compose.yaml` port binding.
 
 ## Scope Boundaries
@@ -133,7 +134,7 @@ sequenceDiagram
 ### Out of Scope ("Here, But Not Further")
 
 * Proxy tokens, the `/<token>/` segment, `loupe token`, and `LOUPE_BOOTSTRAP_TOKEN` behaviour: CR-0003. The `exchanges` table has no token column in this CR; CR-0003 adds it.
-* The parser of model calls, the `calls` table, sessions, and provider account hashes: CR-0004.
+* The parser of model calls, the `calls` table, sessions, and the derivation of provider accounts from the stored `credential_hash` and from the account IDs in the bodies: CR-0004. This CR computes only the credential hash of requirement 22.
 * Cost: CR-0005.
 * Summaries and deletion of raw bodies after `LOUPE_RAW_RETENTION_HOURS`: CR-0006. Bodies stay until then.
 * Day records, publishing, `/v1/days`, and CORS: CR-0007. The `/v1/` prefix is only reserved here.
@@ -204,11 +205,19 @@ flowchart LR
 | `src/proxy/upstreams.rs` (unit) | `invalid_file_is_actionable` | Error content | bad TOML | error names the file, the fix, and `loupe config show` |
 | `src/proxy/headers.rs` (unit) | `drops_hop_by_hop_and_accept_encoding` | Header rules | headers with `connection: x-foo`, `x-foo`, `accept-encoding`, `te` | all four removed, others unchanged |
 | `src/capture/redact.rs` (unit) | `redacts_credential_headers` | Redaction | `authorization`, `x-api-key`, `cookie`, `anthropic-session-id`, `x-goog-api-key` | value `redacted`, names kept |
+| `src/capture/redact.rs` (unit) | `keeps_rate_limit_response_headers` | Redaction exceptions | response `anthropic-ratelimit-tokens-remaining: 9000`, `x-ratelimit-remaining-tokens: 5`, `set-cookie: a=b` | the two rate-limit values kept, `set-cookie` value `redacted` |
+| `src/capture/credential.rs` (unit) | `hashes_bearer_then_api_key` | Credential hash | `authorization: Bearer abc`; only `x-api-key: xyz`; none | HMAC-SHA256 of `abc` with source `authorization`; of `xyz` with source `x-api-key`; both null |
+| `src/capture/writer.rs` (unit) | `full_queue_drops_and_counts` | Queue bound | `LOUPE_CAPTURE_QUEUE=2`, writer paused, 5 exchanges | 3 drops on the counter, one warning line with the count, each response unchanged |
 | `src/capture/seal.rs` (unit) | `seal_then_open_round_trips` | Encryption | random bytes, id, part | same bytes |
 | `src/capture/seal.rs` (unit) | `open_fails_on_wrong_id_or_part` | AAD binding | blob opened with another id or part | error |
 | `src/capture/seal.rs` (unit) | `nonce_is_unique` | Nonce | 1000 seals of one body | 1000 different nonces |
 | `src/capture/tap.rs` (unit) | `truncates_at_limit_and_counts_size` | Capture limit | 3 MiB body, limit 1 MiB | 1 MiB kept, flag set, size 3 MiB |
 | `tests/proxy.forward.rs` (integration) | `forwards_request_unchanged` | Pass-through | POST with body, query, custom header to the echo route | echo shows the same method, path, query, header, body bytes |
+| `tests/proxy.capture.rs` (integration) | `credential_hash_stored_raw_absent` | Credential hash | request with `x-api-key: sk-test-123` | `credential_hash` equals the HMAC-SHA256 of `sk-test-123`, `credential_source` is `x-api-key`, `grep -c sk-test-123` on the database file is 0 |
+| `tests/proxy.capture.rs` (integration) | `large_body_truncated_client_gets_all` | Capture limit | `LOUPE_CAPTURE_MAX_BYTES=1048576`, 3 MiB response | client gets 3 MiB, row has the truncated flag and response size 3145728 |
+| `tests/proxy.queue.rs` (integration) | `full_queue_keeps_responses` | Queue bound | `LOUPE_CAPTURE_QUEUE=1`, blocked writer, 10 parallel requests | every client gets status 200 and the full body, drop counter above 0, warning line present |
+| `tests/proxy.failure.rs` (integration) | `slow_headers_under_timeout_pass` | Timeout | `LOUPE_UPSTREAM_HEADERS_TIMEOUT_SECS=2`, slow route that waits 1 s before headers | status 200, row outcome `complete` |
+| `tests/proxy.failure.rs` (integration) | `slow_headers_over_timeout_is_502` | Timeout | `LOUPE_UPSTREAM_HEADERS_TIMEOUT_SECS=1`, slow route that waits 3 s before headers | 502 JSON body names the timeout, row `upstream_unreachable` |
 | `tests/proxy.forward.rs` (integration) | `unknown_upstream_is_404` | Allowlist | `/claude-code/nope/x` | 404, body lists known names, no row |
 | `tests/proxy.stream.rs` (integration) | `sse_chunks_arrive_before_stream_end` | Streaming | SSE of 5 chunks, 200 ms apart | first chunk at the client before 300 ms |
 | `tests/proxy.capture.rs` (integration) | `stored_exchange_matches_traffic` | Capture | one JSON exchange with `x-api-key` | one row, header `redacted`, decrypted bodies equal the sent bytes, sizes and status match |
@@ -263,6 +272,7 @@ Then the echo shows the same method, path, query, body bytes, and header "x-cust
 Given "loupe serve" runs
 When the reader requests "/healthz", "/v1/days", and "/"
 Then "/healthz" returns {"status":"ok"}
+  And "/v1/days" and "/" return 404 from the router
   And no request reaches an upstream
   And the table "exchanges" has no new row
 ```
@@ -322,6 +332,43 @@ Given "LOUPE_UPSTREAMS_FILE" points to a file with "evil = \"http://example.com\
 When the reader runs "loupe serve"
 Then the exit code is not 0 and the port is not bound
   And stderr names the file, the entry "evil", the fix, and "loupe config show"
+```
+
+### AC-12: The credential hash is stored and the raw value is not
+
+```gherkin
+Given a request through the proxy carries "x-api-key: sk-test-123"
+When the exchange is stored
+Then "sqlite3 <data dir>/loupe.db 'select credential_source, credential_hash from exchanges'" shows "x-api-key" and the HMAC-SHA256 hex of "sk-test-123" under LOUPE_ACCOUNT_KEY
+  And "grep -c sk-test-123 <data dir>/loupe.db" returns 0
+```
+
+### AC-13: A large body is forwarded in full and the capture is truncated
+
+```gherkin
+Given "loupe serve" runs with "LOUPE_CAPTURE_MAX_BYTES=1048576"
+When the client requests a 3 MiB response from the fake upstream through the proxy
+Then the client gets all 3145728 bytes
+  And the row in "exchanges" has the response truncated flag set and the response size 3145728
+```
+
+### AC-14: A full capture queue drops records and keeps responses
+
+```gherkin
+Given "loupe serve" runs with "LOUPE_CAPTURE_QUEUE=1" and a capture writer that cannot keep up
+When 10 clients send requests through the proxy at the same time
+Then every client gets status 200 and the full body
+  And the log has a warning line with the count of dropped records
+```
+
+### AC-15: The timeout for the response headers is applied
+
+```gherkin
+Given "LOUPE_UPSTREAM_HEADERS_TIMEOUT_SECS=2" and the slow route of the fake upstream
+When the slow route waits 1 second before its headers
+Then the client gets status 200
+When the slow route waits 3 seconds before its headers
+Then the client gets status 502 and the row has outcome "upstream_unreachable"
 ```
 
 ### AC-10: The latency target holds
@@ -402,7 +449,7 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8787/claude-code/nope/
 
 **Likelihood:** low
 **Impact:** medium
-**Mitigation:** Each drop logs a warning with the count. The default queue size is large compared to the request rate of two local agents.
+**Mitigation:** Each drop logs a warning with the count. The default `LOUPE_CAPTURE_QUEUE` of 256 records is large compared to the request rate of two local agents, and a test fills the queue.
 
 ### Risk 4: An upstream sends a compressed response although `accept-encoding` is removed
 
@@ -414,7 +461,7 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8787/claude-code/nope/
 
 * CR-0001 (approved): crate, configuration loader, logging, store and migrations, `loupe serve`, container, pipeline entry points, `.taxonomy`, `docs/specification/`.
 * CR-0003 depends on this CR for the route parser interface and the `exchanges` table.
-* CR-0004 depends on this CR for the decrypt function and the stored headers.
+* CR-0004 depends on this CR for the decrypt function, the stored headers, and the columns `credential_hash` and `credential_source`.
 
 ## Estimated Effort
 
@@ -429,6 +476,13 @@ Chosen approach: "streamed pass-through with a non-blocking tap and an asynchron
 1. **Full capture queue.** Provisional default: drop the record and log a warning (requirement 16). The alternative is a spill to disk. The README says capture must never block, but it does not state the behaviour when capture falls behind.
 2. **Capture limit.** Provisional default: `LOUPE_CAPTURE_MAX_BYTES` = 32 MiB per body, with a truncated flag. The README does not state a limit. A truncated response can lose the usage block that CR-0004 reads.
 3. **Reserved static asset names.** Provisional default: CR-0008 adds its asset directory names to the reserved list, and the list here holds `healthz`, `v1`, `assets`, and `favicon.ico`.
+
+## Implementation Status
+
+* **Started:** not started
+* **Completed:** not started
+* **Deployed to Production:** not applicable
+* **Notes:** none
 
 ## Related Items
 
