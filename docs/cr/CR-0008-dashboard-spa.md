@@ -2,7 +2,7 @@
 name: "CR-0008 Stateless dashboard SPA built into the binary"
 description: "Adds the public dashboard at GET /: a stateless single-page app in plain HTML, CSS, and JavaScript with no build step, built into the loupe binary, with self-hosted Geist fonts, that reads only the public API and shows the README dashboard sections with clear empty states."
 id: "CR-0008"
-status: "proposed"
+status: "approved"
 date: 2026-10-18
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
@@ -519,3 +519,7 @@ Chosen approach: "plain HTML, CSS, and ES modules with no build step, inline SVG
 * Later CRs: CR-0009 (GitHub counts), CR-0010 (end-to-end acceptance).
 * README sections: "Dashboard", "The `loupe` binary", "Privacy model".
 * Mockup: `Main.dc.html` in `brainstorm/dashboard.grenemark.se-html.zip`.
+
+## Approval
+
+Reviewed and approved by an independent reviewer agent on 2026-10-18.
