@@ -2,7 +2,7 @@
 name: "CR-0004 parser, sessions, and provider accounts"
 description: "Adds the parser worker that reads stored exchanges into calls, groups calls into sessions and segments per agent and proxy token, and derives the provider account of each call, with a verification of the account ID sources against real captures."
 id: "CR-0004"
-status: "proposed"
+status: "approved"
 date: 2026-10-18
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
@@ -466,3 +466,7 @@ Chosen approach: "a separate parser worker with a transactional cursor, HMAC ses
 
 * CR-0001, CR-0002, CR-0003 (dependencies); CR-0005, CR-0006, CR-0007 (readers of the new tables); CR-0010 (end-to-end).
 * README sections "How it works", "Proxy tokens", "Accounts", "Privacy model", "Open work".
+
+## Approval
+
+Reviewed and approved by an independent reviewer agent on 2026-10-18.
