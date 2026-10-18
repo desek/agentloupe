@@ -2,7 +2,7 @@
 name: "CR-0003 proxy tokens"
 description: "Adds many proxy tokens with name, tags, dates, and revocation, the loupe token commands, the bootstrap token from a secret, the token route segment, and the token ID on each exchange."
 id: "CR-0003"
-status: "proposed"
+status: "approved"
 date: 2026-10-18
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
@@ -465,6 +465,13 @@ About 2 days for one implementer: half a day for the spec and the store, half a 
 ## Decision Outcome
 
 Chosen approach: "a token segment in the route, checked against SHA-256 hashes in SQLite for each request", because it is the README design, it needs no change to the clients other than the base URL, and a revoke takes effect while the server runs.
+
+## Implementation Status
+
+* **Started:** not started
+* **Completed:** not started
+* **Deployed to Production:** not applicable
+* **Notes:** Reviewed and approved by an independent reviewer agent on 2026-10-18.
 
 ## Related Items
 
