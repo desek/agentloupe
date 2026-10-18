@@ -93,7 +93,7 @@ flowchart TD
 5. Each entry of `upstreams.toml` **MUST** have a field `litellm_provider`. The shipped file **MUST** set `anthropic` for the upstream `anthropic` and `openai` for each OpenAI upstream. A missing field **MUST** stop the start with an actionable error that names the upstream and the field.
 6. **Find the entry.** The pricing function **MUST** look up the model name of the call with the `litellm_provider` of its upstream. If no entry matches, it **MUST** remove one trailing `-YYYYMMDD` (a hyphen and eight digits) from the name and look up again. It **MUST NOT** match an entry of a different provider, and it **MUST NOT** match by prefix or by similarity.
 7. **Add the token costs.** The cost **MUST** be the sum of: `input` × `input_cost_per_token`; `cache_read` × `cache_read_input_token_cost`; `cache_write_5m` × `cache_creation_input_token_cost`; `cache_write_1h` × `cache_creation_input_token_cost_above_1hr`; `output` × `output_cost_per_token`. The `output` column already includes the reasoning tokens (CR-0004), so the function **MUST NOT** add them a second time.
-8. **Apply the prompt-size tier.** The prompt size **MUST** be `input + cache_read + cache_write_5m + cache_write_1h`. For each field with the suffix `_above_<N>k_tokens`, the threshold **MUST** be N × 1000 tokens. If the prompt size is above the highest threshold that the entry has, the function **MUST** use the tier field in place of the base field for every token term of the call that has a tier field. A term with no tier field **MUST** keep its base price.
+8. **Apply the prompt-size tier.** The prompt size **MUST** be `input + cache_read + cache_write_5m + cache_write_1h`. For each field with the suffix `_above_<N>k_tokens`, the threshold **MUST** be N × 1000 tokens. For each token term, the function **MUST** select the field of the highest threshold that the prompt size is above, and use it in place of the base field. If the prompt size is above no threshold of that term, the term **MUST** use its base price. A term with no tier field **MUST** keep its base price.
 9. **Apply the service tier.** If `service_tier` of the call is `priority` or `flex`, the function **MUST** use the field with the suffix `_priority` or `_flex` in place of the base field for each term that has one. A term with no such field **MUST** keep its base price. Any other service tier value **MUST** use the base fields.
 10. When both a prompt-size tier and a service tier apply, the function **MUST** first select the service tier field, then the prompt-size tier of that field if the entry has one, else the service tier field.
 11. **Do not guess.** If no entry matches, the cost **MUST** be `null` and `unpriced_reason` **MUST** be `no_entry`. If a price field is missing for a token count that is not zero, the cost **MUST** be `null` and `unpriced_reason` **MUST** be `missing_field:<field name>`. A missing field for a token count of zero **MUST NOT** make the call unpriced.
@@ -217,6 +217,7 @@ flowchart LR
 | `src/price/compute.rs` (unit) | `five_terms_sum` | Rule 2 | fixture entry, counts 100, 200, 300, 400, 500 | hand-computed decimal |
 | `src/price/compute.rs` (unit) | `one_hour_writes_use_1hr_field` | Rule 2 | only `cache_write_1h` non-zero | count × `cache_creation_input_token_cost_above_1hr` |
 | `src/price/tier.rs` (unit) | `prompt_above_threshold_uses_tier` | Rule 3 | prompt 200001 tokens, field `_above_200k_tokens` | tier price for every token |
+| `src/price/tier.rs` (unit) | `two_tiers_selects_highest_exceeded` | Rule 3 | fields `_above_128k_tokens` and `_above_200k_tokens`, prompt sizes 150000 and 200001 | the 128k tier price for 150000, the 200k tier price for 200001 |
 | `src/price/tier.rs` (unit) | `prompt_at_threshold_uses_base` | Rule 3 edge | prompt 200000 tokens | base price |
 | `src/price/tier.rs` (unit) | `priority_and_flex_fields` | Rule 4 | tiers `priority`, `flex`, `default` | the matching fields, base for default |
 | `src/price/tier.rs` (unit) | `service_then_size_tier` | Requirement 10 | priority and large prompt | the priority tier field of that size |
@@ -284,8 +285,9 @@ Then each cost equals the hand-computed decimal text in the fixture
 ### AC-5: An unpriced call has a null cost
 
 ```gherkin
-Given a call whose model has no entry for its provider
-When the parser worker prices it
+Given loupe serve runs with one proxy token and the fake upstream
+  And the fake upstream returns a JSON response with model "no-such-model-x" for one call through the proxy
+When the operator runs "loupe parse --once"
 Then "sqlite3 data/loupe.db 'select cost_usd, unpriced_reason from calls where id = <id>'" shows an empty cost and "no_entry"
   And the log has one warn line with the call id and the fix
 ```
@@ -302,10 +304,10 @@ Then the second run prints "calls_priced: 0"
 ### AC-7: The refresh path works
 
 ```gherkin
-Given the human runs ".agents/scripts/prices.vendor.sh --dry-run"
-When the output has "validation: passed"
-Then a run without --dry-run, a rebuild, and ".agents/scripts/pipeline.verdict.sh" exit 0
-  And "loupe config show" prints the new price_commit when the pin changed
+Given a refreshed vendor/litellm from ".agents/scripts/prices.vendor.sh" with the output "validation: passed"
+When the operator rebuilds and runs ".agents/scripts/pipeline.verdict.sh"
+Then the exit code is 0
+  And "loupe config show" prints the Commit value of vendor/litellm/SOURCE.md as price_commit
 ```
 
 ### AC-8: The verdict passes
