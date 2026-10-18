@@ -156,12 +156,14 @@ sequenceDiagram
 4. Color contrast of text on its background **MUST** be at least 4.5 to 1. The range buttons **MUST** be reachable and usable with the keyboard.
 5. The page **MUST** follow the color scheme of the mockup (dark). A light theme is out of scope.
 6. Every Rust source file and every file of `web/` that permits a comment **MUST** carry one `@agents-index` line. Rust files **MUST** follow the small-file rule, for example `src/web/embed.rs`, `src/web/serve.rs`, `src/web/headers.rs`, `src/web/etag.rs`, `src/web/path.rs`.
-7. No identifier of a governance document **MUST** appear in `web/`, `src/`, `tests/`, or the scenario files.
+7. An identifier of a governance document **MUST NOT** appear in `web/`, `src/`, `tests/`, or the scenario files.
+8. The repository **MUST** contain `.tool-versions` with the exact line `nodejs 22.20.0`. `.agents/scripts/pipeline.web.sh` **MUST** read the Node version from that file and **MUST** stop with a non-zero exit code and an `actionable_errors` payload when `node` is missing or its version differs from the pin. The thin caller **MUST** install Node from this file and **MUST NOT** state a Node version itself.
 
 ## Measurable Targets
 
 | Metric | Method | Baseline | Threshold |
 |---|---|---|---|
+| Node pin | `.agents/scripts/pipeline.web.sh --check-toolchain; echo $?` | none, new pin | exit 0 when `node --version` equals the `.tool-versions` entry, non-zero otherwise |
 | Verdict | `.agents/scripts/pipeline.verdict.sh; echo $?` | exit 0 after CR-0007 | exit 0, every stage `status: passed`, with the new stage `web` |
 | Web size | `.agents/scripts/web.size.sh` prints `code_kib` and `total_kib` | none, new measurement, added before the page | `code_kib` at most 100, `total_kib` at most 400 |
 | First full draw, 400 days | `.agents/scripts/web.render.sh --days 400` prints `draw_ms` | none, new measurement, added before the sections | `draw_ms` at most 500 |
@@ -172,6 +174,7 @@ sequenceDiagram
 ## Affected Components
 
 * New: `web/` (page, CSS, JS modules, fonts), `src/web/`, `docs/specification/dashboard.md`.
+* New: `.tool-versions` (Node pin, extends the toolchain pin of CR-0001).
 * Changed: the router of CR-0002 (static handler for `/`, `/assets/`, `/favicon.ico`), the reserved list, `.agents/scripts/pipeline.verdict.sh` (new stage `web`), `Dockerfile` (no change to the runtime files, because the files are in the binary; the build stage copies `web/`), `.taxonomy`, README.md.
 * New scripts: `.agents/scripts/fonts.vendor.sh`, `.agents/scripts/web.size.sh`, `.agents/scripts/web.render.sh`, `.agents/scripts/pipeline.web.sh`, `.agents/scripts/days.seed.sh`.
 * New scenarios: `.agents/scenarios/dashboard.sections.md`, `.agents/scenarios/dashboard.empty.md`, `.agents/scenarios/dashboard.offline.md`.
@@ -215,7 +218,7 @@ The human and any reader open `http://127.0.0.1:8787/` and see the work of the a
 
 ### Technical Impact
 
-The binary grows by the size of `web/` (at most 400 KiB). The router gains a handler. The pipeline gains a `web` stage that runs `node --test` over the calculation modules, so the local toolchain needs Node; the version is pinned in the toolchain file of CR-0001. The container build does not need Node.
+The binary grows by the size of `web/` (at most 400 KiB). The router gains a handler. The pipeline gains a `web` stage that runs `node --test` over the calculation modules, so the local toolchain needs Node. CR-0001 pins only Rust in `rust-toolchain.toml`, and that file cannot hold a Node version. This CR therefore extends the toolchain pin of CR-0001 to a second file, `.tool-versions`, with the exact entry `nodejs 22.20.0`. `pipeline.web.sh` reads the version from that file, and stops with an actionable error when `node` is missing or `node --version` differs from the pin. The reason for a second file is that `rust-toolchain.toml` is read only by rustup. The container build does not need Node.
 
 ### Business Impact
 
@@ -442,10 +445,8 @@ Then every stage prints "status: passed", including "web"
 
 ### Code Review
 
-- [ ] Changes submitted via pull request
-- [ ] PR title follows Conventional Commits format
+- [ ] Commits follow Conventional Commits on main, one commit per coherent step
 - [ ] Code review completed and approved
-- [ ] Changes squash-merged to maintain linear history
 
 ### Verification Commands
 
@@ -508,8 +509,8 @@ Chosen approach: "plain HTML, CSS, and ES modules with no build step, inline SVG
 
 ## Open Questions
 
-1. **Lines changed, all time.** Provisional default: the sum over the at most 400 days of the one response, labelled with its first day. The alternatives are a page request per 400 days back to the first record, or a new total field in the API (out of scope here, CR-0007 owns the API). This is a question about what the human wants.
-2. **JS unit tests with Node.** Provisional default: `node --test` in a `web` stage, with Node pinned in the toolchain file. The alternative is tests in the browser scenarios only, which is slower and not hermetic.
+1. **Lines changed, all time.** Provisional default: the sum over the at most 400 days of the one response, labelled with its first day. The alternatives are a page request per 400 days back to the first record, or a new total field in the API (out of scope here, CR-0007 owns the API). This is a question about what the human wants, so it is outside the mandate. The parameter is pending the human. The supervisor sends it per `human_questions`, with the provisional default as the recommendation.
+2. **JS unit tests with Node.** Provisional default: `node --test` in a `web` stage, with Node pinned in `.tool-versions` (`nodejs 22.20.0`). The alternative is tests in the browser scenarios only, which is slower and not hermetic.
 3. **Embed mechanism.** Provisional default: `include_bytes!` from a file list that `build.rs` makes. `rust-embed` is acceptable; the behaviour does not change.
 
 ## Related Items
