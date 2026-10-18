@@ -2,7 +2,7 @@
 name: "CR-0010 End-to-end acceptance on macOS with Claude Code and Pi"
 description: "Proves the definition of done of the CR set: the loupe container runs on the human's Mac, claude -p and pi -p reach Anthropic through the proxy with claude-haiku-5-5, and the sessions are captured, parsed, priced, summarized, published, and shown on the dashboard. Adds the connect script, the README instructions, and the persisted user scenario."
 id: "CR-0010"
-status: "approved"
+status: "proposed"
 date: 2026-10-18
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
@@ -127,7 +127,7 @@ sequenceDiagram
 1. The connect script **MUST** run with the `/bin/bash` 3.2 of macOS and the tools of a default macOS install plus `curl`. It **MUST NOT** need `jq`.
 2. A run of `claude -p` through the proxy **MUST** give the same exit code and the same kind of answer as a direct run with the same prompt.
 3. The time from the last agent call to the day on the dashboard **MUST** be at most 5 minutes with `LOUPE_IDLE_SECS=60` (see "Measurable Target").
-4. No provider credential and no proxy token **MUST** appear in the scenario record, in a log line of the container, or in a tracked file. The check is a `grep` for `lpt_` with more than four characters after it, and for `sk-ant-`, over the scenario record and `docker compose logs`.
+4. No provider credential and no proxy token **MUST** appear in the scenario record, in a log line of the container, or in a tracked file. The check is a `grep` for the pattern `lpt_[A-Za-z0-9_-]{5,}`, which matches every base64url token and not the masked form `lpt_…`, and for `sk-ant-`, over the scenario record and `docker compose logs`.
 5. The scenario **MUST** keep its evidence (the command output, a screenshot of the dashboard, the JSON of `/v1/days/<today>`) under the scenario directory, with the tokens masked.
 
 ## Measurable Target
@@ -136,7 +136,7 @@ sequenceDiagram
 |---|---|---|---|
 | Acceptance pass rate | Run `.agents/scenarios/acceptance.macos.end-to-end.md` three times; count runs that meet AC-1 to AC-7 | 0 of 0 (no run exists) | 3 of 3 |
 | Time from the last call to the day on the dashboard | `date +%s` after the last `pi -p` returns, then poll `curl -s http://127.0.0.1:8787/v1/days/$(date +%F)` after `loupe aggregate` until `by_agent` holds both keys; report the difference | not measured | at most 300 seconds with `LOUPE_IDLE_SECS=60` |
-| Secret leak count | `grep -rEc 'lpt_[A-Za-z0-9]{5,}\|sk-ant-' .agents/scenarios/acceptance.macos.end-to-end* ; docker compose logs \| grep -Ec 'lpt_[A-Za-z0-9]{5,}\|sk-ant-'` | not measured | 0 |
+| Secret leak count | `grep -rEc 'lpt_[A-Za-z0-9_-]{5,}\|sk-ant-' .agents/scenarios/acceptance.macos.end-to-end* ; docker compose logs \| grep -Ec 'lpt_[A-Za-z0-9_-]{5,}\|sk-ant-'` | not measured | 0 |
 
 The day in the method is the date in `LOUPE_TZ`. If the local time zone of the Mac differs from `LOUPE_TZ`, the scenario **MUST** compute the date with `TZ=Europe/Stockholm date +%F`.
 
@@ -308,6 +308,7 @@ Then the daily log shows a row for <today> with a token count more than 0
 Given AC-1 to AC-6 passed
 When the reader runs the secret leak check of the measurable target
 Then the count is 0
+And the pattern "lpt_[A-Za-z0-9_-]{5,}" matches every real proxy token and does not match the masked form "lpt_…"
 ```
 
 ### AC-8: The connect script is safe to re-run
@@ -435,4 +436,4 @@ Chosen approach: "a connect script that prints per-invocation environment and an
 
 ## Change Log
 
-* Reviewed and approved by an independent reviewer agent on 2026-10-18.
+* 2026-10-18: Revised after review. The leak pattern now includes "_" and "-". The status is "proposed" until the next review.
