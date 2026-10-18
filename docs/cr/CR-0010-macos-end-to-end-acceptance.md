@@ -83,7 +83,7 @@ sequenceDiagram
     participant A as claude and pi
     participant U as api.anthropic.com
     participant B as browser
-    H->>C: docker compose up -d with LOUPE_IDLE_SECS=60
+    H->>C: docker compose up -d with an override that sets LOUPE_IDLE_SECS to 60
     H->>C: loupe token create --name acceptance
     H->>A: claude -p and pi -p through the proxy
     A->>C: POST token/agent/anthropic/v1/messages
@@ -113,9 +113,9 @@ sequenceDiagram
 11. The README section **MUST** state that, to see the day before the nightly publish, the human runs `docker compose exec loupe loupe aggregate --date YYYY-MM-DD`, and that a short `LOUPE_IDLE_SECS` makes the sessions close sooner.
 12. The repository **MUST** contain the user scenario `.agents/scenarios/acceptance.macos.end-to-end.md`, made and graded through the `user-scenario` skill. The scenario **MUST** state the user goal, the steps, and the success condition before its first run.
 13. The scenario **MUST** drive the real `claude` and `pi` CLIs and the real `api.anthropic.com`, and **MUST** read the dashboard in a real browser through the browser driver. It **MUST NOT** use the fake upstream of CR-0002 or the seed script of CR-0008.
-14. The scenario **MUST** set `LOUPE_IDLE_SECS=60` for the run through a compose override file outside the tracked files, or through the environment of `docker compose up`. It **MUST NOT** change the default of `LOUPE_IDLE_SECS` in the code or in `compose.yaml`.
+14. The scenario **MUST** set `LOUPE_IDLE_SECS` to `60` for the run through an untracked `compose.override.yaml` with `services.loupe.environment.LOUPE_IDLE_SECS: "60"`. A shell variable on `docker compose up` **MUST NOT** be used, because `compose.yaml` (CR-0001 requirement 19) does not interpolate `LOUPE_IDLE_SECS`, so the variable does not reach the container. `.gitignore` **MUST** list `compose.override.yaml`. It **MUST NOT** change the default of `LOUPE_IDLE_SECS` in the code or in `compose.yaml`.
 15. The success condition of the scenario **MUST** be the end state of AC-1 to AC-7. The scenario record **MUST** hold the number of attempts and the number of successes, for at least three runs.
-16. The scenario **MUST** not depend on a GitHub token. With no `LOUPE_GITHUB_TOKEN_<LABEL>`, the run **MUST** still pass, and the PR fields of the day record are `0`.
+16. The scenario **MUST** not depend on a GitHub token. With no `LOUPE_GITHUB_TOKEN_<LABEL>`, the run **MUST** still pass, and the four PR fields of the day record are `null` (CR-0007 requirement 9, CR-0009 requirements 2 and 23), and the dashboard shows "GitHub not connected" (CR-0008 requirement 34).
 17. The prompts of the scenario **MUST** be short and neutral, for example "Reply with the word ok.", so that no project detail goes to the provider or into a summary.
 18. A defect that the scenario finds in an earlier CR **MUST** be fixed under the rules of that CR's area: a reproduction first, then the fix, then the identical scenario again. The fix **MUST** update the Layer 2 document that describes the changed behaviour before the code.
 19. If the real capture shows that an account ID source in the README "Accounts" list is wrong for Claude Code 2.1.302 or Pi 1.3.0, the implementation **MUST** update the README list and `docs/specification/` in the same change, as the README requires.
@@ -246,7 +246,9 @@ Not applicable. No test becomes redundant.
 ```gherkin
 Given Docker Desktop runs on the human's Mac
   And ".env" holds LOUPE_DATA_KEY and LOUPE_ACCOUNT_KEY
-When the reader runs "LOUPE_IDLE_SECS=60 docker compose up -d --build"
+  And an untracked "compose.override.yaml" sets LOUPE_IDLE_SECS to "60" in the environment of the service "loupe"
+When the reader runs "docker compose up -d --build"
+Then "docker compose exec loupe printenv LOUPE_IDLE_SECS" prints 60
 Then "docker compose ps" shows the service "healthy"
   And "curl -s http://127.0.0.1:8787/healthz" returns {"status":"ok"}
 ```
@@ -361,7 +363,9 @@ Then the command prints one line
 .agents/scripts/pipeline.verdict.sh
 shellcheck .agents/scripts/agent.connect.sh
 bash tests/scripts/agent.connect.test.sh
-LOUPE_IDLE_SECS=60 docker compose up -d --build
+printf 'services:\n  loupe:\n    environment:\n      LOUPE_IDLE_SECS: "60"\n' > compose.override.yaml
+docker compose up -d --build
+docker compose exec loupe printenv LOUPE_IDLE_SECS
 .agents/scripts/agent.connect.sh --check
 curl -s http://127.0.0.1:8787/v1/days/$(TZ=Europe/Stockholm date +%F)
 ```
