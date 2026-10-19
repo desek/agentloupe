@@ -111,8 +111,6 @@ sequenceDiagram
 9. The script **MUST** support `--check`, which sends one `GET <base>/healthz` and stops with an actionable error if the container is not reachable.
 10. The README **MUST** gain a section "Connect the agents" after "Proxy tokens". The section **MUST** give, as numbered steps: start the container, make a proxy token into a file outside the repository, run the script for each agent, run `claude -p` and `pi -p` with the model `claude-haiku-5-5`, and open the dashboard. The README update is a stated requirement of this CR; this CR document does not edit README.md.
 11. The README section **MUST** state that, to see the day before the nightly publish, the human runs `docker compose exec loupe loupe aggregate --date YYYY-MM-DD`, and that a short `LOUPE_IDLE_SECS` makes the sessions close sooner.
-22. The summarizer credential for the run **MUST** be the same subscription token, set in `.env` as `LOUPE_SUMMARY_OAUTH_TOKEN` (CR-0006 requirement 17, decision D7). The README section **MUST** state this step.
-23. Before the first `pi -p` call, the scenario **MUST** run `PI_CODING_AGENT_DIR=<isolated agent directory> pi --list-models claude-haiku-5-5` and confirm that the output lists `claude-haiku-5-5` under the provider `anthropic`. If the model is not listed, the fallback **MUST** be a `models` entry for `claude-haiku-5-5` under `providers.anthropic` in the isolated `models.json`, written by the connect script, and the scenario **MUST** record which route it used.
 12. The repository **MUST** contain the user scenario `.agents/scenarios/acceptance.macos.end-to-end.md`, made and graded through the `user-scenario` skill. The scenario **MUST** state the user goal, the steps, and the success condition before its first run.
 13. The scenario **MUST** drive the real `claude` and `pi` CLIs and the real `api.anthropic.com`, and **MUST** read the dashboard in a real browser through the browser driver. It **MUST NOT** use the fake upstream of CR-0002 or the seed script of CR-0008.
 14. The scenario **MUST** set `LOUPE_IDLE_SECS` to `60` for the run through an untracked `compose.override.yaml` with `services.loupe.environment.LOUPE_IDLE_SECS: "60"`. A shell variable on `docker compose up` **MUST NOT** be used, because `compose.yaml` (CR-0001 requirement 19) does not interpolate `LOUPE_IDLE_SECS`, so the variable does not reach the container. `.gitignore` **MUST** list `compose.override.yaml`. It **MUST NOT** change the default of `LOUPE_IDLE_SECS` in the code or in `compose.yaml`.
@@ -123,6 +121,8 @@ sequenceDiagram
 19. If the real capture shows that an account ID source in the README "Accounts" list is wrong for Claude Code 2.1.302 or Pi 1.3.0, the implementation **MUST** update the README list and `docs/specification/` in the same change, as the README requires.
 20. `.taxonomy` **MUST** gain rows for the new nouns connect script and isolated agent directory, with `Lives in` that names the script and the README section.
 21. Governance identifiers **MUST NOT** appear in the script, the scenario file, or the README section.
+22. The summarizer credential for the run **MUST** be the same subscription token, set in `.env` as `LOUPE_SUMMARY_OAUTH_TOKEN` (CR-0006 requirement 17, decision D7). The README section **MUST** state this step.
+23. Before the first `pi -p` call, the scenario **MUST** run `PI_CODING_AGENT_DIR=<isolated agent directory> pi --list-models claude-haiku-5-5` and confirm that the output lists `claude-haiku-5-5` under the provider `anthropic`. If the model is not listed, the fallback **MUST** be a `models` entry for `claude-haiku-5-5` under `providers.anthropic` in the isolated `models.json`. The scenario **MUST** add this entry by hand, because the connect script writes only the `baseUrl` override (requirement 5). The scenario **MUST** record which route it used.
 
 ### Non-Functional Requirements
 
@@ -447,4 +447,4 @@ Chosen approach: "a connect script that prints per-invocation environment and an
 
 * 2026-10-18: Revised after review. The leak pattern now includes "_" and "-". The status is "proposed" until the next review.
 * 2026-10-18: Reviewed and approved by an independent reviewer agent on 2026-10-18.
-* 2026-10-19: Recorded the human decisions D6 and D7 (requirements 7 and 22, AC-4, AC-5, Risk 1). Added requirement 23, a check of the Pi model list with a named fallback. The status is "proposed" until the next review.
+* 2026-10-19: Recorded the human decisions D6 and D7 (requirements 7 and 22, AC-4, AC-5, Risk 1). Added requirement 23, a check of the Pi model list with a named fallback that the scenario adds by hand. Moved requirements 22 and 23 after requirement 21. The status is "proposed" until the next review.
