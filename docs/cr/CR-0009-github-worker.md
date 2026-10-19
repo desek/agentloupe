@@ -2,7 +2,7 @@
 name: "CR-0009 GitHub pull request and line counts with multiple tokens"
 description: "Adds the GitHub worker that reads the pull requests opened and merged on each day for each LOUPE_GITHUB_TOKEN_<LABEL>, counts each pull request one time by an HMAC hash, and fills prs_opened, prs_merged, lines_added, and lines_removed in the day record, with failure records and catch-up."
 id: "CR-0009"
-status: "proposed"
+status: "approved"
 date: 2026-10-19
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
@@ -491,3 +491,9 @@ Chosen approach: "a REST worker per token label that stores hashed pull requests
 * CR-0001, CR-0002, CR-0007, CR-0008, CR-0010.
 * README sections "GitHub", "Privacy model", "The `loupe` binary".
 * GitHub REST API: search issues and pull requests, get a pull request, version `2022-11-28`. The implementer confirms the query qualifiers `created:` and `merged:` with offsets at tier 3 before the code.
+
+## Approval
+
+Reviewed and approved by an independent reviewer agent on 2026-10-18.
+
+Re-approved by an independent reviewer agent on 2026-10-19 after the human decisions were recorded.
