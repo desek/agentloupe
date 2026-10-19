@@ -2,8 +2,8 @@
 name: "CR-0008 Stateless dashboard SPA built into the binary"
 description: "Adds the public dashboard at GET /: a stateless single-page app in plain HTML, CSS, and JavaScript with no build step, built into the loupe binary, with self-hosted Geist fonts, that reads only the public API and shows the README dashboard sections with clear empty states."
 id: "CR-0008"
-status: "approved"
-date: 2026-10-18
+status: "proposed"
+date: 2026-10-19
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
@@ -16,7 +16,7 @@ source-commit: 2dda610
 
 ## Change Summary
 
-After CR-0007, the binary publishes day records on `GET /v1/days`, but `GET /` serves nothing and no person can see the data. This CR adds the dashboard of the README: a stateless single-page app that the `loupe` binary serves at `/` from static files built into the binary. The page reads only the public API and shows the header, the pull requests, the lines changed, the tokens per day, the API-equivalent cost, the 12-month heatmap, the daily log, and the footer, with the design values of the mockup.
+After CR-0007, the binary publishes day records on `GET /v1/days`, but `GET /` serves nothing and no person can see the data. This CR adds the dashboard of the README: a stateless single-page app that the `loupe` binary serves at `/` from static files built into the binary. The page reads only the public API and shows the header, the pull requests, the lines changed in the range, the tokens per day, the API-equivalent cost, the 12-month heatmap, the daily log, and the footer, with the design values of the mockup.
 
 ## Motivation and Background
 
@@ -118,16 +118,16 @@ sequenceDiagram
 
 **Data and range**
 
-21. On load, the page **MUST** fetch `GET /v1/days?from=<today minus 399 days>&to=<today>`, with today as the date of the browser. The page **MUST NOT** make a second request for a change of range.
+21. On load, the page **MUST** fetch `GET /v1/days?from=<today minus 399 days>` and **MUST NOT** send `to`, so the server default of CR-0007 (today in `LOUPE_TZ`) sets the end of the range. The page **MUST** compute `from` as the browser date minus 399 days, and the server limit of 400 days stays met because a browser date is never more than one day from the date in `LOUPE_TZ`; if the server refuses the range, the page **MUST** retry once with `from` one day later. The page **MUST NOT** make a second request for a change of range.
 22. The ranges **MUST** be: `3M` the last 91 days, `6M` the last 182 days, and `1Y` the last 365 days, each ending on the `to` value of the response, both ends included.
-23. A day inside the range with no record **MUST** count as zero for every sum and **MUST** draw as zero in a chart. This follows the provisional default of CR-0007 open question 2.
+23. A day inside the range with no record **MUST** count as zero for every sum and **MUST** draw as zero in a chart. This follows the rule of CR-0007, decided by the human on 2026-10-19: a day has a record only when it has agent calls or GitHub activity.
 24. The page **MUST** keep the record fields that it does not show out of the DOM, and **MUST** show only fields of the CR-0007 allowlist.
 
 **Sections**
 
 25. **Header.** The page **MUST** show the title "Agentloupe", the time of the last update from `updated_at` as a local date and time with the time zone name, and the range selector with the three buttons `3M`, `6M`, and `1Y`. The selected button **MUST** carry `aria-pressed="true"`. When `updated_at` is `null`, the header **MUST** show "No update yet".
 26. **Pull requests.** The page **MUST** show the sum of `prs_opened` and the sum of `prs_merged` for the range, and a bar chart per ISO week with two bars per week, opened and merged, in the mockup colors.
-27. **Lines changed, all time.** The page **MUST** show the sum of `lines_added`, the sum of `lines_removed`, and the net value (added minus removed) over all records in the response. The label **MUST** state the first day of the data that the sum covers, for example "since 2026-09-12", because the response holds at most 400 days.
+27. **Lines changed in the range.** The page **MUST** show the sum of `lines_added`, the sum of `lines_removed`, and the net value (added minus removed) over the records of the selected range (`3M`, `6M`, or `1Y`), like the other cards. A change of range **MUST** change these figures. The API does not change. This was decided by the human on 2026-10-19.
 28. **Tokens per day.** The page **MUST** show two line charts for the range, one for `input_total` and one for `output`, each with its own vertical scale, and the sum of each for the range.
 29. **Cost (API-equivalent).** The page **MUST** show a card in the totals row with the sum of `cost_usd` for the range in US dollars with two decimals, and a daily line chart in the style of the token charts. The card label **MUST** be "Cost (API-equivalent)" and the card **MUST** show the text "List price of the tokens, not money paid." When the sum of `unpriced_calls` for the range is more than zero, the card **MUST** show "<n> calls not priced".
 30. **Token usage, last 12 months.** The page **MUST** show a heatmap of the last 365 days, one cell per day, in columns of weeks from Monday to Sunday. The value of a cell **MUST** be `input_total + output`. The levels **MUST** be five: level 0 for a value of zero, and levels 1 to 4 from the quartiles of the values above zero in the 365 days. Each cell **MUST** carry a `title` with the date and the token count. The heatmap **MUST NOT** change with the range selector.
@@ -146,7 +146,7 @@ sequenceDiagram
 37. The Layer 2 document `docs/specification/dashboard.md` **MUST** describe the routes, the headers, the CSP, the files, the data request, the ranges, each section with its formula, the empty states, the font delivery, and the design tokens, before the code lands.
 38. The design values of `Main.dc.html` **MUST** be written as CSS custom properties in `web/assets/css/tokens.css`, and `docs/specification/dashboard.md` **MUST** list each token with its value. The page **MUST NOT** contain `support.js` or a file from the mockup `vendor/` directory.
 39. `.taxonomy` **MUST** gain rows for `dashboard`, `range`, `heatmap level`, and `empty state`, and **MUST** reuse the rows for `day record`, `API-equivalent cost`, and `public API`.
-40. README.md **MUST** be updated only where the behaviour differs from its text. The ranges of requirement 22 and the "since" label of requirement 27 are additions, and the section "Dashboard" **MUST** state them.
+40. README.md **MUST** be updated only where the behaviour differs from its text. The ranges of requirement 22 are an addition, and the section "Dashboard" **MUST** state them. The README dashboard row "Lines changed, all time" **MUST** change to state that the lines card shows lines added, removed, and net for the selected range.
 
 ### Non-Functional Requirements
 
@@ -276,6 +276,8 @@ flowchart LR
 | `web/test/view.build.test.js` | `missing_days_are_zero` | Gaps | 3 records in 91 days | 91 points, 88 zero |
 | `web/test/view.build.test.js` | `range_lengths` | Ranges | `to` date | 91, 182, 365 days |
 | `web/test/view.build.test.js` | `week_buckets_iso` | PR bars | days across a year end | ISO weeks |
+| `web/test/api.days.test.js` | `request_omits_to` | Time zone | browser time zone `America/Los_Angeles`, server zone `Europe/Stockholm` | the request URL has `from` and no `to`; the view ends on the `to` of the response |
+| `web/test/view.build.test.js` | `lines_follow_range` | Lines card | seeded lines, `3M` then `1Y` | sums of the 91 and 365 last days |
 | `web/test/view.build.test.js` | `github_null_states` | States | all null, some null | `not_connected`, `partial` |
 | `web/test/stats.quartiles.test.js` | `five_levels` | Heatmap | known values | levels 0 to 4 at the quartiles |
 | `web/test/stats.quartiles.test.js` | `all_zero_is_level_zero` | Edge | zeros | all level 0 |
@@ -330,7 +332,7 @@ Then no "web" directory exists in the image
 ```gherkin
 Given ".agents/scripts/days.seed.sh --days 400" wrote day records
 When the reader opens "http://127.0.0.1:8787/" in a browser
-Then the page shows the header, pull requests, lines changed all time, tokens per day, cost, heatmap, daily log, and footer
+Then the page shows the header, pull requests, lines changed in the range, tokens per day, cost, heatmap, daily log, and footer
   And the footer names "Claude Code and Pi"
 ```
 
@@ -341,6 +343,7 @@ Given seeded day records
 When the reader presses "6M"
 Then the URL fragment is "#range=6M"
   And the totals equal the sums of the last 182 days that "curl /v1/days" returns
+  And the lines added, removed, and net equal the sums of the last 182 days
   And the heatmap does not change
   And no new request to "/v1/days" occurs
 ```
@@ -467,11 +470,11 @@ Then every stage prints "status: passed", including "web"
 **Impact:** medium
 **Mitigation:** Requirement 20 makes the check a tier 1 step. The fallbacks of requirement 19 keep the page usable.
 
-### Risk 2: "All time" lines covers only 400 days
+### Risk 2: The lines card loses the all-time view
 
-**Likelihood:** high after 400 days of data
+**Likelihood:** certain, by design
 **Impact:** low
-**Mitigation:** Requirement 27 labels the first day that the sum covers. Open question 1 names the alternatives.
+**Mitigation:** The human decided on 2026-10-19 that the lines card follows the range. The README row changes in the same change (requirement 40).
 
 ### Risk 3: A summary injects markup
 
@@ -483,13 +486,13 @@ Then every stage prints "status: passed", including "web"
 
 **Likelihood:** medium
 **Impact:** low
-**Mitigation:** The ranges end on the `to` value of the response (requirement 22), which the API computes in `LOUPE_TZ`.
+**Mitigation:** The request omits `to` (requirement 21), so the API computes the end in `LOUPE_TZ`, and the ranges end on the `to` value of the response (requirement 22). The test `request_omits_to` uses a browser time zone west of the server zone.
 
 ### Risk 5: Node in the pipeline breaks hermetic runs
 
 **Likelihood:** low
 **Impact:** medium
-**Mitigation:** The tests use only `node:test` and `node:assert`, and no package. Open question 2 names the alternative.
+**Mitigation:** The tests use only `node:test` and `node:assert`, and no package. Open question 1 names the alternative.
 
 ## Dependencies
 
@@ -507,11 +510,15 @@ About 16 to 24 agent hours: 3 for the spec and the measurements, 4 for serving a
 
 Chosen approach: "plain HTML, CSS, and ES modules with no build step, inline SVG charts, vendored Geist fonts, all files built into the binary", because it keeps one artifact, works offline, has no supply chain beyond the fonts, and meets the size and draw targets.
 
+## Decided Questions
+
+1. **Lines card range.** Decided by the human on 2026-10-19: the lines card follows the selected range (`3M`, `6M`, `1Y`) and shows lines added, removed, and net for the range, like the other cards. No API change. Requirements 27 and 40 and AC-3 and AC-4 state it.
+2. **End of the requested range.** Judgement call of the supervisor on 2026-10-19: the page omits `to`, so the server default of CR-0007 (today in `LOUPE_TZ`) applies. A browser west of `LOUPE_TZ` then does not miss the record of today. Requirement 21 states it.
+
 ## Open Questions
 
-1. **Lines changed, all time.** Provisional default: the sum over the at most 400 days of the one response, labelled with its first day. The alternatives are a page request per 400 days back to the first record, or a new total field in the API (out of scope here, CR-0007 owns the API). This is a question about what the human wants, so it is outside the mandate. The parameter is pending the human. The supervisor sends it per `human_questions`, with the provisional default as the recommendation.
-2. **JS unit tests with Node.** Provisional default: `node --test` in a `web` stage, with Node pinned in `.tool-versions` (`nodejs 22.20.0`). The alternative is tests in the browser scenarios only, which is slower and not hermetic.
-3. **Embed mechanism.** Provisional default: `include_bytes!` from a file list that `build.rs` makes. `rust-embed` is acceptable; the behaviour does not change.
+1. **JS unit tests with Node.** Provisional default: `node --test` in a `web` stage, with Node pinned in `.tool-versions` (`nodejs 22.20.0`). The alternative is tests in the browser scenarios only, which is slower and not hermetic.
+2. **Embed mechanism.** Provisional default: `include_bytes!` from a file list that `build.rs` makes. `rust-embed` is acceptable; the behaviour does not change.
 
 ## Related Items
 
@@ -522,4 +529,4 @@ Chosen approach: "plain HTML, CSS, and ES modules with no build step, inline SVG
 
 ## Approval
 
-Reviewed and approved by an independent reviewer agent on 2026-10-18.
+Reviewed and approved by an independent reviewer agent on 2026-10-18. Revised on 2026-10-19 to record the decisions of the human; the revision needs a new review.
