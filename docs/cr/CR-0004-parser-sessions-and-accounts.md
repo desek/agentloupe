@@ -2,8 +2,8 @@
 name: "CR-0004 parser, sessions, and provider accounts"
 description: "Adds the parser worker that reads stored exchanges into calls, groups calls into sessions and segments per agent and proxy token, and derives the provider account of each call, with a verification of the account ID sources against real captures."
 id: "CR-0004"
-status: "approved"
-date: 2026-10-18
+status: "proposed"
+date: 2026-10-19
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
@@ -238,7 +238,7 @@ This CR is the first step that gives figures. It unblocks CR-0005 to CR-0007.
 7. Run the verification of requirement 30 with this setup, then correct the lists:
    - Start the container with `docker compose up -d`, `LOUPE_IDLE_SECS=60`, and one proxy token from `loupe token create --name verify`.
    - Claude Code: `ANTHROPIC_BASE_URL=http://127.0.0.1:8787/<proxy-token>/claude-code/anthropic claude -p "say hi" --model claude-haiku-5-5`. Do not change `~/.claude/settings.json`.
-   - Pi: make a temporary agent dir in the scratchpad, write `models.json` with `{"providers":{"anthropic":{"baseUrl":"http://127.0.0.1:8787/<proxy-token>/pi/anthropic"}}}`, then run `PI_CODING_AGENT_DIR=<dir> pi -p "say hi" --provider anthropic --model claude-haiku-5-5`. The credential reaches Pi through the environment variable `ANTHROPIC_API_KEY` or `ANTHROPIC_OAUTH_TOKEN` that the human exports in the shell. The implementer **MUST NOT** copy `~/.pi/agent/auth.json` or print a credential.
+   - Pi: make a temporary agent dir in the scratchpad, write `models.json` with `{"providers":{"anthropic":{"baseUrl":"http://127.0.0.1:8787/<proxy-token>/pi/anthropic"}}}`, then run `PI_CODING_AGENT_DIR=<dir> pi -p "say hi" --provider anthropic --model claude-haiku-5-5`. The credential **MUST** reach Pi through the environment variable `ANTHROPIC_OAUTH_TOKEN`. It holds the subscription token that the human makes one time with `claude setup-token`. The implementer **MUST NOT** copy, link, or read a file from `~/.pi/agent`, and **MUST NOT** print a credential.
    - Read the header names and body field paths with a script that decrypts inside the container and prints names only.
 8. Write the scenarios and run them. Run the verdict.
 
@@ -460,7 +460,10 @@ Chosen approach: "a separate parser worker with a transactional cursor, HMAC ses
 1. **Session hint header list.** The initial list comes from the prototype and is not verified. Provisional default: the list of requirement 1, corrected by the verification of requirement 30.
 2. **The shape of `metadata.user_id` in Claude Code 2.1.302.** It can hold an account UUID and a session ID. Provisional default: parse it as JSON first, then as the `user_<hash>_account_<uuid>_session_<uuid>` string, and record the verified shape.
 3. **README change.** The README "Accounts" section must change after the verification. Provisional default: this CR proposes the text to the human and does not edit README.md.
-4. **Pi credential for the verification.** The human can hold the Anthropic credential only in `~/.pi/agent/auth.json`, and the isolated agent dir has no `auth.json`. Provisional default: if neither `ANTHROPIC_API_KEY` nor `ANTHROPIC_OAUTH_TOKEN` is exported, the implementer asks the human through the structured question tool to export one (for example a token from `claude setup-token`). The implementer **MUST NOT** read or copy `auth.json`.
+
+### Decided
+
+* **Pi credential for the verification** (former open question 4). Decided by the human on 2026-10-19: Pi gets its credential from the environment variable `ANTHROPIC_OAUTH_TOKEN`. It holds the subscription token that the human makes one time with `claude setup-token`. Nothing is copied or linked from `~/.pi/agent`. CR-0010 uses the same credential.
 
 ## Related Items
 
