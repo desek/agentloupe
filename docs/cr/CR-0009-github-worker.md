@@ -2,8 +2,8 @@
 name: "CR-0009 GitHub pull request and line counts with multiple tokens"
 description: "Adds the GitHub worker that reads the pull requests opened and merged on each day for each LOUPE_GITHUB_TOKEN_<LABEL>, counts each pull request one time by an HMAC hash, and fills prs_opened, prs_merged, lines_added, and lines_removed in the day record, with failure records and catch-up."
 id: "CR-0009"
-status: "approved"
-date: 2026-10-18
+status: "proposed"
+date: 2026-10-19
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "medium"
@@ -56,7 +56,7 @@ Add a GitHub client, a GitHub worker, two tables, and a change to the day builde
 1. The GitHub client sends `GET /user`, `GET /search/issues`, and `GET /repos/{owner}/{repo}/pulls/{pull_number}` with one token. Its base URL is `https://api.github.com`, and a configuration value can change it to a local fake for the tests.
 2. The GitHub worker runs a fetch of one day for each label. It runs in the publisher of CR-0007 before the first build of a due day, in catch-up, and in `loupe aggregate`.
 3. The table `github_prs` holds one row per pull request hash. The table `github_pr_labels` holds the labels that saw each hash. The table `github_fetches` holds the result of each fetch of one day and one label.
-4. `build_day(day)` also reads the GitHub tables and fills the four fields, and puts the missing labels in `detail.github`.
+4. `build_day(day)` also reads the GitHub tables and fills the four fields, and puts the number of failed tokens in `detail.github`.
 
 ### Proposed State Diagram
 
@@ -136,7 +136,7 @@ Day record
 
 22. `build_day(day)` **MUST** read `github_prs` and `github_fetches` in addition to the tables of CR-0007.
 23. If no GitHub token is set, the four fields **MUST** be `null`. Otherwise `prs_opened` **MUST** be the count of distinct `pr_hash` with `opened_day` equal to the day, `prs_merged` the count with `merged_day` equal to the day, and `lines_added` and `lines_removed` the sums of `additions` and `deletions` of the pull requests merged on the day.
-24. If at least one label has no `github_fetches` row with `status: ok` for the day, the record **MUST** hold `detail.github.missing_labels` with the sorted list of those labels. If no label is missing, the record **MUST** hold `detail.github.missing_labels` as an empty list. The field allowlist of CR-0007 requirement 17 **MUST** gain `github` and `missing_labels`.
+24. If at least one label has no `github_fetches` row with `status: ok` for the day, the record **MUST** hold `detail.github.failed_tokens` with the number of those labels. If no label is missing, the record **MUST** hold `detail.github.failed_tokens` as `0`. The record **MUST NOT** hold a label name. The label names stay in the private table `github_fetches` and in the log lines. The field allowlist of CR-0007 requirement 17 **MUST** gain `github` and `failed_tokens`. Decided by the human on 2026-10-19.
 25. The record **MUST NOT** hold a count per label. Per-label analysis stays in the private table `github_pr_labels`.
 
 Schedule and catch-up
@@ -144,11 +144,11 @@ Schedule and catch-up
 26. Before the publisher of CR-0007 makes the first `days` row of a due day, it **MUST** run the fetch of that day for each label. Catch-up **MUST** run the fetch for each day that it publishes, oldest first.
 27. On each wake, the publisher **MUST** run the fetch again for each published day of the last 7 days that has a label with no `status: ok` row, and **MUST** put each such day in `agg_queue` with reason `github` after a fetch that changes a row.
 28. `loupe aggregate --date <day>` **MUST** run the fetch of that day for each label before it builds the day. `loupe aggregate --date <day> --dry-run` **MUST NOT** call GitHub and **MUST** build from the stored rows.
-29. The GitHub worker **MUST NOT** publish a day that the rule of CR-0007 does not publish. A day with pull requests and no calls gets no record in this CR (see Open Questions).
+29. The worker **MUST** register a GitHub source through the activity source interface of CR-0007 requirement 15a. `has_activity(day)` **MUST** return `true` when `github_prs` has one or more rows with `opened_day` or `merged_day` equal to the day. `first_activity_day()` **MUST** return the oldest such day, or none. After a fetch that changes a row, the worker **MUST** put the day in `agg_queue` with reason `github` (CR-0007 requirement 15b). Thus a due day with pull requests and no call gets a record with `calls: 0`, and a day with no call and no pull request gets no record. Decided by the human on 2026-10-19.
 
 Documentation
 
-30. The implementation **MUST** update README.md in the same change: the configuration table gains a row for `LOUPE_GITHUB_API_URL`, the example day record shows `detail.github.missing_labels`, and the section "GitHub" states the 7-day retry and the `search_limit` cause. This CR document does not edit README.md.
+30. The implementation **MUST** update README.md in the same change: the configuration table gains a row for `LOUPE_GITHUB_API_URL`, the example day record shows `detail.github.failed_tokens`, the README text that says the day records which labels are missing changes to say that the day records the number of failed tokens, and the section "GitHub" states the 7-day retry and the `search_limit` cause. This CR document does not edit README.md.
 31. The Layer 2 document `docs/specification/github.md` **MUST** describe the tokens, the queries, the day range, the hash, the tables, the failure causes, the schedule, and the retry before the code lands.
 32. The file `.env.example` **MUST** list `LOUPE_GITHUB_TOKEN_PERSONAL` with no value and a comment that points to the README permissions table.
 
@@ -186,7 +186,8 @@ Documentation
 
 * The tokens `LOUPE_GITHUB_TOKEN_<LABEL>`, the user of each token, the searches, and the line counts.
 * The HMAC hash, the three tables, and the label per pull request.
-* The failure causes, the log lines, and `detail.github.missing_labels`.
+* The failure causes, the log lines, and `detail.github.failed_tokens`.
+* The GitHub source of the activity source interface of CR-0007, so a day with pull requests and no call gets a record.
 * The fetch in publish, catch-up, retry, and `loupe aggregate`.
 * The four day fields.
 
@@ -212,7 +213,7 @@ Documentation
 
 ### User Impact
 
-The human sets one or more tokens in `.env`. The public record then shows the PR and line counts. A failed token shows as a missing label in the record, and the log names the fix.
+The human sets one or more tokens in `.env`. The public record then shows the PR and line counts. A failed token shows as a count in the record, and the log names the label and the fix.
 
 ### Technical Impact
 
@@ -269,9 +270,11 @@ flowchart LR
 | `tests/github.privacy.rs` | `tables_hold_no_repo_number_url_or_token` | Privacy | fake with known owner, repo, number, title, login, token | no table, no log line holds any of them |
 | `tests/day.github.rs` | `fields_null_without_token` | Optional tokens | no token | four fields `null`, no request to the fake |
 | `tests/day.github.rs` | `lines_count_on_merge_day` | Day fields | opened on day 1, merged on day 2 | day 1 `prs_opened` 1, day 2 `prs_merged` 1 and the lines |
-| `tests/day.github.rs` | `missing_labels_in_detail` | Failure in record | `A` failed | `detail.github.missing_labels` `["A"]` |
+| `tests/day.github.rs` | `failed_tokens_in_detail` | Failure in record | `A` failed | `detail.github.failed_tokens` `1`, no label name in the record |
+| `tests/publish.github.rs` | `github_only_day_gets_record` | GitHub activity source | due day with a merged pull request and no call | one `days` row, `calls` 0, `prs_merged` 1 |
+| `tests/publish.github.rs` | `day_without_calls_or_prs_gets_no_record` | Activity rule | due day, no call, no pull request | no `days` row |
 | `tests/publish.github.rs` | `catch_up_fetches_each_day_oldest_first` | Catch-up | 3 due days | fetches in day order, before each first build |
-| `tests/publish.github.rs` | `retry_failed_label_within_7_days` | Retry | day with `A` failed, then fake passes | `agg_queue` row `github`, record with empty `missing_labels` |
+| `tests/publish.github.rs` | `retry_failed_label_within_7_days` | Retry | day with `A` failed, then fake passes | `agg_queue` row `github`, record with `failed_tokens` 0 |
 | `tests/cli.aggregate.rs` | `dry_run_does_not_call_github` | Dry run | `--dry-run` | zero requests to the fake |
 
 ### Tests to Modify
@@ -279,7 +282,7 @@ flowchart LR
 | Test File | Test Name | Current Behavior | New Behavior | Reason for Change |
 |-----------|-----------|------------------|--------------|-------------------|
 | `tests/day.build.rs` (CR-0007) | the record shape test | four fields always `null` | `null` without token, numbers with token | requirement 23 |
-| `tests/api.allowlist.rs` (CR-0007) | `api_routes_read_only_days_table` | allowlist without `github` | allowlist with `github` and `missing_labels` | requirement 24 |
+| `tests/api.allowlist.rs` (CR-0007) | `api_routes_read_only_days_table` | allowlist without `github` | allowlist with `github` and `failed_tokens` | requirement 24 |
 
 ### Tests to Remove
 
@@ -291,7 +294,7 @@ Not applicable. No test covers removed behaviour.
 |----------|-----------|--------------|-------------------|-----------------|-----------------|
 | PR counts for a day | See the PR and line counts of a day | HTTP request | after `loupe aggregate --date <day>` with a real fine-grained token, `GET /v1/days/<day>` shows `prs_opened` and `prs_merged` that match the counts that `gh search prs` gives for the same range, and the database has no repository name | AC-1, AC-2 | `.agents/scenarios/github.counts.md` |
 | No token | Run the product without GitHub | HTTP request | with no GitHub token, `GET /v1/days/<day>` returns the record with the four fields `null` | AC-3 | `.agents/scenarios/github.no-token.md` |
-| Failed token | Find out that a token does not work | command line | with a revoked token, the log has a warn line with the label and the fix, and the record holds the label in `detail.github.missing_labels` | AC-4 | `.agents/scenarios/github.failed-token.md` |
+| Failed token | Find out that a token does not work | command line | with a revoked token, the log has a warn line with the label and the fix, and the record holds `detail.github.failed_tokens` 1 with no label name | AC-4 | `.agents/scenarios/github.failed-token.md` |
 
 ## Acceptance Criteria
 
@@ -302,7 +305,7 @@ Given the fake GitHub has, for the token user, 2 pull requests opened on 2026-10
   And LOUPE_GITHUB_TOKEN_PERSONAL is set and the day has calls
 When the reader runs "loupe aggregate --date 2026-10-17" and "curl -s http://127.0.0.1:8787/v1/days/2026-10-17"
 Then the record has "prs_opened": 2, "prs_merged": 1, "lines_added": 40, "lines_removed": 5
-  And "detail.github.missing_labels" is an empty list
+  And "detail.github.failed_tokens" is 0
 ```
 
 ### AC-2: No double count and no repository data
@@ -331,7 +334,8 @@ Then the log has one line "github: disabled, no token"
 Given LOUPE_GITHUB_TOKEN_ACME is revoked and LOUPE_GITHUB_TOKEN_PERSONAL works
 When the reader runs "loupe aggregate --date 2026-10-17"
 Then the log has a warn line with "github_label":"ACME", "cause":"unauthorized", and the fix text
-  And the record has "detail.github.missing_labels" equal to ["ACME"]
+  And the record has "detail.github.failed_tokens" equal to 1
+  And the record does not contain the text "ACME"
   And the counts of PERSONAL are in the record
 ```
 
@@ -347,10 +351,10 @@ Then "github_fetches" has a row for each of the 3 days and each label
 ### AC-6: A failed label is retried
 
 ```gherkin
-Given a published day of yesterday with ACME in "missing_labels"
+Given a published day of yesterday with ACME failed and "failed_tokens" equal to 1
   And the ACME token now works
 When the publisher wakes
-Then the day is built again and "missing_labels" is an empty list
+Then the day is built again and "failed_tokens" is 0
 ```
 
 ### AC-7: Day range uses the offset of LOUPE_TZ
@@ -377,6 +381,16 @@ Given the change is complete
 When the reader runs ".agents/scripts/pipeline.verdict.sh" and ".agents/scripts/github.bench.sh --merged 50"
 Then the verdict exits 0 with every stage "status: passed"
   And "fetch_secs" is at most 10
+```
+
+### AC-10: A day with pull requests and no call gets a record
+
+```gherkin
+Given a due day D1 with one merged pull request and no call
+  And a due day D2 with no pull request and no call
+When the publisher wakes
+Then "GET /v1/days/D1" returns a record with "calls" 0 and "prs_merged" 1
+  And D2 has no "days" row
 ```
 
 ## Quality Standards Compliance
@@ -438,7 +452,7 @@ cargo test --test github.fetch --test github.privacy --test day.github --test pu
 
 **Likelihood:** medium
 **Impact:** medium
-**Mitigation:** Open question 1. The human chooses the label names, and the README already says "the day records which labels are missing".
+**Mitigation:** Requirement 24. The public record holds only the number of failed tokens. The label names stay in `github_fetches` and the log lines.
 
 ### Risk 4: A repository name leaks to a log line
 
@@ -464,9 +478,12 @@ Chosen approach: "a REST worker per token label that stores hashed pull requests
 
 ## Open Questions
 
-1. **Missing labels in the public record.** Provisional default: `detail.github.missing_labels` holds the label names, as the README says "the day records which labels are missing". A label such as `ACME` can identify a company in public. The alternative is a count `detail.github.missing_tokens` in public and the names in `github_fetches` only. This is a question about what the human wants, so it goes to the human.
-2. **Days with pull requests and no calls.** Provisional default: no record, the CR-0007 rule. The alternative is to publish a record for such a day. This follows the human answer to CR-0007 open question 2.
-3. **Retry window.** Provisional default: 7 days (requirement 27). A pull request that is merged after publish is counted on its own merge day, so the window only covers failed tokens.
+1. **Retry window.** Provisional default: 7 days (requirement 27). A pull request that is merged after publish is counted on its own merge day, so the window only covers failed tokens.
+
+## Decisions
+
+* **Failed tokens in the public record.** Decided by the human on 2026-10-19: the public record shows only the number of failed tokens, `detail.github.failed_tokens`. The label names stay in the private database and the logs. Requirement 24 and AC-4 state the rule.
+* **Days with pull requests and no calls.** Decided by the human on 2026-10-19: a day gets a record when it has calls or GitHub activity. This CR registers the GitHub source through the CR-0007 interface. Requirement 29 states the rule.
 
 ## Related Items
 
