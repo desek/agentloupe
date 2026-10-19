@@ -2,8 +2,8 @@
 name: "CR-0010 End-to-end acceptance on macOS with Claude Code and Pi"
 description: "Proves the definition of done of the CR set: the loupe container runs on the human's Mac, claude -p and pi -p reach Anthropic through the proxy with claude-haiku-5-5, and the sessions are captured, parsed, priced, summarized, published, and shown on the dashboard. Adds the connect script, the README instructions, and the persisted user scenario."
 id: "CR-0010"
-status: "approved"
-date: 2026-10-18
+status: "proposed"
+date: 2026-10-19
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
@@ -106,11 +106,13 @@ sequenceDiagram
 4. For `--agent claude-code`, the script **MUST** print `ANTHROPIC_BASE_URL=<base>/<token>/claude-code/anthropic` as one `export` line, and the model hint `--model claude-haiku-5-5`.
 5. For `--agent pi`, the script **MUST** make the directory `${XDG_STATE_HOME:-$HOME/.local/state}/agentloupe/pi-agent` with mode `0700`, and write `models.json` in it with mode `0600` and the content `{"providers":{"anthropic":{"baseUrl":"<base>/<token>/pi/anthropic"}}}`. It **MUST** print `PI_CODING_AGENT_DIR=<that directory>` as one `export` line.
 6. The script **MUST NOT** write to `~/.claude`, to `~/.pi/agent`, or to any file in the repository.
-7. The script **MUST NOT** copy, read, or print a provider credential. Pi in the isolated directory has no `auth.json`. The README **MUST** state that Pi then reads the Anthropic credential from the environment of the human (`ANTHROPIC_API_KEY`, `ANTHROPIC_OAUTH_TOKEN`, or `ANTHROPIC_AUTH_TOKEN`), and **MUST** state the open question of this CR about the credential (see "Open Questions").
+7. The script **MUST NOT** copy, read, or print a provider credential. Pi in the isolated directory has no `auth.json`. Pi then reads the Anthropic credential from the environment of the human. The credential for Pi **MUST** be the variable `ANTHROPIC_OAUTH_TOKEN`, which holds the subscription token that the human makes one time with `claude setup-token` (decision D6). The script and the README **MUST NOT** copy or link a file from `~/.pi/agent`. The README **MUST** state these steps: run `claude setup-token` one time, then export `ANTHROPIC_OAUTH_TOKEN` in the shell that runs `pi -p`.
 8. The script **MUST** be idempotent: a second run with the same inputs **MUST** give the same `models.json` bytes and the same output. It **MUST** support `--dry-run`, which prints the planned file path and content with the token masked as `lpt_…` and writes nothing.
 9. The script **MUST** support `--check`, which sends one `GET <base>/healthz` and stops with an actionable error if the container is not reachable.
 10. The README **MUST** gain a section "Connect the agents" after "Proxy tokens". The section **MUST** give, as numbered steps: start the container, make a proxy token into a file outside the repository, run the script for each agent, run `claude -p` and `pi -p` with the model `claude-haiku-5-5`, and open the dashboard. The README update is a stated requirement of this CR; this CR document does not edit README.md.
 11. The README section **MUST** state that, to see the day before the nightly publish, the human runs `docker compose exec loupe loupe aggregate --date YYYY-MM-DD`, and that a short `LOUPE_IDLE_SECS` makes the sessions close sooner.
+22. The summarizer credential for the run **MUST** be the same subscription token, set in `.env` as `LOUPE_SUMMARY_OAUTH_TOKEN` (CR-0006 requirement 17, decision D7). The README section **MUST** state this step.
+23. Before the first `pi -p` call, the scenario **MUST** run `PI_CODING_AGENT_DIR=<isolated agent directory> pi --list-models claude-haiku-5-5` and confirm that the output lists `claude-haiku-5-5` under the provider `anthropic`. If the model is not listed, the fallback **MUST** be a `models` entry for `claude-haiku-5-5` under `providers.anthropic` in the isolated `models.json`, written by the connect script, and the scenario **MUST** record which route it used.
 12. The repository **MUST** contain the user scenario `.agents/scenarios/acceptance.macos.end-to-end.md`, made and graded through the `user-scenario` skill. The scenario **MUST** state the user goal, the steps, and the success condition before its first run.
 13. The scenario **MUST** drive the real `claude` and `pi` CLIs and the real `api.anthropic.com`, and **MUST** read the dashboard in a real browser through the browser driver. It **MUST NOT** use the fake upstream of CR-0002 or the seed script of CR-0008.
 14. The scenario **MUST** set `LOUPE_IDLE_SECS` to `60` for the run through an untracked `compose.override.yaml` with `services.loupe.environment.LOUPE_IDLE_SECS: "60"`. A shell variable on `docker compose up` **MUST NOT** be used, because `compose.yaml` (CR-0001 requirement 19) does not interpolate `LOUPE_IDLE_SECS`, so the variable does not reach the container. `.gitignore` **MUST** list `compose.override.yaml`. It **MUST NOT** change the default of `LOUPE_IDLE_SECS` in the code or in `compose.yaml`.
@@ -223,6 +225,7 @@ flowchart LR
 | `tests/scripts/agent.connect.test.sh` | `missing_token_is_actionable` | Error | no token | exit non-zero, stderr names `--token-file`, `loupe token create`, `loupe token list` |
 | `tests/scripts/agent.connect.test.sh` | `dry_run_writes_nothing_and_masks` | Dry run | `--dry-run --agent pi` | no file, output shows `lpt_…` and not the token |
 | `tests/scripts/agent.connect.test.sh` | `never_touches_global_dirs` | Isolation | temp `HOME` with `.claude` and `.pi/agent` | both directories unchanged after a run |
+| `tests/scripts/agent.connect.test.sh` | `never_reads_pi_auth` | Credential isolation | temp `HOME` with `.pi/agent/auth.json` | the isolated directory has no `auth.json` and no link to `~/.pi/agent` |
 | `tests/scripts/agent.connect.test.sh` | `check_fails_when_down` | Health | `--check --base http://127.0.0.1:1` | exit non-zero, stderr names `docker compose up -d` |
 
 ### Tests to Modify
@@ -274,7 +277,8 @@ Then the command exits 0 and prints an answer
 
 ```gherkin
 Given the reader ran "eval $(.agents/scripts/agent.connect.sh --agent pi --token-file <file>)"
-  And an Anthropic credential is in the environment of the reader
+  And "ANTHROPIC_OAUTH_TOKEN" holds the subscription token from "claude setup-token" in the environment of the reader
+  And "pi --list-models claude-haiku-5-5" lists "claude-haiku-5-5" under the provider "anthropic", or the isolated "models.json" holds the fallback model entry
 When the reader runs "pi -p --provider anthropic --model claude-haiku-5-5 'Reply with the word ok.'"
 Then the command exits 0 and prints an answer
   And every file under "~/.pi/agent" has the same checksum as before the run
@@ -284,6 +288,7 @@ Then the command exits 0 and prints an answer
 
 ```gherkin
 Given AC-3 and AC-4 passed
+  And ".env" holds LOUPE_SUMMARY_OAUTH_TOKEN with the subscription token
   And 60 seconds and one summary interval passed with no calls
 When the reader runs "docker compose exec loupe loupe aggregate --date <today>"
 Then "curl -s http://127.0.0.1:8787/v1/days/<today>" returns 200
@@ -377,7 +382,7 @@ curl -s http://127.0.0.1:8787/v1/days/$(TZ=Europe/Stockholm date +%F)
 
 **Likelihood:** high
 **Impact:** high
-**Mitigation:** The README states the environment variables that Pi reads. The open question below decides the default route; the scenario records which credential kind it used, never the value.
+**Mitigation:** Decision D6 sets the credential: `ANTHROPIC_OAUTH_TOKEN` with the subscription token from `claude setup-token`. The README states the step. The scenario records the credential kind, never the value.
 
 ### Risk 2: The real API rejects a request that the fake upstream accepted
 
@@ -403,10 +408,14 @@ curl -s http://127.0.0.1:8787/v1/days/$(TZ=Europe/Stockholm date +%F)
 **Impact:** medium
 **Mitigation:** Requirement 3 forbids the token as an argument value; the token comes from a file or a variable.
 
+## Decisions
+
+* D6: Pi gets its credential from the variable `ANTHROPIC_OAUTH_TOKEN`, which holds the subscription token that the human makes one time with `claude setup-token`. Nothing is copied or linked from `~/.pi/agent` (requirement 7). Decided by the human on 2026-10-19.
+* D7: the summarizer uses the same subscription token, set in `.env` as `LOUPE_SUMMARY_OAUTH_TOKEN` (requirement 22, CR-0006 requirement 17). Decided by the human on 2026-10-19.
+
 ## Open Questions
 
-1. **Credential for Pi in the isolated directory.** The options are: (a) the human exports `ANTHROPIC_API_KEY` (a Console key) for the run; (b) the human exports `ANTHROPIC_OAUTH_TOKEN` with the subscription token from `claude setup-token`; (c) the script links `~/.pi/agent/auth.json` into the isolated directory. Option (c) reads a credential file of the human. Provisional default: (b), because it needs no new paid key and Haiku works on the subscription path; the scenario records which option it used. This question goes to the human.
-2. **Summary credential for the run.** CR-0006 accepts `LOUPE_SUMMARY_API_KEY` or `LOUPE_SUMMARY_OAUTH_TOKEN`. Provisional default: `LOUPE_SUMMARY_OAUTH_TOKEN` in `.env`, for the same reason.
+None. D6 and D7 close the two earlier open questions.
 
 ## Dependencies
 
@@ -438,3 +447,4 @@ Chosen approach: "a connect script that prints per-invocation environment and an
 
 * 2026-10-18: Revised after review. The leak pattern now includes "_" and "-". The status is "proposed" until the next review.
 * 2026-10-18: Reviewed and approved by an independent reviewer agent on 2026-10-18.
+* 2026-10-19: Recorded the human decisions D6 and D7 (requirements 7 and 22, AC-4, AC-5, Risk 1). Added requirement 23, a check of the Pi model list with a named fallback. The status is "proposed" until the next review.
