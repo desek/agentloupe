@@ -2,8 +2,8 @@
 name: "CR-0003 proxy tokens"
 description: "Adds many proxy tokens with name, tags, dates, and revocation, the loupe token commands, the bootstrap token from a secret, the token route segment, and the token ID on each exchange."
 id: "CR-0003"
-status: "approved"
-date: 2026-10-18
+status: "proposed"
+date: 2026-10-19
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
@@ -16,7 +16,7 @@ source-commit: 6e4f5bf
 
 ## Change Summary
 
-After CR-0002, any client that can reach the port can use the proxy on the route `/<agent>/<upstream>/<path>`, and the stored exchange does not show which client sent it. This CR adds proxy tokens. An operator can make many tokens, each with a unique name, `key=value` tags, and dates. When at least one token is active, each proxied request must start with a valid token, and each exchange stores the ID of its token.
+After CR-0002, any client that can reach the port can use the proxy on the route `/<agent>/<upstream>/<path>`, and the stored exchange does not show which client sent it. This CR adds proxy tokens. An operator can make many tokens, each with a unique name, `key=value` tags, and dates. After the first token exists, each proxied request must start with a valid active token, also after the last token is revoked, and each exchange stores the ID of its token.
 
 ## Motivation and Background
 
@@ -57,9 +57,9 @@ flowchart TD
     C["Client"] -->|"/token/agent/upstream/path"| R["Router"]
     R --> P["Route parser with token segment"]
     P --> G{"Token gate"}
-    G -->|"no active token, no segment"| F["Forwarder"]
+    G -->|"no token row ever, no segment"| F["Forwarder"]
     G -->|"valid active token"| F
-    G -->|"missing, unknown, or revoked"| E["401 JSON error, no exchange"]
+    G -->|"missing, unknown, or revoked, also with no active token"| E["401 JSON error, no exchange"]
     F --> W["Capture writer"]
     W --> DB[("exchanges with proxy_token_id")]
     G -.->|"lookup by SHA-256 hash"| T[("proxy_tokens")]
@@ -115,9 +115,9 @@ stateDiagram-v2
 11. `loupe token create` and `loupe token revoke` **MUST** support `--dry-run`, which validates the input and prints what the command would do with no write. Each subcommand **MUST** have a complete `--help`, and a missing required argument **MUST** name the flag.
 12. The route parser **MUST** accept an optional first path segment that starts with `lpt_`. The route value **MUST** then carry the segment as the presented token, and the rest of the path **MUST** parse as `/<agent>/<upstream>/<path>` with the rules of CR-0002. Because the agent label pattern has no `_`, a first segment that starts with `lpt_` **MUST** never be read as an agent label.
 13. The token gate **MUST** run after the route parser and before the forwarder. The gate **MUST** read the active token state from the database for each request, so that a `create` or a `revoke` from another process takes effect on the next request without a restart. A cache **MUST** be at most 5 seconds old.
-14. When at least one token is active, the gate **MUST** refuse a request with no token segment, an unknown token, or a revoked token with status 401 and a JSON error body. The body **MUST** state what failed (`token_missing`, `token_unknown`, or `token_revoked`), the fix (put a valid token first in the base URL, as `/<token>/<agent>/<upstream>`), and the check (`loupe token list`). The body **MUST NOT** echo the presented token. The proxy **MUST NOT** forward a refused request, and **MUST NOT** store an exchange for it.
-15. When no token is active, the gate **MUST** accept a request with no token segment. It **MUST** refuse a request with a token segment with status 401 and the error `token_mode_off`, because the client expects a check that the server does not do.
-16. When no token is active, `loupe serve` **MUST** log one warning line at start that states that the proxy is open to every client that can reach the port, and that names the fix (`loupe token create` or `LOUPE_BOOTSTRAP_TOKEN`). The binary **MUST** also log this warning line when the last active token is revoked while it runs, at the first request after the change.
+14. When the table `proxy_tokens` holds at least one row, active or revoked, the gate **MUST** refuse a request with no token segment, an unknown token, or a revoked token with status 401 and a JSON error body. The body **MUST** state what failed (`token_missing`, `token_unknown`, or `token_revoked`), the fix (put a valid token first in the base URL, as `/<token>/<agent>/<upstream>`), and the check (`loupe token list`). The body **MUST NOT** echo the presented token. The proxy **MUST NOT** forward a refused request, and **MUST NOT** store an exchange for it. When every row is revoked, the gate **MUST** refuse every proxied request in this way until a new token is active; revoke of the last active token **MUST NOT** open the proxy.
+15. Only while the table `proxy_tokens` has never held a row (no-token mode), the gate **MUST** accept a request with no token segment. It **MUST** refuse a request with a token segment with status 401 and the error `token_mode_off`, because the client expects a check that the server does not do.
+16. In no-token mode, `loupe serve` **MUST** log one warning line at start that states that the proxy is open to every client that can reach the port, and that names the fix (`loupe token create` or `LOUPE_BOOTSTRAP_TOKEN`). When rows exist but no token is active, `loupe serve` **MUST** log one warning line at start, and at the first request after the last active token is revoked while it runs, that states that the proxy refuses all proxied requests and names the fix (`loupe token create` or `LOUPE_BOOTSTRAP_TOKEN`).
 17. Before it opens the port, `loupe serve` **MUST** run the bootstrap step. If `LOUPE_BOOTSTRAP_TOKEN` is set, the value **MUST** be a valid raw token per requirement 2, else the start **MUST** stop with an actionable error that names the variable, the fix (`loupe token generate`), `.env.example`, and the check (`loupe config show`). If no row named `bootstrap` exists, the step **MUST** make it with no tags. If the row exists and its hash differs, the step **MUST** replace the hash, clear `revoked_at`, and keep the row ID. If the variable is not set and an active row named `bootstrap` exists, the step **MUST** set its `revoked_at`.
 18. The bootstrap step **MUST** be idempotent: a second start with the same environment **MUST** make no change to `proxy_tokens`.
 19. After a request passes the gate, `last_used_at` of its token **MUST** be updated. To keep the write load low, the update **MUST** happen at most one time per minute for each token, and **MUST NOT** delay or fail the forwarded request.
@@ -128,6 +128,7 @@ stateDiagram-v2
 23. `.taxonomy` **MUST** update the row for proxy token so that its `Lives in` column names the new source files, and **MUST** add rows for the new nouns bootstrap token and token gate.
 24. `.env.example` **MUST** keep `LOUPE_BOOTSTRAP_TOKEN` with no value and a comment that names `loupe token generate`.
 25. `docs/specification/proxy.tokens.md` **MUST** describe the token format, the table, the commands, the gate states, and the bootstrap rules before the code lands, per the operating model.
+26. The implementer **MUST** change the README text "With no active token, the routes have no token part" so that it states the rule of requirements 14 and 15: the routes have no token part only while no token has ever existed, and after the first token every proxied request needs a valid active token, also when every token is revoked.
 
 ### Non-Functional Requirements
 
@@ -149,7 +150,8 @@ stateDiagram-v2
 * The token format, SHA-256 storage, name, tags, and the three dates.
 * `loupe token generate`, `create`, `list`, and `revoke`.
 * `LOUPE_BOOTSTRAP_TOKEN`: make, replace the hash, and revoke at start.
-* The route segment `/<token>/`, the token gate, the 401 errors, and the no-token mode with its warning.
+* The route segment `/<token>/`, the token gate, the 401 errors, the no-token mode with its warning, and the closed state after the last revoke.
+* The change of the README text about no active token (requirement 26).
 * The column `proxy_token_id` on `exchanges`.
 * The rule that the public API never shows token data.
 
@@ -173,7 +175,7 @@ stateDiagram-v2
 
 ### User Impact
 
-An operator who makes a token must change the base URL of each client to start with `/<token>/`. A client without a token gets a 401 with the fix. With no token, the proxy keeps the behaviour of CR-0002 and logs a warning.
+An operator who makes a token must change the base URL of each client to start with `/<token>/`. A client without a token gets a 401 with the fix. Before the first token exists, the proxy keeps the behaviour of CR-0002 and logs a warning. After the last active token is revoked, the proxy refuses all proxied requests until a new token is active.
 
 ### Technical Impact
 
@@ -233,7 +235,7 @@ flowchart LR
 | `src/token/store.rs` (unit) | `tag_rules_hold` | Tags | 17 tags, repeated key, bad key, empty value | each refused |
 | `src/token/store.rs` (unit) | `revoke_is_idempotent` | Revoke | revoke two times | exit 0, first `revoked_at` kept |
 | `src/token/bootstrap.rs` (unit) | `bootstrap_create_replace_revoke` | Bootstrap | value A, then A, then B, then unset, then A | create, no change, hash B and same ID, revoked, active with hash A |
-| `src/token/gate.rs` (unit) | `gate_states` | Gate | no token active with and without segment; one active with missing, unknown, revoked, valid | accept, `token_mode_off`, `token_missing`, `token_unknown`, `token_revoked`, accept with ID |
+| `src/token/gate.rs` (unit) | `gate_states` | Gate | no row ever with and without segment; one active with missing, unknown, revoked, valid; all rows revoked with no segment and with the revoked token | accept, `token_mode_off`, `token_missing`, `token_unknown`, `token_revoked`, accept with ID, `token_missing`, `token_revoked` |
 | `src/token/gate.rs` (unit) | `last_used_written_once_per_minute` | Write load | 50 requests in 10 seconds | one update of `last_used_at` |
 | `tests/token.cli.rs` (integration) | `generate_stores_nothing` | Generate | `loupe token generate` with an empty data dir | one token on stdout, no database file made |
 | `tests/token.cli.rs` (integration) | `list_never_shows_token_or_hash` | List | create two tokens, `loupe token list` | names, tags, dates, status; no `lpt_`, no hash |
@@ -241,7 +243,8 @@ flowchart LR
 | `tests/token.proxy.rs` (integration) | `valid_token_forwards_and_records_id` | Tracking | active token, request to the fake upstream | 200, exchange row with `proxy_token_id` of the token |
 | `tests/token.proxy.rs` (integration) | `refused_request_is_401_without_exchange` | Gate | missing, unknown, revoked token | 401 JSON with the code, no echo of the token, no row |
 | `tests/token.proxy.rs` (integration) | `revoke_applies_without_restart` | Live state | `serve` runs, `loupe token revoke` from a second process | next request after 5 seconds is 401 |
-| `tests/token.proxy.rs` (integration) | `no_token_mode_warns_and_forwards` | Open mode | no token | warning line at start, 200, `proxy_token_id` null |
+| `tests/token.proxy.rs` (integration) | `no_token_mode_warns_and_forwards` | Open mode | no token row ever | warning line at start, 200, `proxy_token_id` null |
+| `tests/token.proxy.rs` (integration) | `last_revoke_keeps_proxy_closed` | Closed state | one token, then revoke it while `serve` runs | warning line, next request with no segment is 401 `token_missing`, no row |
 | `tests/token.secrets.rs` (integration) | `token_segment_absent_from_logs_and_path` | Path redaction | `RUST_LOG=trace`, active token, one request on `/<token>/claude-code/anthropic/v1/messages` | no `lpt_` in `<LOUPE_DATA_DIR>/logs/loupe.log`, on stderr, or in `exchanges.path`; `exchanges.path` is `/v1/messages` |
 | `tests/token.secrets.rs` (integration) | `raw_token_absent_from_disk` | Leak | create, use, bootstrap | no raw token in the data dir or stderr |
 | `tests/api.privacy.rs` (integration) | `public_routes_have_no_token_data` | Privacy | tokens with tags, `GET /v1/...` routes that exist | no name, tag, or hash in a body |
@@ -318,12 +321,23 @@ Then "loupe token list" shows a "last_used_at" after the time of the request sta
 ### AC-6: No-token mode warns and forwards
 
 ```gherkin
-Given "loupe serve" starts with no active token and no "LOUPE_BOOTSTRAP_TOKEN"
+Given "loupe serve" starts with no row in "proxy_tokens" and no "LOUPE_BOOTSTRAP_TOKEN"
 When the reader reads "<data dir>/logs/loupe.log"
 Then it holds one warning line that names "loupe token create" and "LOUPE_BOOTSTRAP_TOKEN"
   And "curl http://127.0.0.1:8787/claude-code/anthropic/v1/messages" is forwarded
   And the new row of "exchanges" has "proxy_token_id" null
   And a request that starts with an "lpt_" segment gets 401 "token_mode_off"
+```
+
+### AC-13: Revoke of the last token keeps the proxy closed
+
+```gherkin
+Given "loupe serve" runs and "work-laptop" is the only token and is active
+When the reader runs "loupe token revoke work-laptop" and after 5 seconds sends "curl http://127.0.0.1:8787/claude-code/anthropic/v1/messages"
+Then the response is 401 with the JSON field "error" equal to "token_missing"
+  And the fake upstream received no request
+  And "exchanges" has no new row
+  And "<data dir>/logs/loupe.log" holds a warning line that states that the proxy refuses all proxied requests
 ```
 
 ### AC-7: The bootstrap token follows the variable
@@ -431,7 +445,7 @@ grep -rnE '(CR|AC|FR|NFR)-[0-9]+' src tests
 
 **Likelihood:** medium
 **Impact:** high
-**Mitigation:** The README states that the routes have no token part when no token is active, so this CR follows it, logs the warning of requirement 16, and records the risk as open question 1.
+**Mitigation:** Decided by the human on 2026-10-19: the proxy stays closed after the first token exists (requirement 14), so revoke of the last token refuses all proxied requests. Requirement 26 changes the README to match.
 
 ### Risk 2: A token leaks through a log or an error body
 
@@ -453,8 +467,10 @@ grep -rnE '(CR|AC|FR|NFR)-[0-9]+' src tests
 
 ## Open Questions
 
-1. When an operator revokes the last active token, the proxy goes back to no-token mode and accepts every client. Provisional default: follow the README literally, with the warning of requirement 16. The alternative is to stay closed (refuse all proxied requests) once any token row exists. This is a question for the human.
-2. In no-token mode, a request with a token segment gets 401 `token_mode_off` (requirement 15). Provisional default: refuse, so a client never thinks that it is protected. The alternative is to strip the segment and forward.
+No question is open. The decisions are:
+
+1. Revoke of the last active token: decided by the human on 2026-10-19. The proxy stays closed. After the table `proxy_tokens` holds any row, every proxied request needs a valid active token, and revoke of the last active token refuses all proxied traffic until a new token exists. No-token mode applies only while the table has never held a token (requirements 14, 15, 16, 26, and AC-13).
+2. A request with a token segment in no-token mode: decided by the supervisor as a judgement call on 2026-10-19. The proxy refuses it with 401 `token_mode_off` (requirement 15), so a client never thinks that it is protected.
 
 ## Dependencies
 
