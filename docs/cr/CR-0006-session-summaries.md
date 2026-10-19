@@ -2,8 +2,8 @@
 name: "CR-0006 Non-identifying one-line session summaries and raw-body retention"
 description: "Adds a summary worker that writes one scrubbed, non-identifying line per closed session and one line per day with a small Anthropic model that the binary calls directly, and deletes the raw bodies after parse and summary."
 id: "CR-0006"
-status: "approved"
-date: 2026-10-18
+status: "proposed"
+date: 2026-10-19
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
@@ -441,7 +441,7 @@ docker compose exec loupe loupe summarize --once --dry-run
 
 **Likelihood:** medium
 **Impact:** high
-**Mitigation:** strict rules in the system prompt, a 12-word limit, temperature 0, and the operator reads the day line before CR-0007 publishes it. A deny list of names is not possible in general, so this risk stays and is stated in `docs/specification/summaries.md`.
+**Mitigation:** strict rules in the system prompt, a 12-word limit, temperature 0, and the day can be rebuilt later with `loupe aggregate --date`. CR-0007 publishes the day line with no manual review (decided by the human on 2026-10-19). A deny list of names is not possible in general, so this risk stays and is stated in `docs/specification/summaries.md`.
 
 ### Risk 2: Prompt injection in the transcript
 
@@ -479,10 +479,14 @@ Chosen approach: "a direct Anthropic client with two separate credential variabl
 
 Reviewed and approved by an independent reviewer agent on 2026-10-18.
 
+## Decisions
+
+* D2: the day line is published automatically, with no manual review. A day can be rebuilt later with `loupe aggregate --date`. Decided by the human on 2026-10-19.
+* D7: the summarizer uses the subscription token, set in `.env` as `LOUPE_SUMMARY_OAUTH_TOKEN` (requirement 17). Decided by the human on 2026-10-19.
+
 ## Open Questions
 
-1. The day line is not shown to the human before publication. Provisional default: CR-0007 publishes the stored line with no manual review. Pending the human.
-2. The exact headers for the OAuth Bearer path are not confirmed. Provisional default: `Authorization: Bearer` with `anthropic-version`, and the implementer adds what tier 1 shows (requirement 19).
+1. The exact headers for the OAuth Bearer path are not confirmed. Provisional default: `Authorization: Bearer` with `anthropic-version`, and the implementer adds what tier 1 shows (requirement 19).
 
 ## Related Items
 
