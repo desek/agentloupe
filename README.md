@@ -99,12 +99,16 @@ Configuration:
 | `LOUPE_ACCOUNT_KEY` | yes | Secret for the HMAC hashes of accounts and pull requests. |
 | `LOUPE_BOOTSTRAP_TOKEN` | no | A proxy token from a secret (see "Proxy tokens"). |
 | `LOUPE_GITHUB_TOKEN_<LABEL>` | no | One or more GitHub tokens (see "GitHub"). |
-| `LOUPE_SUMMARY_API_KEY` | no | Anthropic API key for the one-line summaries. Without it, no summaries. |
+| `LOUPE_SUMMARY_API_KEY` or `LOUPE_SUMMARY_OAUTH_TOKEN` | no | Anthropic credential for the one-line summaries: an API key, or the subscription token from `claude setup-token`. Without one, no summaries. |
 | `LOUPE_SUMMARY_MODEL` | no | Model for the summaries. Default `claude-haiku-5-5`. |
 | `LOUPE_TZ` | no | Time zone that cuts the days. Default `Europe/Stockholm`. |
 | `LOUPE_PUBLISH_AT` | no | Time to publish the previous day. Default `01:00`. |
 | `LOUPE_IDLE_SECS` | no | Seconds without calls before a session closes. Default `1800`. |
 | `LOUPE_RAW_RETENTION_HOURS` | no | Hours to keep raw bodies after parse and summary. Default `24`. |
+
+A day has a record when it has agent calls or GitHub activity. A day with neither has no record,
+and the dashboard shows it as zero. The day line is published with no manual review. To change a
+day later, run `loupe aggregate --date` again.
 
 Example day record:
 
@@ -131,7 +135,7 @@ it shows is public.
 |---|---|
 | Header | Title "Agentloupe", time of the last update, range selector (3M, 6M, 1Y) |
 | Pull requests | PRs opened and PRs merged for the range, bar chart per week |
-| Lines changed, all time | Lines added, lines removed, net lines |
+| Lines changed | Lines added, lines removed, and net lines for the selected range |
 | Tokens per day | Input and output, two line charts, each on its own scale |
 | Cost (API-equivalent) | A card in the totals row: the total for the range, and a daily line chart in the style of the token charts. The label says that the figure is a list price, not money paid. |
 | Token usage, last 12 months | Heatmap per day, five levels from quartiles |
@@ -163,9 +167,10 @@ request, so you can later analyse the usage by token and by the metadata of the 
   independently, so an analysis can group by token, by account, or by both.
 - **Privacy.** Token names and tags stay in the database. The public API does not show them.
 - **Use.** The client puts the token first in the route: `/<token>/<agent>/<upstream>/<path>`.
-  When at least one token is active, every proxied request needs a valid token. With no active
-  token, the routes have no token part. The binary then logs a warning at start, because anyone
-  who can reach the port can use the proxy.
+  Before the first token exists, the routes have no token part, and the binary logs a warning at
+  start, because anyone who can reach the port can use the proxy. After the first token exists,
+  every proxied request needs a valid active token. If no token is active, for example after you
+  revoke the last one, the proxy refuses all proxied requests until you make a new token.
 - **Bootstrap.** A deployment without a shell can set `LOUPE_BOOTSTRAP_TOKEN` from a secret. At
   start, the binary records it as the token named `bootstrap`, as a hash only. If the value
   changes, the binary replaces the hash. If the variable is removed, the binary revokes the
@@ -270,7 +275,8 @@ as the day is published. It catches up missed days in the same way as the rest o
 - **Day fields.** `prs_opened`, `prs_merged`, `lines_added`, and `lines_removed`. The lines
   count on the day of the merge.
 - **Failures.** If a token fails (expired, revoked, not approved), the worker logs the label and
-  the cause, and the day records which labels are missing.
+  the cause. The public day record shows only the number of failed tokens. The label names stay
+  in the private database and in the logs.
 
 Required permissions for a fine-grained personal access token (recommended):
 
