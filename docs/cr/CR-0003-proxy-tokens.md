@@ -2,7 +2,7 @@
 name: "CR-0003 proxy tokens"
 description: "Adds many proxy tokens with name, tags, dates, and revocation, the loupe token commands, the bootstrap token from a secret, the token route segment, and the token ID on each exchange."
 id: "CR-0003"
-status: "proposed"
+status: "approved"
 date: 2026-10-19
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
@@ -491,7 +491,7 @@ Chosen approach: "a token segment in the route, checked against SHA-256 hashes i
 * **Started:** not started
 * **Completed:** not started
 * **Deployed to Production:** not applicable
-* **Notes:** Reviewed and approved by an independent reviewer agent on 2026-10-18. The revision of commit 57cc483 was reviewed again and approved by an independent reviewer agent on 2026-10-18.
+* **Notes:** Reviewed and approved by an independent reviewer agent on 2026-10-18. The revision of commit 57cc483 was reviewed again and approved by an independent reviewer agent on 2026-10-18. Re-approved by an independent reviewer agent on 2026-10-19 after the human decisions were recorded.
 
 ## Related Items
 
