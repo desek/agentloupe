@@ -141,7 +141,7 @@ Day record
 
 Schedule and catch-up
 
-26. Before the publisher of CR-0007 makes the first `days` row of a due day, it **MUST** run the fetch of that day for each label. Catch-up **MUST** run the fetch for each day that it publishes, oldest first.
+26. On each wake, the worker **MUST** run the fetch for each label and each due day that has no `days` row and no `github_fetches` row with `status: ok` for that label, oldest first. This scan **MUST NOT** depend on the days that the calls source makes due. The scan starts at the start day and ends at the newest due day. The start day is the later of two days: the oldest `first_activity_day()` of the calls source, and the current day minus 90 days. If the calls source has no activity day, the start day is the current day minus 90 days. Thus the lookback is at most 90 days. The worker **MUST** finish this scan before the publisher of CR-0007 decides which due days to publish on the same wake.
 27. On each wake, the publisher **MUST** run the fetch again for each published day of the last 7 days that has a label with no `status: ok` row, and **MUST** put each such day in `agg_queue` with reason `github` after a fetch that changes a row.
 28. `loupe aggregate --date <day>` **MUST** run the fetch of that day for each label before it builds the day. `loupe aggregate --date <day> --dry-run` **MUST NOT** call GitHub and **MUST** build from the stored rows.
 29. The worker **MUST** register a GitHub source through the activity source interface of CR-0007 requirement 15a. `has_activity(day)` **MUST** return `true` when `github_prs` has one or more rows with `opened_day` or `merged_day` equal to the day. `first_activity_day()` **MUST** return the oldest such day, or none. After a fetch that changes a row, the worker **MUST** put the day in `agg_queue` with reason `github` (CR-0007 requirement 15b). Thus a due day with pull requests and no call gets a record with `calls: 0`, and a day with no call and no pull request gets no record. Decided by the human on 2026-10-19.
@@ -199,7 +199,7 @@ Documentation
 * GitHub Enterprise Server, GitHub Apps, and OAuth app flows.
 * Commits, reviews, issues, and lines of pull requests that are not merged.
 * A public count per label.
-* Records for days without calls: CR-0007 decides.
+* The activity rule and the activity source interface: CR-0007 defines them. This CR only registers the GitHub source (requirement 29).
 
 ## Alternative Approaches Considered
 
@@ -271,7 +271,7 @@ flowchart LR
 | `tests/day.github.rs` | `fields_null_without_token` | Optional tokens | no token | four fields `null`, no request to the fake |
 | `tests/day.github.rs` | `lines_count_on_merge_day` | Day fields | opened on day 1, merged on day 2 | day 1 `prs_opened` 1, day 2 `prs_merged` 1 and the lines |
 | `tests/day.github.rs` | `failed_tokens_in_detail` | Failure in record | `A` failed | `detail.github.failed_tokens` `1`, no label name in the record |
-| `tests/publish.github.rs` | `github_only_day_gets_record` | GitHub activity source | due day with a merged pull request and no call | one `days` row, `calls` 0, `prs_merged` 1 |
+| `tests/publish.github.rs` | `github_only_day_gets_record` | GitHub activity source | fake GitHub has a pull request merged on a due day, database has no call and no `github_prs` row for it | one `days` row, `calls` 0, `prs_merged` 1 |
 | `tests/publish.github.rs` | `day_without_calls_or_prs_gets_no_record` | Activity rule | due day, no call, no pull request | no `days` row |
 | `tests/publish.github.rs` | `catch_up_fetches_each_day_oldest_first` | Catch-up | 3 due days | fetches in day order, before each first build |
 | `tests/publish.github.rs` | `retry_failed_label_within_7_days` | Retry | day with `A` failed, then fake passes | `agg_queue` row `github`, record with `failed_tokens` 0 |
@@ -386,8 +386,9 @@ Then the verdict exits 0 with every stage "status: passed"
 ### AC-10: A day with pull requests and no call gets a record
 
 ```gherkin
-Given a due day D1 with one merged pull request and no call
-  And a due day D2 with no pull request and no call
+Given the fake GitHub has one pull request merged on due day D1
+  And the database has no call and no "github_prs" row for D1
+  And the fake GitHub has no pull request on due day D2, and the database has no call for D2
 When the publisher wakes
 Then "GET /v1/days/D1" returns a record with "calls" 0 and "prs_merged" 1
   And D2 has no "days" row
