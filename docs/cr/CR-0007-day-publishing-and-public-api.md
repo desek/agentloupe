@@ -2,8 +2,8 @@
 name: "CR-0007 Day aggregation, nightly publishing, and the public API"
 description: "Adds the day record built from calls, sessions, and the day line in LOUPE_TZ, a publisher that publishes the previous day after LOUPE_PUBLISH_AT with catch-up and late updates, the loupe aggregate command, and the read-only public API GET /v1/days with open CORS."
 id: "CR-0007"
-status: "approved"
-date: 2026-10-18
+status: "proposed"
+date: 2026-10-19
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
@@ -117,7 +117,9 @@ sequenceDiagram
 12. `detail.by_agent` **MUST** be an object keyed by agent label (for example `claude-code`, `pi`). Each value **MUST** hold `input_total`, `input`, `cache_read`, `cache_write`, `output`, `calls`, `sessions`, `cost_usd`, and `unpriced_calls` for the calls and segments of that agent label, with the rules of requirements 6 to 8.
 13. `detail.by_model` **MUST** be an object keyed by the model name of the call. Each value **MUST** hold `input_total`, `input`, `cache_read`, `cache_write`, `output`, `calls`, `cost_usd`, and `unpriced_calls`. It **MUST NOT** hold `sessions`, because one segment can use more than one model.
 14. The keys of `by_agent` and `by_model` **MUST** be sorted in byte order, so two builds of the same data give the same bytes.
-15. A day with no call **MUST NOT** get a record. The API returns only the days that have a record. Provisional default, see Open Questions, item 2.
+15. A day **MUST** get a record only when it has activity: one or more calls, or GitHub activity (pull requests opened or merged) that an activity source reports. A day with no activity **MUST NOT** get a record. The API returns only the days that have a record, and the dashboard shows a day with no record as zero. Decided by the human on 2026-10-19.
+15a. One source file **MUST** define the activity source interface, with two functions for each source: `has_activity(day)` returns `true` or `false`, and `first_activity_day()` returns the oldest day with activity or none. This CR **MUST** register one source, the calls source, which reads `calls` only. A day has activity when one or more registered sources return `true`. CR-0009 registers a GitHub source through this interface, and **MUST NOT** need a change to the publisher.
+15b. A source that gets new data for a day **MUST** put that day in `agg_queue` with a reason that names the source (CR-0009 uses `github`). This is the interface that CR-0009 uses to create or update the record of a day with GitHub activity and no call: requirement 27 creates the record when the day is due and has no `days` row, and requirement 28 updates it when the row exists.
 
 **Privacy of the record**
 
@@ -141,7 +143,7 @@ sequenceDiagram
 
 25. `loupe serve` **MUST** start one publisher worker. It **MUST** wake at an interval of `LOUPE_PUBLISH_INTERVAL_SECS` (default `60`) and once at start.
 26. A day D is due when the local time in `LOUPE_TZ` is at or after `LOUPE_PUBLISH_AT` (default `01:00`, format `HH:MM`) on the date D plus one. An invalid `LOUPE_PUBLISH_AT` **MUST** stop start with an actionable error, as in requirement 3.
-27. On each wake, the worker **MUST** publish each due day that has calls and no `days` row, oldest first. The first day to check **MUST** be the day of the oldest call. Thus the worker catches up each day that it missed while the container was stopped, and a restart repeats no work.
+27. On each wake, the worker **MUST** publish each due day that has activity (requirement 15) and no `days` row, oldest first. The first day to check **MUST** be the oldest `first_activity_day()` of all registered sources. Thus the worker catches up each day that it missed while the container was stopped, and a restart repeats no work.
 28. On each wake, the worker **MUST** then build again each day in `agg_queue` that has a `days` row, and **MUST** delete the queue row in the same transaction as the write, unless requirement 11 puts the day back.
 29. A queued day that is not yet due **MUST** stay in the queue and **MUST NOT** get a record from the worker. The worker publishes it when it is due (requirement 27).
 30. Thus a late session updates its day: a segment that starts on day D and closes after D is published puts D in the queue (requirement 22), and the next wake writes a new revision of D.
@@ -153,7 +155,7 @@ sequenceDiagram
 33. A record of today that `loupe aggregate` writes **MUST** be visible in the public API. The publisher **MUST** build that day again when it is due, because the parser puts the day in the queue for each later call.
 34. `loupe aggregate` **MUST** print `key: value` lines on stdout: `day`, `calls`, `sessions`, `cost_usd`, `unpriced_calls`, `summary` (the literal `present` or `absent`, never the line), `revision`, and `written` (`true` or `false`). It **MUST** exit 0 on success.
 35. `loupe aggregate --dry-run` **MUST** print the same lines with `written: false` and **MUST NOT** write `days`, `agg_queue`, or `day_summaries`. In dry-run, the builder **MUST** read `day_summaries` as it is and **MUST NOT** call `build_day_line`.
-36. `--date` with a value that is not a valid `YYYY-MM-DD` date and not `today` **MUST** exit with code 2 and an actionable error on stderr that names the flag and an example. A day with no call **MUST** print `calls: 0` and `written: false`, and exit 0.
+36. `--date` with a value that is not a valid `YYYY-MM-DD` date and not `today` **MUST** exit with code 2 and an actionable error on stderr that names the flag and an example. A day with no activity (requirement 15) **MUST** print `calls: 0` and `written: false`, and exit 0. A day with activity and no call **MUST** be written, with `calls: 0`.
 37. `loupe aggregate --help` **MUST** list each flag and the exit codes (0 success, 2 bad input, 1 internal error).
 
 **Public API**
@@ -234,7 +236,8 @@ sequenceDiagram
 * Build the record in the request path from `calls`. Rejected: the API then reads private tables, the latency grows with the data, and the record changes during the day, which the README "nightly" rule does not permit.
 * Publish only at the exact time `LOUPE_PUBLISH_AT` with a cron-like timer. Rejected: a stopped container misses the day for ever. The due rule with catch-up gives the same result and survives a restart.
 * Wait for every segment of the day to close before the first publish. Rejected: one segment that stays open blocks the day. The late update through `agg_queue` gives a correct day later.
-* Store a zero record for each day with no call. Deferred to Open Questions, item 2.
+* Store a zero record for each day with no activity. Rejected by the human on 2026-10-19: the API stays small, and the dashboard shows a missing day as zero.
+* Publish only days with calls. Rejected by the human on 2026-10-19: a day with pull requests and no agent call is real work, so it gets a record.
 
 ## Impact Assessment
 
@@ -296,6 +299,9 @@ flowchart LR
 | `tests/day.build.rs` | `by_model_has_no_sessions_field` | Detail shape | two models | no `sessions` key |
 | `tests/day.build.rs` | `record_bytes_are_deterministic` | Same rows give same hash | rows in two orders | equal `content_hash` |
 | `tests/day.build.rs` | `summary_not_ready_requeues_day` | Day line not ready | open segment | `summary` null, queue row `summary_not_ready` |
+| `tests/publish.activity.rs` | `day_without_activity_gets_no_record` | Activity rule | due day, no source reports activity | no `days` row |
+| `tests/publish.activity.rs` | `source_activity_without_calls_publishes_day` | Activity source interface | test source reports a due day with no call | one `days` row, `calls` 0 |
+| `tests/publish.activity.rs` | `source_queue_put_updates_published_day` | Queue put by a source | published day, source puts it with its reason | `revision` 2 |
 | `tests/day.store.rs` | `same_content_keeps_revision` | Upsert rule | two equal builds | `revision` 1 |
 | `tests/day.store.rs` | `changed_content_bumps_revision` | Upsert rule | new call, build again | `revision` 2, `published_at` unchanged |
 | `tests/publish.due.rs` | `day_not_due_before_publish_at` | Due rule | local 00:59 on D+1 | not due |
@@ -450,6 +456,17 @@ Then the container exits non-zero
   And its log names "LOUPE_TZ", the example "Europe/Stockholm", and "loupe config show"
 ```
 
+### AC-13: Only a day with activity gets a record
+
+```gherkin
+Given day D1 has no call and no GitHub activity
+  And day D2 has no call and a test activity source reports activity for D2
+  And D1 and D2 are due
+When the publisher worker wakes
+Then "GET /v1/days/D1" returns 404
+  And "GET /v1/days/D2" returns 200 with "calls" 0
+```
+
 ## Quality Standards Compliance
 
 ### Build & Compilation
@@ -544,7 +561,6 @@ Chosen approach: "store a deterministic day record in `days`, written by a due-r
 ## Open Questions
 
 1. **Time zone crate.** Provisional default: `jiff` with the bundled database. The implementer confirms at tier 1. Another crate with an embedded database (for example `chrono-tz`) is acceptable if `jiff` fails the check. The behaviour does not change.
-2. **Days with no call.** Provisional default: no record (requirement 15). The dashboard of CR-0008 shows a missing day as zero. The alternative is a stored zero record per day, which makes the API larger but shows that the day was checked. This is a question about what the human wants, so it goes to the human.
 3. **Session count.** Provisional default: a segment counts on the day that it starts (requirement 4), the same rule as the session line. The alternative counts a segment on each day that it has a call.
 
 ## Related Items
@@ -552,6 +568,10 @@ Chosen approach: "store a deterministic day record in `days`, written by a due-r
 * Earlier CRs: CR-0001 to CR-0006.
 * Later CRs: CR-0008 (dashboard), CR-0009 (GitHub counts), CR-0010 (end-to-end acceptance).
 * README sections: "How it works", "The `loupe` binary", "Privacy model".
+
+## Decisions
+
+* **Days with no call.** Decided by the human on 2026-10-19: a day gets a record when it has calls or GitHub activity (pull requests opened or merged). A day with neither gets no record, and the dashboard shows it as zero. Requirements 15, 15a, 15b, 27, and 36 state the rule.
 
 ## Approval
 
