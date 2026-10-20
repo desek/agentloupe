@@ -47,13 +47,20 @@ impl Client {
         }
     }
 
-    /// The request body: temperature 0, the rule text as the system prompt, the user message.
+    /// The request body: the rule text as the system prompt and the user message. No `temperature`:
+    /// the API refuses it for the current Haiku model. The OAuth path puts the billing block first.
     pub fn body(&self, system: &str, user: &str, max_tokens: u32) -> Value {
+        let mut blocks = vec![json!({"type": "text", "text": system})];
+        if matches!(self.credential, Credential::OauthToken(_)) {
+            blocks.insert(
+                0,
+                json!({"type": "text", "text": super::headers::BILLING_BLOCK}),
+            );
+        }
         json!({
             "model": self.model,
             "max_tokens": max_tokens,
-            "temperature": 0,
-            "system": [{"type": "text", "text": system}],
+            "system": blocks,
             "messages": [{"role": "user", "content": user}],
         })
     }
@@ -181,15 +188,24 @@ mod tests {
     }
 
     #[test]
-    fn body_has_temperature_zero() {
+    fn body_shape_per_credential() {
         let c = Client::new(
             "http://127.0.0.1:1/",
             "m",
             Credential::ApiKey(crate::config::secret::Secret::new("k".into())),
         );
         let b = c.body("S", "U", LINE_TOKENS);
-        assert_eq!(b["temperature"], 0);
+        assert!(b.get("temperature").is_none());
+        assert_eq!(b["system"].as_array().unwrap().len(), 1);
         assert_eq!(b["max_tokens"], 64);
         assert_eq!(c.base_url, "http://127.0.0.1:1");
+        let o = Client::new(
+            "http://127.0.0.1:1",
+            "m",
+            Credential::OauthToken(crate::config::secret::Secret::new("t".into())),
+        );
+        let b = o.body("S", "U", DAY_TOKENS);
+        assert_eq!(b["system"][0]["text"], super::super::headers::BILLING_BLOCK);
+        assert_eq!(b["system"][1]["text"], "S");
     }
 }
