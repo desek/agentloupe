@@ -128,12 +128,16 @@ mod tests {
             }
         }
         let json = render(&cfg, false);
-        assert!(json.contains(&format!(
-            "\"name\":\"price_commit\",\"value\":\"{}\"",
-            crate::price::embed::PRICE_COMMIT
-        )));
-        assert!(json.contains("\"name\":\"price_entries\",\"value\":\"4"));
-        assert!(json.contains("\"name\":\"subscription_total_per_month\",\"value\":\"0\""));
+        let value = |name: &str| {
+            json.lines()
+                .map(|l| serde_json::from_str::<serde_json::Value>(l).unwrap())
+                .find(|v| v["name"] == name)
+                .map(|v| v["value"].as_str().unwrap().to_string())
+                .unwrap_or_else(|| panic!("no {name} line"))
+        };
+        assert_eq!(value("price_commit"), crate::price::embed::PRICE_COMMIT);
+        assert!(value("price_entries").parse::<usize>().unwrap() > 4000);
+        assert_eq!(value("subscription_total_per_month"), "0");
         assert!(
             json.lines()
                 .filter(|l| l.contains("\"secret\":true"))
