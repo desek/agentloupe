@@ -2,7 +2,7 @@
 name: "CR-0006 Non-identifying one-line session summaries and raw-body retention"
 description: "Adds a summary worker that writes one scrubbed, non-identifying line per closed session and one line per day with a small Anthropic model that the binary calls directly, and deletes the raw bodies after parse and summary."
 id: "CR-0006"
-status: "approved"
+status: "implemented"
 date: 2026-10-20
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
