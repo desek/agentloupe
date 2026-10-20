@@ -1,4 +1,4 @@
-//! @agents-index Fake upstream for the tests and the latency script: JSON, SSE with delay, mid-stream close, slow, echo, sized bytes.
+//! @agents-index Fake upstream for tests and scripts: JSON, SSE, abort, slow, echo, bytes, and model calls with usage blocks.
 #![allow(dead_code)]
 
 use axum::Router;
@@ -6,7 +6,7 @@ use axum::body::{Body, Bytes};
 use axum::extract::{Query, Request};
 use axum::http::header;
 use axum::response::Response;
-use axum::routing::{any, get};
+use axum::routing::{any, get, post};
 use futures_util::stream;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -110,8 +110,92 @@ async fn echo(req: Request) -> Response {
     )
 }
 
+fn sse_body(events: Vec<String>) -> Response {
+    Response::builder()
+        .header(header::CONTENT_TYPE, "text/event-stream")
+        .body(Body::from(events.concat()))
+        .unwrap()
+}
+
+fn event(name: &str, data: serde_json::Value) -> String {
+    format!("event: {name}\ndata: {data}\n\n")
+}
+
+async fn request_json(req: Request) -> serde_json::Value {
+    let body = axum::body::to_bytes(req.into_body(), usize::MAX)
+        .await
+        .unwrap_or_default();
+    serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null)
+}
+
+/// Anthropic Messages: JSON, or SSE when the request has `"stream": true`.
+async fn messages(req: Request) -> Response {
+    let r = request_json(req).await;
+    let model = r["model"]
+        .as_str()
+        .unwrap_or("claude-haiku-5-5")
+        .to_string();
+    let usage = serde_json::json!({"input_tokens":10,"cache_read_input_tokens":20,
+        "cache_creation_input_tokens":7,"cache_creation":{"ephemeral_5m_input_tokens":4,"ephemeral_1h_input_tokens":3},
+        "output_tokens":1,"service_tier":"standard"});
+    if r["stream"] != true {
+        let mut u = usage;
+        u["output_tokens"] = 5.into();
+        return json(serde_json::json!({"id":"msg_1","type":"message","model":model,"content":[{"type":"text","text":"hi"}],"usage":u}).to_string());
+    }
+    sse_body(vec![
+        event(
+            "message_start",
+            serde_json::json!({"type":"message_start","message":{"id":"msg_1","model":model,"usage":usage}}),
+        ),
+        event(
+            "content_block_delta",
+            serde_json::json!({"type":"content_block_delta","delta":{"type":"text_delta","text":"hi"}}),
+        ),
+        event(
+            "message_delta",
+            serde_json::json!({"type":"message_delta","usage":{"output_tokens":3}}),
+        ),
+        event(
+            "message_delta",
+            serde_json::json!({"type":"message_delta","usage":{"output_tokens":5}}),
+        ),
+        event("message_stop", serde_json::json!({"type":"message_stop"})),
+    ])
+}
+
+async fn count_tokens() -> Response {
+    json(r#"{"input_tokens":12}"#.into())
+}
+
+/// OpenAI Responses: the top-level usage of a response object.
+async fn responses() -> Response {
+    json(r#"{"id":"resp_1","model":"gpt-5","usage":{"input_tokens":100,"input_tokens_details":{"cached_tokens":40},"output_tokens":9}}"#.into())
+}
+
+/// OpenAI Chat Completions: JSON, or SSE with usage in the last chunk.
+async fn chat(req: Request) -> Response {
+    let r = request_json(req).await;
+    let usage = serde_json::json!({"prompt_tokens":50,"prompt_tokens_details":{"cached_tokens":10},"completion_tokens":6});
+    if r["stream"] != true {
+        return json(serde_json::json!({"id":"c1","model":"gpt-5","usage":usage}).to_string());
+    }
+    Response::builder()
+        .header(header::CONTENT_TYPE, "text/event-stream")
+        .body(Body::from(format!(
+            "data: {}\n\ndata: {}\n\ndata: [DONE]\n\n",
+            serde_json::json!({"id":"c1","model":"gpt-5","choices":[{"delta":{"content":"hi"}}],"usage":null}),
+            serde_json::json!({"id":"c1","model":"gpt-5","choices":[],"usage":usage})
+        )))
+        .unwrap()
+}
+
 pub fn app() -> Router {
     Router::new()
+        .route("/v1/messages", post(messages))
+        .route("/v1/messages/count_tokens", post(count_tokens))
+        .route("/v1/responses", post(responses))
+        .route("/v1/chat/completions", post(chat))
         .route("/json", any(json_route))
         .route("/sse", get(sse))
         .route("/abort", get(abort))
