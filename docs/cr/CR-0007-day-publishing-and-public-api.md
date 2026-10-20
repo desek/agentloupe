@@ -2,7 +2,7 @@
 name: "CR-0007 Day aggregation, nightly publishing, and the public API"
 description: "Adds the day record built from calls, sessions, and the day line in LOUPE_TZ, a publisher that publishes the previous day after LOUPE_PUBLISH_AT with catch-up and late updates, the loupe aggregate command, a configurable day review, the loupe day commands to approve, edit, delete, and restore a day, the subscription cost of a day, and the read-only public API GET /v1/days with open CORS."
 id: "CR-0007"
-status: "proposed"
+status: "approved"
 date: 2026-10-20
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
@@ -670,3 +670,5 @@ Chosen approach: "store a deterministic day record in `days`, written by a due-r
 Reviewed and approved by an independent reviewer agent on 2026-10-18.
 
 Re-approved by an independent reviewer agent on 2026-10-19 after the human decisions were recorded.
+
+Approved by an independent reviewer agent on 2026-10-20 after the answered questions were recorded.
