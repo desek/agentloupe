@@ -11,7 +11,8 @@ This directory describes how the `loupe` binary behaves. Each file covers one pr
 | `parser.md` | The parser that finds calls in exchanges, the token columns, and the sessions and segments that group the calls. |
 | `cost.md` | The API-equivalent cost of each call from the vendored price file. |
 | `summaries.md` | The one-line session summaries, the day paragraph, and the retention of raw bodies. |
-| `days-public-api.md` | The day records, the nightly publish, and the routes under `/v1/days`. |
+| `days.md` | The day records, the aggregation queue, the publisher, `loupe aggregate`, and `loupe day`. |
+| `api.md` | The public API routes under `/v1/days`, the errors, the headers, and the version policy. |
 | `dashboard.md` | The dashboard page at `GET /`. |
 | `github.md` | The GitHub worker and the GitHub token labels. |
 | `configuration.md` | The configuration loader, the variables, and `loupe config show`. |

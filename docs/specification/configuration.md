@@ -37,6 +37,7 @@ The flag `--env` or the variable `LOUPE_ENV` gives the name of the environment. 
 | `LOUPE_SUMMARY_MAX_ATTEMPTS` | no | no | `5` |
 | `LOUPE_TZ` | no | no | `Europe/Stockholm` |
 | `LOUPE_PUBLISH_AT` | no | no | `01:00` |
+| `LOUPE_PUBLISH_INTERVAL_SECS` | no | no | `60` |
 | `LOUPE_IDLE_SECS` | no | no | `3600` |
 | `LOUPE_PARSE_INTERVAL_SECS` | no | no | `5` |
 | `LOUPE_RAW_RETENTION_HOURS` | no | no | `168` |
@@ -77,10 +78,16 @@ The subcommand also prints these lines:
 3. One line `subscription.<name>: <USD per month>` for each subscription.
 4. `subscription_total_per_month: <sum>`.
 5. `summary_credential`, the active credential kind of the summarizer: `api_key`, `oauth_token`, or `none`.
+6. `LOUPE_TZ`, `LOUPE_PUBLISH_AT`, `LOUPE_PUBLISH_INTERVAL_SECS`, and `LOUPE_DAY_REVIEW`, each with its source.
+7. The next due publish time, in `LOUPE_TZ` and in UTC.
 
 ## Summary credential
 
 `LOUPE_SUMMARY_API_KEY` and `LOUPE_SUMMARY_OAUTH_TOKEN` are the two credentials of the summarizer. Either one enables the summaries. If both are set, `api_key` is active. A model other than `claude-haiku-5-5` needs `LOUPE_SUMMARY_API_KEY`. `LOUPE_SUMMARY_BASE_URL` must use `https`, except for a loopback host. `summaries.md` gives the full rules.
+
+## Day variables
+
+`LOUPE_TZ` is an IANA time zone name, for example `Europe/Stockholm`. `LOUPE_PUBLISH_AT` has the format `HH:MM`, with an hour from 00 to 23 and a minute from 00 to 59. `LOUPE_PUBLISH_INTERVAL_SECS` is the interval of the publisher in seconds. `LOUPE_DAY_REVIEW` is `auto` or `manual`. A value that is not valid stops the start with an actionable error that names the variable and an example. `days.md` gives the full rules.
 
 ## Subscription variables
 
