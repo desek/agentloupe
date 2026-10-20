@@ -1,4 +1,4 @@
-//! @agents-index The HTTP router: reserved routes take precedence, every other path falls back to the proxy.
+//! @agents-index The HTTP router: health and the public API first, reserved paths 404, the rest falls back to the proxy; CORS on public paths.
 
 use crate::proxy::ProxyState;
 use axum::Router;
@@ -10,12 +10,17 @@ use std::sync::Arc;
 /// The reserved first path segments; the only list, so the route parser rejects these names too.
 pub const RESERVED: &[&str] = &["healthz", "v1", "assets", "favicon.ico"];
 
-/// Builds the app: `/healthz`, then a fallback that answers reserved paths with 404 and proxies the rest.
-pub fn router(state: Arc<ProxyState>) -> Router {
-    super::health::router().fallback(move |req: Request<Body>| {
-        let state = state.clone();
-        async move { dispatch(state, req).await }
-    })
+/// Builds the app: `/healthz` and the public API, then a fallback that answers reserved paths with
+/// 404 and proxies the rest. The CORS layer covers every route, and adds its header only to
+/// `/healthz` and the paths under `/v1/`.
+pub fn router(state: Arc<ProxyState>, api: Arc<crate::api::ApiState>) -> Router {
+    super::health::router()
+        .merge(crate::api::router(api))
+        .fallback(move |req: Request<Body>| {
+            let state = state.clone();
+            async move { dispatch(state, req).await }
+        })
+        .layer(axum::middleware::from_fn(crate::api::cors::layer))
 }
 
 async fn dispatch(state: Arc<ProxyState>, req: Request<Body>) -> Response {

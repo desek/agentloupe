@@ -1,6 +1,7 @@
 //! @agents-index Library root of loupe: every module, so the binary and the integration tests share one code path.
 
 pub mod account;
+pub mod api;
 pub mod capture;
 pub mod cli;
 pub mod config;

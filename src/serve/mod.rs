@@ -1,4 +1,4 @@
-//! @agents-index Runs the HTTP server: migrates the store, bootstrap token step, starts capture, parser, summary, and retention workers, binds, serves.
+//! @agents-index Runs the HTTP server: migrates the store, bootstrap token, starts capture, parser, summary, publisher, retention workers, binds, serves.
 
 mod health;
 pub mod router;
@@ -87,11 +87,17 @@ pub fn run(cfg: &Config, upstreams: Upstreams) -> Result<(), Box<dyn Error>> {
         headers_timeout: cfg.headers_timeout,
         gate,
     });
+    // The API connection reads only the days table.
+    let api = Arc::new(crate::api::ApiState {
+        conn: std::sync::Mutex::new(crate::store::open::open(&cfg.data_dir)?),
+        tz: cfg.summary.tz,
+        subscriptions: cfg.days.subscriptions.clone(),
+    });
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(async {
         let listener = tokio::net::TcpListener::bind(cfg.listen).await?;
         tracing::info!(listen = %cfg.listen, "listening");
-        shutdown::serve_until_signal(listener, router::router(state)).await
+        shutdown::serve_until_signal(listener, router::router(state, api)).await
     })?;
     // The runtime drop ends every open stream, which drops the last capture handle; the writer
     // then drains the queue and stops.
