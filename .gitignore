@@ -14,3 +14,6 @@ data/
 
 # OS files
 .DS_Store
+
+# Local compose overrides, for example a short LOUPE_IDLE_SECS for a verification
+compose.override.yaml

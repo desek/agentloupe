@@ -37,6 +37,7 @@ fn check(e: &Entry) -> Result<(), ConfigError> {
         )),
         (
             "LOUPE_IDLE_SECS"
+            | "LOUPE_PARSE_INTERVAL_SECS"
             | "LOUPE_RAW_RETENTION_HOURS"
             | "LOUPE_CAPTURE_MAX_BYTES"
             | "LOUPE_CAPTURE_QUEUE"
@@ -122,6 +123,8 @@ impl Loaded {
                 .get("LOUPE_BOOTSTRAP_TOKEN")
                 .and_then(text)
                 .map(|v| super::secret::Secret::new(v.to_string())),
+            idle_secs: num("LOUPE_IDLE_SECS"),
+            parse_interval: std::time::Duration::from_secs(num("LOUPE_PARSE_INTERVAL_SECS")),
         })
     }
 }

@@ -1,4 +1,4 @@
-//! @agents-index Runs the HTTP server: migrates the store, runs the bootstrap token step, starts capture, binds LOUPE_LISTEN, serves.
+//! @agents-index Runs the HTTP server: migrates the store, bootstrap token step, starts capture and the parser worker, binds, serves.
 
 mod health;
 pub mod router;
@@ -35,6 +35,16 @@ pub fn run(cfg: &Config, upstreams: Upstreams) -> Result<(), Box<dyn Error>> {
         rx,
         spill_dir,
         cfg.data_key,
+    );
+    // The worker thread ends with the process; each exchange is one transaction, so a stop loses nothing.
+    let _parser = crate::parse::worker::start(
+        crate::store::open::open(&cfg.data_dir)?,
+        crate::parse::worker::Settings {
+            data_key: cfg.data_key,
+            account_key: cfg.account_key,
+            idle_secs: cfg.idle_secs,
+        },
+        cfg.parse_interval,
     );
     let state = Arc::new(ProxyState {
         upstreams,

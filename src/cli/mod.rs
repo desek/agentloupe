@@ -2,6 +2,7 @@
 
 mod config_show;
 mod gen_key;
+mod parse;
 mod serve;
 mod token;
 
@@ -28,6 +29,23 @@ enum Command {
     Token {
         #[command(subcommand)]
         command: TokenCommand,
+    },
+    /// Find the model calls in the stored exchanges and group them into sessions.
+    ///
+    /// Prints exchanges_read, calls_added, sessions_opened, sessions_closed as key: value lines.
+    /// Exit codes: 0 done, 1 a database or runtime failure, 2 bad input or configuration.
+    Parse {
+        /// Run one parse pass and one idle step, then exit. Required.
+        #[arg(long)]
+        once: bool,
+        /// Report the counts and write nothing.
+        #[arg(long)]
+        dry_run: bool,
+        /// Print a sentence instead of key: value lines.
+        #[arg(long)]
+        human: bool,
+        #[command(flatten)]
+        args: ConfigArgs,
     },
     /// Inspect the configuration.
     Config {
@@ -129,6 +147,12 @@ pub fn run() -> ExitCode {
     match Cli::parse().command {
         Command::Serve(args) => serve::run(&args),
         Command::GenKey => gen_key::run(),
+        Command::Parse {
+            once,
+            dry_run,
+            human,
+            args,
+        } => parse::run(&args, once, dry_run, human),
         Command::Config {
             command: ConfigCommand::Show { args, human },
         } => config_show::run(&args, human),

@@ -1,0 +1,8 @@
+data: {"id":"c1","model":"gpt-5","choices":[{"delta":{"content":"h"}}],"usage":null}
+
+data: {"id":"c1","model":"gpt-5","choices":[{"delta":{"content":"i"}}],"usage":{"prompt_tokens":1,"completion_tokens":1}}
+
+data: {"id":"c1","model":"gpt-5","choices":[],"usage":{"prompt_tokens":50,"prompt_tokens_details":{"cached_tokens":10},"completion_tokens":6}}
+
+data: [DONE]
+
