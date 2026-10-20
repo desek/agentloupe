@@ -4,6 +4,7 @@ name = "agent-loupe"
 version = "0.1.0"
 edition = "2024"
 publish = false
+build = "build.rs"
 
 [[bin]]
 name = "loupe"
@@ -81,6 +82,30 @@ path = "tests/parse.end_to_end.rs"
 name = "parse_secrets"
 path = "tests/parse.secrets.rs"
 
+[[test]]
+name = "price_schema"
+path = "tests/price.schema.rs"
+
+[[test]]
+name = "price_fixtures"
+path = "tests/price.fixtures.rs"
+
+[[test]]
+name = "price_required"
+path = "tests/price.required.rs"
+
+[[test]]
+name = "price_worker"
+path = "tests/price.worker.rs"
+
+[[test]]
+name = "upstreams"
+path = "tests/upstreams.rs"
+
+[[test]]
+name = "prices_vendor"
+path = "tests/prices.vendor.rs"
+
 [dependencies]
 aes-gcm = "0.10"
 axum = "0.8"
@@ -94,6 +119,7 @@ hex = "0.4"
 hmac = "0.12"
 reqwest = { version = "0.12", default-features = false, features = ["stream", "rustls-tls", "json"] }
 rusqlite = { version = "0.37", features = ["bundled"] }
+rust_decimal = { version = "1.43.0", features = ["serde-with-str"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
@@ -104,4 +130,5 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "registry"] }
 
 [dev-dependencies]
+jsonschema = { version = "0.59.0", default-features = false }
 tempfile = "3"

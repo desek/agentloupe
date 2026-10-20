@@ -6,10 +6,12 @@ mod cli;
 mod config;
 mod log;
 mod parse;
+mod price;
 mod proxy;
 mod serve;
 mod session;
 mod store;
+mod subscription;
 mod token;
 
 fn main() -> std::process::ExitCode {

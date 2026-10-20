@@ -7,6 +7,8 @@ WORKDIR /src
 COPY rust-toolchain.toml ./
 RUN rustup show active-toolchain || rustup toolchain install
 COPY Cargo.toml Cargo.lock ./
+COPY build.rs ./
+COPY vendor/litellm ./vendor/litellm
 COPY src ./src
 COPY migrations ./migrations
 COPY tests ./tests

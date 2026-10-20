@@ -1,0 +1,4 @@
+{"model": "claude-haiku-5-5", "provider": "anthropic", "service_tier": "standard",
+ "input": 150000, "cache_read": 0, "cache_write_5m": 0, "cache_write_1h": 0, "output": 1000,
+ "expected_cost_usd": "0.0775",
+ "hand_computation": "prompt 150000 is above 100k: 150000*0.0000005 + 1000*0.0000025"}

@@ -1,0 +1,4 @@
+{"model": "claude-haiku-4-5-20991231", "provider": "anthropic", "service_tier": null,
+ "input": 10, "cache_read": 0, "cache_write_5m": 0, "cache_write_1h": 0, "output": 20,
+ "expected_cost_usd": "0.00011",
+ "hand_computation": "date suffix removed, entry claude-haiku-4-5: 10*0.000001 + 20*0.000005"}
