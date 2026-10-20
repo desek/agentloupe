@@ -2,7 +2,7 @@
 name: "CR-0013 Live metrics over a WebSocket on the dashboard"
 description: "Adds a live route at GET /live that upgrades to a WebSocket and streams allowlisted live events (exchange start and end, stored calls with token counts, open segments, cost) from a bounded broadcast channel in the binary, and a live section on the dashboard under the headline that shows today's calls, tokens, open segments, and a rolling chart in real time."
 id: "CR-0013"
-status: "draft"
+status: "approved"
 date: 2026-10-20
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
@@ -119,7 +119,7 @@ sequenceDiagram
 `status` is the HTTP status. The five token counts are `input`, `output`, `cache_read`, `cache_write`, `reasoning`. `cost_usd` is the API-equivalent cost from CR-0005 pricing, `null` if no price. The public route **MUST** use the public column and **MUST NOT** require authentication. The private column is out of scope of this CR; it applies only on the private page of CR-0011, in a later change.
 
 11. A live event **MUST NOT** hold a prompt, a body, a path, a query, a header, a session key, a segment ID, an account, a proxy token, a token ID, a token name, an upstream URL, or a summary. A serializer test **MUST** prove the allowlist for each kind of the table of requirement 10, including `snapshot`, `calls.batch`, and `exchanges.batch`.
-12. Where an allowlist holds `agent` or `by_agent`, the value **MUST** be the agent label of the exchange, the same value that `by_agent` in the public API shows.
+12. This requirement applies only to the later private feed of requirement 10, not to the public route of this CR. Where an allowlist holds `agent` or `by_agent`, the value **MUST** be the agent label of the exchange, the same value that `by_agent` in the public API shows.
 
 **Envelope and snapshot**
 
@@ -158,6 +158,7 @@ sequenceDiagram
 | live route | The reserved route `GET /live` of the binary that upgrades to a WebSocket and sends live events with a rate limit and a heartbeat. | A proxied path, which the proxy forwards to an upstream and which never upgrades; the public API under `/v1`. | `docs/specification/live.md`, `docs/specification/proxy.md`, `src/serve/router.rs` |
 | live hub | The one bounded broadcast channel in the binary to which the capture and the parser send live events without a wait. | The database; the live route, which reads from the hub for each client. | `docs/specification/live.md` |
 | live section | The section of the dashboard under the headline that shows the figures of the current day and a rolling chart from the live route. | The headline and the sections of published days, which read `GET /v1/days`. | `docs/specification/dashboard.md` |
+
 29. Layer 2 **MUST** add `docs/specification/live.md` and **MUST** update `docs/specification/dashboard.md` (live section, states) and `docs/specification/proxy.md` (reserved list with `live`). README.md **MUST** describe the live section in the Dashboard section and the live feed in the Privacy model section.
 
 ### Non-Functional Requirements
@@ -256,10 +257,10 @@ flowchart LR
 | `tests/live.route.rs` | `disabled_is_404` | Config | `LOUPE_LIVE_ENABLED=false` | `404`, no hub | 6 |
 | `tests/live.route.rs` | `connection_limit_is_503` | Limit | 33 clients, limit 32 | 33rd gets `503`, `retry-after: 30` | 17 |
 | `tests/live.route.rs` | `no_cookie_set` | Privacy | upgrade | no `set-cookie` | 4 |
-| `tests/live.events.rs` | `exchange_events_in_order` | Capture | one proxied exchange | `exchange.start` then `exchange.end` with status and timing | 8 |
+| `tests/live.events.rs` | `exchange_events_in_order` | Capture | one proxied exchange | `exchange.start` then `exchange.end` with `ts` and `status` only | 8 |
 | `tests/live.events.rs` | `call_stored_after_parse` | Parser | one exchange with usage | `call.stored` with five counts equal to the `calls` row | 9 |
 | `tests/live.events.rs` | `segments_open_after_parse` | Parser | one segment opens, then closes on idle | `segments.open` with count 1, then 0 | 9 |
-| `tests/live.events.rs` | `allowlist_per_kind` | Privacy | each kind of requirement 10 (also `snapshot`, `calls.batch`, `exchanges.batch`) for the public column of `live_access` option (c), seeded secrets in body, path, token | keys equal the allowlist, no seeded secret in any frame | 10, 11, 12 |
+| `tests/live.events.rs` | `allowlist_per_kind` | Privacy | each kind of requirement 10 (also `snapshot`, `calls.batch`, `exchanges.batch`) for the public column of `live_access` option (c), seeded secrets in body, path, token | keys equal the allowlist, no seeded secret in any frame | 10, 11 |
 | `tests/live.events.rs` | `snapshot_matches_day_rules` | Snapshot | seeded calls across midnight in `LOUPE_TZ` | totals of the current day only | 14 |
 | `tests/live.rate.rs` | `coalesces_above_rate` | Rate | 500 calls in 1 s, rate 10 | at most 10 frames per second, sums equal 500 calls | 15 |
 | `tests/live.rate.rs` | `heartbeat_when_idle` | Heartbeat | 16 s idle (paused clock) | one `heartbeat` | 16 |
@@ -292,7 +293,7 @@ None.
 
 | Scenario | User Goal | User Surface | Success Condition | Criteria Proved | Scenario Record |
 |---|---|---|---|---|---|
-| Live follow | Follow the calls and tokens as they occur | browser | with the page open, one agent call through the proxy raises the calls figure by 1 and the tokens figure by the stored sum within parse interval plus 1 s, with no reload | AC-1, AC-3, AC-4 | `.agents/scenarios/dashboard.live.follow.md` |
+| Live follow | Follow the calls and tokens as they occur | browser | with the page open, one agent call through the proxy raises the calls figure by 1 and the tokens figure by the stored sum within parse interval plus 1 s, with no reload | AC-1, AC-3 | `.agents/scenarios/dashboard.live.follow.md` |
 | Reconnect | Keep the view when the binary restarts | browser | after a restart of the container, the section shows the paused state, then the figures return within 35 s with no reload | AC-6 | `.agents/scenarios/dashboard.live.reconnect.md` |
 | Disabled | Run without a live feed | browser | with `LOUPE_LIVE_ENABLED=false`, the page shows no live section after 3 failed connects | AC-7 | `.agents/scenarios/dashboard.live.disabled.md` |
 | CSP | Connect under the CSP | browser of the CR-0008 baseline | the socket opens and the console shows no CSP violation | AC-9 | `.agents/scenarios/dashboard.live.follow.md` |
@@ -421,6 +422,8 @@ Then each measured value meets its threshold
 cargo test --test live.route --test live.events --test live.rate --test live.backpressure
 cargo test --test live.latency -- --nocapture
 node --test web/tests/
+for t in 'live event' 'live route' 'live hub' 'live section'; do grep -cF "**$t**" .taxonomy; done  # each prints 1 (requirement 28)
+test -f docs/specification/live.md && grep -c 'live' docs/specification/dashboard.md docs/specification/proxy.md README.md  # each count is 1 or more (requirement 29)
 ```
 
 ## Risks and Mitigation
@@ -456,7 +459,9 @@ Medium: about 3 to 4 units of work (Layer 2, hub and events, route, page).
 
 Pending the reviewer agent. The human answered the three open questions on 2026-10-20 (see Decisions).
 
-## Decided Questions
+## Judgement Calls
+
+The supervisor made these calls. The human did not answer them.
 
 - **Unit of "turn".** The binary observes calls, not turns, so the live metric is the call. Judgement call of the supervisor from the observable data.
 - **WebSocket over SSE.** The request names WebSockets. Judgement call.
@@ -474,10 +479,20 @@ Answered by the human on 2026-10-20. Each answer equals the recommendation of th
 
 None is open.
 
+## Implementation Status
+
+Not started.
+
+* **Approval:** reviewed and approved by an independent reviewer agent on 2026-10-20, after the human decisions were recorded.
+
 ## Related Items
 
 - `docs/cr/CR-0007-day-publishing-and-public-api.md`, `docs/cr/CR-0008-dashboard-spa.md`, `docs/cr/CR-0011-private-reports-page.md`.
 - `docs/specification/dashboard.md`, `proxy.md`, `parser.md`, `days.md`, `api.md`.
+
+## More Information
+
+The defaults 1024 events for the buffer, 32 connections, 15 seconds for the heartbeat, and 5 seconds for a write are judgement calls of the supervisor. The human can change them before approval.
 
 ## Approval
 
