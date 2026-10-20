@@ -2,7 +2,7 @@
 name: "CR-0006 Non-identifying one-line session summaries and raw-body retention"
 description: "Adds a summary worker that writes one scrubbed, non-identifying line per closed session and one line per day with a small Anthropic model that the binary calls directly, and deletes the raw bodies after parse and summary."
 id: "CR-0006"
-status: "proposed"
+status: "approved"
 date: 2026-10-20
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
@@ -503,6 +503,7 @@ Chosen approach: "a direct Anthropic client with two separate credential variabl
 
 Reviewed and approved by an independent reviewer agent on 2026-10-18.
 Re-approved by an independent reviewer agent on 2026-10-19 after the human decisions were recorded.
+Approved by an independent reviewer agent on 2026-10-20 after the answered questions were recorded.
 
 ## Decisions
 
