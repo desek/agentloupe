@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # @agents-index Measures the added time to the first byte through the proxy against the fake upstream; prints p95_added_ms.
 #
-# Usage: proxy.latency.sh [--requests N] [--human]
+# Usage: proxy.latency.sh [--requests N] [--with-token] [--human]
 #   --requests N   Server-sent events requests per path, direct and through the proxy. Default: 200.
+#   --with-token   Create 100 proxy tokens before the start and send each proxied request with one.
 #   --human        Print a friendly view for a person. Also the default when stdout is a terminal.
 #
 # Output (stdout, key: value): requests, p95_direct_ms, p95_proxy_ms, p95_added_ms, threshold_ms, status, log.
@@ -16,7 +17,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LOG="$ROOT/.agents/logs/proxy.latency.log"
 THRESHOLD_MS=20
-requests=200; human=0
+requests=200; human=0; with_token=0
 [[ -t 1 ]] && human=1
 
 usage() { awk 'NR>=4 && /^#/ {sub(/^# ?/, ""); print; next} NR>=4 {exit}' "$0"; }
@@ -26,6 +27,7 @@ while [[ $# -gt 0 ]]; do
     --requests)
       [[ $# -ge 2 && "$2" =~ ^[1-9][0-9]*$ ]] || { echo "error: --requests needs a positive whole number. Fix: pass --requests 200. Verify: the script prints p95_added_ms." >&2; exit 2; }
       requests="$2"; shift 2 ;;
+    --with-token) with_token=1; shift ;;
     --human) human=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "error: unknown argument $1. Fix: run --help for the flags. Verify: the script prints p95_added_ms." >&2; exit 2 ;;
@@ -59,6 +61,14 @@ fport="$(free_port)"; lport="$(free_port)"
 wait_port "$fport" json || fail "the fake upstream did not start on port $fport" "check the log for a bind error"
 printf 'fake = "http://127.0.0.1:%s"\n' "$fport" >"$work/upstreams.toml"
 key="$("$BIN/loupe" gen-key)"
+prefix=""
+if [[ $with_token -eq 1 ]]; then
+  for i in $(seq 1 100); do
+    tok="$(cd "$ROOT" && env -i PATH="$PATH" LOUPE_DATA_DIR="$work" "$BIN/loupe" token create --name "latency-$i" 2>>"$LOG" \
+      | perl -ne 'print $1 if /"token":"([^"]+)"/')" || fail "loupe token create failed" "check the log"
+    [[ $i -eq 50 ]] && prefix="/$tok"
+  done
+fi
 (cd "$ROOT" && env -i PATH="$PATH" LOUPE_LISTEN="127.0.0.1:$lport" LOUPE_DATA_DIR="$work" LOUPE_DATA_KEY="$key" \
   LOUPE_ACCOUNT_KEY="$key" LOUPE_UPSTREAMS_FILE="$work/upstreams.toml" "$BIN/loupe" serve) 2>>"$LOG" & pids+=($!)
 wait_port "$lport" healthz || fail "loupe serve did not start on port $lport" "check the log for a configuration error"
@@ -67,20 +77,20 @@ wait_port "$lport" healthz || fail "loupe serve did not start on port $lport" "c
 measure() {
   local url="$1" i
   for ((i = 0; i < requests; i++)); do
-    curl -s -o /dev/null -w '%{time_starttransfer}\n' "$url" || return 1
+    curl -sf -o /dev/null -w '%{time_starttransfer}\n' "$url" || return 1
   done
 }
 p95() { sort -n | perl -e 'my @v=<STDIN>; chomp @v; my $i=int(0.95*@v+0.999)-1; $i=0 if $i<0; printf "%.2f", $v[$i]*1000'; }
 
 direct="$(measure "http://127.0.0.1:$fport/sse?chunks=1&delay_ms=0" | p95)" || fail "a direct request failed" "check that the fake upstream runs"
-proxy="$(measure "http://127.0.0.1:$lport/latency/fake/sse?chunks=1&delay_ms=0" | p95)" || fail "a proxied request failed" "check the log of loupe serve"
+proxy="$(measure "http://127.0.0.1:$lport$prefix/latency/fake/sse?chunks=1&delay_ms=0" | p95)" || fail "a proxied request failed" "check the log of loupe serve"
 added="$(perl -e "printf '%.2f', $proxy - $direct")"
 status=passed; perl -e "exit($added <= $THRESHOLD_MS ? 0 : 1)" || status=failed
-echo "requests=$requests p95_direct_ms=$direct p95_proxy_ms=$proxy p95_added_ms=$added" >>"$LOG"
+echo "with_token=$with_token requests=$requests p95_direct_ms=$direct p95_proxy_ms=$proxy p95_added_ms=$added" >>"$LOG"
 
 if [[ $human -eq 1 ]]; then
   echo "The proxy adds $added ms at the 95th percentile to the first byte ($proxy ms through the proxy, $direct ms direct, $requests requests each). Threshold: $THRESHOLD_MS ms. Result: $status."
 else
-  echo "requests: $requests p95_direct_ms: $direct p95_proxy_ms: $proxy p95_added_ms: $added threshold_ms: $THRESHOLD_MS status: $status log: .agents/logs/proxy.latency.log"
+  echo "with_token: $with_token requests: $requests p95_direct_ms: $direct p95_proxy_ms: $proxy p95_added_ms: $added threshold_ms: $THRESHOLD_MS status: $status log: .agents/logs/proxy.latency.log"
 fi
 [[ $status == passed ]] || fail "p95_added_ms $added is above $THRESHOLD_MS" "profile the forward path in src/proxy/forward.rs"
