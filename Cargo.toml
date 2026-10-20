@@ -53,6 +53,22 @@ path = "tests/proxy.secrets.rs"
 name = "serve_router"
 path = "tests/serve.router.rs"
 
+[[test]]
+name = "token_cli"
+path = "tests/token.cli.rs"
+
+[[test]]
+name = "token_proxy"
+path = "tests/token.proxy.rs"
+
+[[test]]
+name = "token_secrets"
+path = "tests/token.secrets.rs"
+
+[[test]]
+name = "api_privacy"
+path = "tests/api.privacy.rs"
+
 [dependencies]
 aes-gcm = "0.10"
 axum = "0.8"

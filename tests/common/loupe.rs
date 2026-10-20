@@ -1,4 +1,4 @@
-//! @agents-index Test helper: starts loupe serve on a free port with a temp data dir and an upstreams file, reads its rows.
+//! @agents-index Test helper: starts loupe serve on a free port with a temp data dir, reads rows and stderr, runs token commands.
 #![allow(dead_code)]
 
 use std::net::{TcpListener, TcpStream};
@@ -29,7 +29,42 @@ pub fn free_port() -> u16 {
 pub struct Loupe {
     pub port: u16,
     pub data: tempfile::TempDir,
+    /// Holds stderr.log, outside the data dir.
+    pub err_dir: tempfile::TempDir,
     child: Child,
+}
+
+/// Runs `loupe <args>` against `data` with a clean environment, as a second process would.
+pub fn cmd(data: &std::path::Path, args: &[&str]) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_loupe"))
+        .args(args)
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .env_clear()
+        .env("LOUPE_DATA_DIR", data)
+        .output()
+        .unwrap()
+}
+
+/// Creates a token named `name` in `data` and returns the raw value.
+pub fn create_token(data: &std::path::Path, name: &str) -> String {
+    let out = cmd(data, &["token", "create", "--name", name]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    v["token"].as_str().unwrap().to_string()
+}
+
+/// Revokes the token `name` in `data`.
+pub fn revoke_token(data: &std::path::Path, name: &str) {
+    let out = cmd(data, &["token", "revoke", name]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 }
 
 impl Drop for Loupe {
@@ -42,7 +77,16 @@ impl Drop for Loupe {
 impl Loupe {
     /// Starts loupe with `fake` pointing at the fake upstream, plus `more` upstream entries and env values.
     pub fn start(fake_port: u16, more: &[(&str, String)], env: &[(&str, &str)]) -> Loupe {
-        let data = tempfile::tempdir().unwrap();
+        Loupe::start_in(tempfile::tempdir().unwrap(), fake_port, more, env)
+    }
+
+    /// Like start, with a data dir that a test prepared, for example with tokens.
+    pub fn start_in(
+        data: tempfile::TempDir,
+        fake_port: u16,
+        more: &[(&str, String)],
+        env: &[(&str, &str)],
+    ) -> Loupe {
         let mut file = format!(
             "anthropic = \"https://api.anthropic.com\"\nfake = \"http://127.0.0.1:{fake_port}\"\n"
         );
@@ -52,6 +96,7 @@ impl Loupe {
         let up = data.path().join("upstreams.toml");
         std::fs::write(&up, file).unwrap();
         let port = free_port();
+        let err_dir = tempfile::tempdir().unwrap();
         let mut cmd = Command::new(env!("CARGO_BIN_EXE_loupe"));
         cmd.arg("serve")
             .current_dir(env!("CARGO_MANIFEST_DIR"))
@@ -61,7 +106,9 @@ impl Loupe {
             .env("LOUPE_DATA_KEY", KEY)
             .env("LOUPE_ACCOUNT_KEY", KEY)
             .env("LOUPE_UPSTREAMS_FILE", &up)
-            .stderr(Stdio::null());
+            .stderr(Stdio::from(
+                std::fs::File::create(err_dir.path().join("stderr.log")).unwrap(),
+            ));
         for (k, v) in env {
             cmd.env(k, v);
         }
@@ -71,7 +118,12 @@ impl Loupe {
             assert!(Instant::now() < deadline, "loupe did not start");
             std::thread::sleep(Duration::from_millis(50));
         }
-        Loupe { port, data, child }
+        Loupe {
+            port,
+            data,
+            err_dir,
+            child,
+        }
     }
 
     pub fn url(&self, path: &str) -> String {
@@ -99,6 +151,10 @@ impl Loupe {
             );
             std::thread::sleep(Duration::from_millis(50));
         }
+    }
+
+    pub fn stderr(&self) -> String {
+        std::fs::read_to_string(self.err_dir.path().join("stderr.log")).unwrap_or_default()
     }
 
     pub fn log(&self) -> String {
