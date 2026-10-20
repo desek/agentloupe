@@ -9,6 +9,8 @@ pub struct Assigned {
     pub session_id: i64,
     pub opened: u64,
     pub closed: u64,
+    /// The segment that this call closed on a gap, so the caller can queue its days.
+    pub closed_id: Option<i64>,
 }
 
 /// A closed segment is never reopened: a call after a close always starts the next segment number.
@@ -22,6 +24,7 @@ pub fn assign(
 ) -> rusqlite::Result<Assigned> {
     let idle_ms = idle_secs as i64 * 1000;
     let mut closed = 0;
+    let mut closed_id = None;
     if let Some(open) = store::open_segment(conn, scope)? {
         if at_ms - open.last_call_ms <= idle_ms {
             store::join(conn, open.id, at_ms)?;
@@ -29,16 +32,19 @@ pub fn assign(
                 session_id: open.id,
                 opened: 0,
                 closed: 0,
+                closed_id: None,
             });
         }
         store::close(conn, open.id, open.last_call_ms + idle_ms)?;
         closed = 1;
+        closed_id = Some(open.id);
     }
     let id = store::insert(conn, scope, key_source, at_ms, account_id)?;
     Ok(Assigned {
         session_id: id,
         opened: 1,
         closed,
+        closed_id,
     })
 }
 

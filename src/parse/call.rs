@@ -67,6 +67,18 @@ pub fn store(
             priced.cost_usd, priced.price_commit, priced.unpriced_reason
         ],
     )?;
+    let now = time::text(chrono::Utc::now().timestamp_millis());
+    let day = crate::day::boundary::day_of(at_ms, s.tz).to_string();
+    crate::day::queue::put(conn, &day, crate::day::queue::CALL, &now)?;
+    if let Some(closed) = seg.closed_id {
+        crate::day::queue::put_session_days(
+            conn,
+            closed,
+            s.tz,
+            crate::day::queue::SESSION_CLOSED,
+            &now,
+        )?;
+    }
     if let Some(reason) = &priced.unpriced_reason {
         super::cost::warn(
             conn.last_insert_rowid(),

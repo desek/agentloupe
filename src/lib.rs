@@ -4,6 +4,7 @@ pub mod account;
 pub mod capture;
 pub mod cli;
 pub mod config;
+pub mod day;
 pub mod log;
 pub mod parse;
 pub mod price;

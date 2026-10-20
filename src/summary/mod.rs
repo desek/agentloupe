@@ -23,5 +23,6 @@ pub fn settings(cfg: &crate::config::Config) -> worker::Settings {
             .map(|c| client::Client::new(&s.base_url, &s.model, c)),
         public: s.public_projects.clone(),
         max_attempts: s.max_attempts,
+        tz: s.tz,
     }
 }

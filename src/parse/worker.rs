@@ -18,6 +18,8 @@ pub struct Settings {
     pub idle_secs: u64,
     /// Upstream name to its litellm_provider, from the allowlist file; selects the prices of a call.
     pub providers: std::collections::BTreeMap<String, String>,
+    /// The time zone that cuts the days of the aggregation queue.
+    pub tz: chrono_tz::Tz,
 }
 
 /// The counts that `loupe parse` prints.
@@ -147,7 +149,7 @@ fn run(conn: &Connection, s: &Settings, now_ms: i64, nested: bool) -> rusqlite::
     }
     c.sessions_closed += atomic(conn, nested, || {
         let w = idle::watermark(conn, cursor::get(conn, PARSER)?, now_ms)?;
-        idle::close_idle(conn, s.idle_secs, w)
+        idle::close_idle(conn, s.idle_secs, w, s.tz)
     })?;
     Ok(c)
 }

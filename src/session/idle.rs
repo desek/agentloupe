@@ -15,7 +15,13 @@ pub fn watermark(conn: &Connection, cursor: i64, now_ms: i64) -> rusqlite::Resul
 }
 
 /// Closes with `closed_at` = last call + idle time; returns the count of closed segments.
-pub fn close_idle(conn: &Connection, idle_secs: u64, watermark_ms: i64) -> rusqlite::Result<u64> {
+/// Each closed segment puts its days in the aggregation queue in the same transaction.
+pub fn close_idle(
+    conn: &Connection,
+    idle_secs: u64,
+    watermark_ms: i64,
+    tz: chrono_tz::Tz,
+) -> rusqlite::Result<u64> {
     let idle_ms = idle_secs as i64 * 1000;
     let open: Vec<(i64, String)> = conn
         .prepare("SELECT id, last_call_at FROM sessions WHERE state = 'open'")?
@@ -28,6 +34,13 @@ pub fn close_idle(conn: &Connection, idle_secs: u64, watermark_ms: i64) -> rusql
             conn.execute(
                 "UPDATE sessions SET state = 'closed', closed_at = ?2 WHERE id = ?1",
                 params![id, time::text(end)],
+            )?;
+            crate::day::queue::put_session_days(
+                conn,
+                id,
+                tz,
+                crate::day::queue::SESSION_CLOSED,
+                &time::text(chrono::Utc::now().timestamp_millis()),
             )?;
             closed += 1;
         }
@@ -57,7 +70,7 @@ mod tests {
         let now = 10 * HOUR;
         let a = assign(&c, &scope(None), "header", now - 2 * HOUR, 60, None).unwrap();
         assert_eq!(
-            close_idle(&c, 60, watermark(&c, 0, now).unwrap()).unwrap(),
+            close_idle(&c, 60, watermark(&c, 0, now).unwrap(), chrono_tz::UTC).unwrap(),
             1
         );
         let closed_at: String = c
@@ -79,7 +92,7 @@ mod tests {
         let a = assign(&c, &scope(None), "header", t0, 60, None).unwrap();
         // The cursor stands after e1; e2 is not parsed and the clock is 2 hours later.
         let w = watermark(&c, 1, t0 + 2 * HOUR).unwrap();
-        assert_eq!(close_idle(&c, 60, w).unwrap(), 0);
+        assert_eq!(close_idle(&c, 60, w, chrono_tz::UTC).unwrap(), 0);
         let b = assign(&c, &scope(None), "header", t0 + 30_000, 60, None).unwrap();
         assert_eq!(b.session_id, a.session_id);
         let n: i64 = c

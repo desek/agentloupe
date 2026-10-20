@@ -52,6 +52,7 @@ pub fn run(cfg: &Config, upstreams: Upstreams) -> Result<(), Box<dyn Error>> {
             account_key: cfg.account_key,
             idle_secs: cfg.idle_secs,
             providers: proxy::upstreams::providers(&upstreams),
+            tz: cfg.summary.tz,
         },
         cfg.parse_interval,
     );

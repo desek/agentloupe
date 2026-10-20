@@ -11,6 +11,8 @@ pub struct Settings {
     pub client: Option<Client>,
     pub public: Vec<String>,
     pub max_attempts: u32,
+    /// The time zone that cuts the days of the aggregation queue.
+    pub tz: chrono_tz::Tz,
 }
 
 /// The counts that `loupe summarize --once` prints.
@@ -103,7 +105,23 @@ fn one(
             last_error_kind: kind,
             next_attempt_at: next,
         };
-        store::put(conn, id, &row, &time::text(now_ms()))?;
+        let now = time::text(now_ms());
+        // A final status and the queue write of the days of the segment share one transaction.
+        conn.execute_batch("BEGIN IMMEDIATE")?;
+        let r = store::put(conn, id, &row, &now).and_then(|_| {
+            if status == "pending" {
+                return Ok(());
+            }
+            crate::day::queue::put_session_days(
+                conn,
+                id,
+                s.tz,
+                crate::day::queue::SUMMARY_FINAL,
+                &now,
+            )
+        });
+        conn.execute_batch(if r.is_ok() { "COMMIT" } else { "ROLLBACK" })?;
+        r?;
     }
     tracing::info!(session_id = id, status = %status, attempts, error_kind = kind.unwrap_or(""), duration_ms = t0.elapsed().as_millis() as u64, "session summary");
     Ok(status)
