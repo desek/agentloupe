@@ -117,7 +117,7 @@ Configuration:
 | `LOUPE_PUBLISH_INTERVAL_SECS` | no | Seconds between two checks for days to publish. Default `60`. |
 | `LOUPE_IDLE_SECS` | no | Seconds without calls before a session closes. Default `3600`. |
 | `LOUPE_RAW_RETENTION_HOURS` | no | Hours to keep raw bodies after parse and summary. Default `168`. |
-| `LOUPE_SITE_TITLE` | no | Title of the public page. Default `AI agent activity`. |
+| `LOUPE_SITE_TITLE` | no | Title of the public page. Default `AI agent activity`. By default, the public page does not show the product name. |
 | `LOUPE_PUBLIC_PROJECTS` | no | Comma-separated names of public projects that summaries may name. Default empty. |
 | `LOUPE_DAY_REVIEW` | no | `auto` publishes days with no review, `manual` waits for `loupe day approve`. Default `auto`. |
 | `LOUPE_SUBSCRIPTION_<NAME>` | no | Monthly price in USD of a subscription, shown next to the API-equivalent cost. |
@@ -152,12 +152,19 @@ it shows is public.
 |---|---|
 | Header | Title from `LOUPE_SITE_TITLE`, token velocity as the headline, time of the last update, range selector (3M, 6M, 1Y) |
 | Pull requests | PRs opened and PRs merged for the range, bar chart per week |
-| Lines changed | Lines added, lines removed, and net lines for the selected range |
+| Lines changed | The lines card shows lines added, lines removed, and net lines for the selected range |
 | Tokens per day | Input and output, two line charts, each on its own scale |
 | Cost (API-equivalent) | A card in the totals row: the total for the range, and a daily line chart in the style of the token charts. The label says that the figure is a list price, not money paid. Next to it, the subscription cost from `LOUPE_SUBSCRIPTION_<NAME>`, spread over the days of the range. |
 | Token usage, last 12 months | Heatmap per day, five levels from quartiles |
 | Daily log | One line per day, with the PR count and the token count |
 | Footer | The sources that the page covers, today Claude Code and Pi |
+
+The headline is the token velocity: the input and output tokens of the range divided by the
+days of the range, in tokens per day. The ranges are 3M (the last 91 days), 6M (the last 182
+days), and 1Y (the last 365 days), each ending on the newest day of the API. The URL fragment
+keeps the range, for example `#range=6M`. The subscription cost card shows the subscription
+cost of the range next to the API-equivalent cost. The page shows only sums for the range. It
+shows no streaks and no record days.
 
 The design uses the Geist and Geist Mono fonts. The values to copy (colors, sizes, spacing)
 are in the inline styles of `Main.dc.html` in the mockup archive. An implementation must
