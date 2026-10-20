@@ -29,6 +29,7 @@ The flag `--env` or the variable `LOUPE_ENV` gives the name of the environment. 
 | `LOUPE_ACCOUNT_KEY` | yes | yes | none |
 | `LOUPE_BOOTSTRAP_TOKEN` | no | yes | none |
 | `LOUPE_GITHUB_TOKEN_<LABEL>` | no | yes | none |
+| `LOUPE_GITHUB_API_URL` | no | no | `https://api.github.com`, `https` or a loopback host only |
 | `LOUPE_SUMMARY_API_KEY` | no | yes | none |
 | `LOUPE_SUMMARY_OAUTH_TOKEN` | no | yes | none |
 | `LOUPE_SUMMARY_MODEL` | no | no | `claude-haiku-5-5` |

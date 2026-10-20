@@ -39,7 +39,7 @@ The API returns the stored record text. It never builds a record in the path of 
 
 ## Field allowlist
 
-Each field name of a record and of the envelope is in the allowlist of `days.md`, at each level except the keys of `by_agent` and `by_model`. A test fails if a response holds a field name outside the allowlist.
+Each field name of a record and of the envelope is in the allowlist of `days.md`, at each level except the keys of `by_agent` and `by_model`. The allowlist contains `github` and `failed_tokens`, for the number of failed GitHub tokens. A test fails if a response holds a field name outside the allowlist.
 
 ## Headers and methods
 

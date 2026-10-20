@@ -15,7 +15,7 @@ A call belongs to the day of its start time in `LOUPE_TZ`. A segment counts on e
 
 ## Day record
 
-The day builder reads only the calls, the sessions, the day summaries, and the day overrides. It also takes the configured subscriptions as an input. It reads no clock, so the same rows give the same record. The record has exactly these top-level fields, in this order:
+The day builder reads only the calls, the sessions, the day summaries, the day overrides, and the GitHub tables of `github.md`. It also takes the configured subscriptions as an input. It reads no clock, so the same rows give the same record. The record has exactly these top-level fields, in this order:
 
 | Field | Value |
 |---|---|
@@ -30,12 +30,12 @@ The day builder reads only the calls, the sessions, the day summaries, and the d
 | `cost_usd` | The exact decimal sum of the cost of the priced calls, rounded half to even to 4 fraction digits, as a JSON number. `0` when no call has a price. |
 | `unpriced_calls` | The number of calls of the day with no cost. |
 | `subscription_cost_usd` | The subscription cost of the day from `cost.md`, rounded half to even to 4 fraction digits, as a JSON number. `0` when no subscription is configured. It never holds a subscription name. |
-| `prs_opened` | JSON `null`. A later product area fills it. |
-| `prs_merged` | JSON `null`. |
-| `lines_added` | JSON `null`. |
-| `lines_removed` | JSON `null`. |
+| `prs_opened` | The number of pull requests opened on the day, from `github.md`. `null` when no GitHub token is set. |
+| `prs_merged` | The number of pull requests merged on the day. `null` when no GitHub token is set. |
+| `lines_added` | The sum of the added lines of the pull requests merged on the day. `null` when no GitHub token is set. |
+| `lines_removed` | The sum of the removed lines of the pull requests merged on the day. `null` when no GitHub token is set. |
 | `summary` | The text of the day, or `null`. |
-| `detail` | An object with `by_agent` and `by_model`. |
+| `detail` | An object with `by_agent` and `by_model`, and `github` with `failed_tokens` when a GitHub token is set. |
 
 The token fields are integer sums. For example, an input of 21000, a cache read of 1250000, and a cache write of 12200 give an `input_total` of 1283200. The four GitHub fields keep their keys, so the shape of the record does not change when the GitHub counts land.
 
@@ -63,7 +63,7 @@ The keys of `by_agent` and `by_model` are sorted in byte order. Thus two builds 
 
 A day gets a record only when it has activity: one or more calls, or GitHub activity that an activity source reports. A day with no activity gets no record. The API returns only the days with a record, and the dashboard shows a day with no record as zero. A subscription cost alone does not give a day activity.
 
-An activity source has two functions. The first function tells if a day has activity. The second function gives the oldest day with activity, or none. One source file defines this interface. The calls source is the only registered source. It reads only the calls. A day has activity when one or more registered sources tell that it has activity. A later GitHub source registers through the same interface, with no change to the publisher.
+An activity source has two functions. The first function tells if a day has activity. The second function gives the oldest day with activity, or none. One source file defines this interface. Two sources are registered. The calls source reads only the calls. The GitHub source of `github.md` reads only the pull request table. A day has activity when one or more registered sources tell that it has activity. The GitHub source registers through the same interface, with no change to the publisher.
 
 A source that gets new data for a day puts that day in the aggregation queue with a reason that names the source. The GitHub source uses the reason `github`.
 
