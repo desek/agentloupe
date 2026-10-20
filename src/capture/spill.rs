@@ -90,6 +90,8 @@ pub mod tests {
             credential_source: None,
             account_id_hash: None,
             account_id_source: None,
+            session_hint_hash: None,
+            session_hint_source: None,
             outcome: "complete".into(),
             error: None,
             proxy_token_id: None,

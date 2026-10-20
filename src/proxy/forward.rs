@@ -4,7 +4,7 @@ use super::stream::{CaptureStream, Pending};
 use super::{ProxyState, error, headers, route::Route};
 use crate::capture::record::{ExchangeRecord, new_id};
 use crate::capture::tap::Tap;
-use crate::capture::{credential, redact};
+use crate::capture::{credential, redact, session_hint};
 use crate::token::gate::Accepted;
 use axum::body::Body;
 use axum::http::{HeaderValue, Request, StatusCode, header};
@@ -51,6 +51,7 @@ pub async fn forward(
     let mut h = parts.headers;
     let cred = credential::credential(&state.account_key, &h);
     let acct = credential::account_id(&state.account_key, &h);
+    let hint = session_hint::session_hint(&state.account_key, &h);
     let with_body = has_body(&h);
     headers::for_request(&mut h);
     let url = if route.query.is_empty() {
@@ -89,6 +90,8 @@ pub async fn forward(
         credential_source: cred.map(|c| c.1),
         account_id_hash: acct.as_ref().map(|c| c.0.clone()),
         account_id_source: acct.map(|c| c.1),
+        session_hint_hash: hint.as_ref().map(|c| c.0.clone()),
+        session_hint_source: hint.map(|c| c.1),
         outcome: String::new(),
         error: None,
         proxy_token_id: token.as_ref().map(|t| t.id),

@@ -1,4 +1,4 @@
-//! @agents-index Integration test: the stored exchange matches the traffic, the credential is only a hash, a large body is truncated.
+//! @agents-index Integration test: the stored exchange matches the traffic, credential and session hint are hashes, large bodies truncate.
 
 #[path = "common/fake_upstream.rs"]
 mod fake;
@@ -43,6 +43,15 @@ async fn credential_hash_stored_raw_absent() {
     assert_eq!(hash, hmac_hex(b"sk-test-123"));
     assert_eq!(source, "x-api-key");
     assert!(!loupe::contains(&l.db_bytes(), b"sk-test-123"));
+    let hint: (Option<String>, Option<String>) = l
+        .db()
+        .query_row(
+            "SELECT session_hint_hash, session_hint_source FROM exchanges",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(hint, (None, None));
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -83,6 +92,7 @@ async fn stored_exchange_matches_traffic() {
     let resp = reqwest::Client::new()
         .post(l.url("/claude-code/fake/json?beta=true"))
         .header("x-api-key", "sk-abc")
+        .header("x-session-id", "sess-abc")
         .body(sent.to_vec())
         .send()
         .await
@@ -141,4 +151,14 @@ async fn stored_exchange_matches_traffic() {
         ),
         ("claude-code", "fake", "/json", "beta=true", "complete")
     );
+    let hint: (String, String) = l
+        .db()
+        .query_row(
+            "SELECT session_hint_hash, session_hint_source FROM exchanges",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(hint, (hmac_hex(b"sess-abc"), "x-session-id".to_string()));
+    assert!(!loupe::contains(&l.db_bytes(), b"sess-abc"));
 }

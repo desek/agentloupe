@@ -11,6 +11,14 @@ const MIGRATIONS: &[(i64, &str)] = &[
         4,
         include_str!("../../migrations/0004_exchanges_proxy_token_id.sql"),
     ),
+    (
+        5,
+        include_str!("../../migrations/0005_exchanges_session_hint.sql"),
+    ),
+    (6, include_str!("../../migrations/0006_accounts.sql")),
+    (7, include_str!("../../migrations/0007_sessions.sql")),
+    (8, include_str!("../../migrations/0008_calls.sql")),
+    (9, include_str!("../../migrations/0009_worker_cursors.sql")),
 ];
 
 /// Applies each migration not yet recorded; returns how many it applied.
@@ -58,7 +66,7 @@ mod tests {
             .query_row("SELECT count(*) FROM schema_version", [], |r| r.get(0))
             .unwrap();
         assert_eq!(rows as usize, super::MIGRATIONS.len());
-        assert_eq!(rows, 4);
+        assert_eq!(rows, 9);
         let tokens: i64 = conn
             .query_row("SELECT count(*) FROM proxy_tokens", [], |r| r.get(0))
             .unwrap();
@@ -71,6 +79,20 @@ mod tests {
             )
             .unwrap();
         assert_eq!(col, 1);
+        for table in ["calls", "sessions", "accounts", "worker_cursors"] {
+            let n: i64 = conn
+                .query_row(&format!("SELECT count(*) FROM {table}"), [], |r| r.get(0))
+                .unwrap();
+            assert_eq!(n, 0, "{table}");
+        }
+        let hint: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM pragma_table_info('exchanges') WHERE name IN ('session_hint_hash', 'session_hint_source', 'parse_outcome')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(hint, 3);
         let exchanges: i64 = conn
             .query_row("SELECT count(*) FROM exchanges", [], |r| r.get(0))
             .unwrap();

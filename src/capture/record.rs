@@ -31,6 +31,11 @@ pub struct ExchangeRecord {
     pub credential_source: Option<String>,
     pub account_id_hash: Option<String>,
     pub account_id_source: Option<String>,
+    /// HMAC of the first present session header and its lowercase name. Default for old spill files.
+    #[serde(default)]
+    pub session_hint_hash: Option<String>,
+    #[serde(default)]
+    pub session_hint_source: Option<String>,
     pub outcome: String,
     pub error: Option<String>,
     /// The ID of the proxy token that passed the gate; None in no-token mode. Default for old spill files.

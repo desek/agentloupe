@@ -1,4 +1,4 @@
-//! @agents-index Integration test: no credential header value and no key appears in the database files or the log file.
+//! @agents-index Integration test: no credential or session header value and no key appears in the database files or the log file.
 
 #[path = "common/fake_upstream.rs"]
 mod fake;
@@ -16,6 +16,7 @@ async fn no_secret_in_db_or_log() {
         .header("x-api-key", "sk-known-secret-777")
         .header("authorization", "Bearer tok-known-888")
         .header("chatgpt-account-id", "acct-known-999")
+        .header("x-claude-code-session-id", "sess-known-555")
         .body("{}")
         .send()
         .await
@@ -31,6 +32,7 @@ async fn no_secret_in_db_or_log() {
         "sk-known-secret-777",
         "tok-known-888",
         "acct-known-999",
+        "sess-known-555",
         loupe::KEY,
     ] {
         assert!(

@@ -9,7 +9,8 @@ pub type Hashed = Option<(String, String)>;
 
 const ACCOUNT_ID_HEADERS: &[&str] = &["chatgpt-account-id"];
 
-fn hmac_hex(key: &[u8; 32], input: &[u8]) -> String {
+/// HMAC-SHA256 of `input` under `key` as lowercase hex.
+pub fn hmac_hex(key: &[u8; 32], input: &[u8]) -> String {
     let mut m = Hmac::<Sha256>::new_from_slice(key).expect("any key length is valid");
     m.update(input);
     hex::encode(m.finalize().into_bytes())
