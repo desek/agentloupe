@@ -169,34 +169,62 @@ impl Loupe {
         }
         let up = data.path().join("upstreams.toml");
         std::fs::write(&up, file).unwrap();
-        let port = free_port();
         let err_dir = tempfile::tempdir().unwrap();
+        // Parallel tests can get the same free port; a child that cannot bind exits, so retry on a new port.
+        for _ in 0..5 {
+            let port = free_port();
+            if let Some(child) = Self::spawn(data.path(), &up, port, err_dir.path(), env) {
+                return Loupe {
+                    port,
+                    data,
+                    err_dir,
+                    child,
+                };
+            }
+        }
+        panic!(
+            "loupe did not start: {}",
+            std::fs::read_to_string(err_dir.path().join("stderr.log")).unwrap_or_default()
+        );
+    }
+
+    /// Spawns loupe serve on `port`; None if the child exits before it is ready.
+    fn spawn(
+        data: &std::path::Path,
+        up: &std::path::Path,
+        port: u16,
+        err: &std::path::Path,
+        env: &[(&str, &str)],
+    ) -> Option<Child> {
+        let data_path = data;
         let mut cmd = Command::new(env!("CARGO_BIN_EXE_loupe"));
         cmd.arg("serve")
             .current_dir(env!("CARGO_MANIFEST_DIR"))
             .env_clear()
             .env("LOUPE_LISTEN", format!("127.0.0.1:{port}"))
-            .env("LOUPE_DATA_DIR", data.path())
+            .env("LOUPE_DATA_DIR", data_path)
             .env("LOUPE_DATA_KEY", KEY)
             .env("LOUPE_ACCOUNT_KEY", KEY)
-            .env("LOUPE_UPSTREAMS_FILE", &up)
+            .env("LOUPE_UPSTREAMS_FILE", up)
             .stderr(Stdio::from(
-                std::fs::File::create(err_dir.path().join("stderr.log")).unwrap(),
+                std::fs::File::create(err.join("stderr.log")).unwrap(),
             ));
         for (k, v) in env {
             cmd.env(k, v);
         }
-        let child = cmd.spawn().unwrap();
+        let mut child = cmd.spawn().unwrap();
         let deadline = Instant::now() + Duration::from_secs(10);
-        while TcpStream::connect(("127.0.0.1", port)).is_err() {
+        loop {
+            if child.try_wait().unwrap().is_some() {
+                return None;
+            }
+            if TcpStream::connect(("127.0.0.1", port)).is_ok() {
+                // A connect can reach another test's server on the same port; ours must still be alive.
+                std::thread::sleep(Duration::from_millis(100));
+                return child.try_wait().unwrap().is_none().then_some(child);
+            }
             assert!(Instant::now() < deadline, "loupe did not start");
             std::thread::sleep(Duration::from_millis(50));
-        }
-        Loupe {
-            port,
-            data,
-            err_dir,
-            child,
         }
     }
 
