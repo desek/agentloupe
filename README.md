@@ -197,13 +197,19 @@ The binary identifies the provider account between sessions without a sign-up. F
 request, it uses the first source that exists:
 
 1. A stable account ID that the agent sends:
-   - Claude Code: the account UUID in `metadata.user_id` of the request body.
    - Codex (ChatGPT login): the `ChatGPT-Account-Id` header.
+   - Claude Code: the account UUID in `metadata.user_id` of the request body.
 2. The credential that the agent sends to the provider: the `authorization` bearer token or the
    `x-api-key` header. This is the fallback that catches every request without an account ID.
 
-The account ID sources are not verified yet. The implementation must confirm them with a
-capture of real requests from the agent versions in use, and update this list.
+A capture of real requests on 2026-10-20 verified these sources per agent version:
+
+| Agent | Version | Account source | Session source |
+|---|---|---|---|
+| Claude Code | 2.1.304 | `metadata.user_id`, a JSON object string with `account_uuid`, `device_id`, `session_id` | the header `x-claude-code-session-id`; a subagent call also sends `x-claude-code-agent-id`, which makes it its own session |
+| Pi | 1.3.0 | the credential in `authorization` | no session header and no `prompt_cache_key`, so the hash of the opening of the conversation |
+
+The Codex source is not verified yet.
 
 The binary computes an HMAC-SHA256 of the value with the server secret `LOUPE_ACCOUNT_KEY`,
 before it redacts the headers. It stores only the hash and the name of the source. It never

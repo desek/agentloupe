@@ -8,6 +8,7 @@ const REQUEST_NAMES: &[&str] = &[
     "x-api-key",
     "cookie",
     "chatgpt-account-id",
+    "x-claude-code-agent-id",
 ];
 const REQUEST_PARTS: &[&str] = &["key", "token", "secret", "session"];
 /// The substring `token` is not here: rate-limit and usage headers name tokens as counts.
@@ -77,6 +78,7 @@ mod tests {
             "x-api-key",
             "cookie",
             "chatgpt-account-id",
+            "x-claude-code-agent-id",
             "anthropic-session-id",
             "x-goog-api-key",
         ];

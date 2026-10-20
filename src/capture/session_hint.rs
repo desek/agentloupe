@@ -4,7 +4,10 @@ use super::credential::{Hashed, hmac_hex};
 use axum::http::HeaderMap;
 
 /// The session headers in order of preference; the first present one is the session hint.
+/// Claude Code sends the agent ID header only on the calls of a subagent, next to the session ID
+/// of its parent, so it comes first: a subagent is then its own session.
 pub const SESSION_HEADERS: &[&str] = &[
+    "x-claude-code-agent-id",
     "x-claude-code-session-id",
     "x-session-id",
     "session_id",
@@ -33,6 +36,11 @@ mod tests {
         assert_eq!(
             session_hint(&K, &h),
             Some((hmac_hex(&K, b"first"), "x-claude-code-session-id".into()))
+        );
+        h.insert("x-claude-code-agent-id", "sub".parse().unwrap());
+        assert_eq!(
+            session_hint(&K, &h),
+            Some((hmac_hex(&K, b"sub"), "x-claude-code-agent-id".into()))
         );
         assert_eq!(session_hint(&K, &HeaderMap::new()), None);
     }

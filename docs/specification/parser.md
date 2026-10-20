@@ -5,11 +5,11 @@ The parser reads the stored exchanges. It finds the model calls from the usage b
 
 ## Session hint capture
 
-The capture reads the session hint before it redacts the request headers. It reads the first present header of an ordered list of session headers. One source file holds the list. The initial list is `x-claude-code-session-id`, `x-session-id`, `session_id`, `session-id`. The section "Verified sources per agent" can correct the list.
+The capture reads the session hint before it redacts the request headers. It reads the first present header of an ordered list of session headers. One source file holds the list. The list is `x-claude-code-agent-id`, `x-claude-code-session-id`, `x-session-id`, `session_id`, `session-id`. The section "Verified sources per agent" gives the reason for the first entry: Claude Code sends `x-claude-code-agent-id` only on the calls of a subagent.
 
 The capture stores the HMAC-SHA256 of the header value under `LOUPE_ACCOUNT_KEY`, as lowercase hex, in `session_hint_hash`. It stores the lowercase header name in `session_hint_source`. Both are null when no listed header is present. See `proxy.md`, section "Exchange record".
 
-The capture keeps every rule of the proxy. It does not delay the stream, it redacts the header value, and it writes no header value to a log line.
+The capture keeps every rule of the proxy. It does not delay the stream, it redacts the header value, and it writes no header value to a log line. The redaction of `x-claude-code-agent-id` is a name in the redaction list of `proxy.md`, because its name does not contain `session`.
 
 ## Parser worker
 
@@ -101,7 +101,7 @@ The session key is the first present source, in this order:
 
 The worker stores the key as an HMAC-SHA256 under `LOUPE_ACCOUNT_KEY` of the value of the source. It stores the name of the source in `key_source`.
 
-A subagent is a session. The key rule gives a subagent a key that differs from the key of its parent. The section "Verified sources per agent" records which field or header separates the calls of a subagent from the main calls.
+A subagent is a session. The key rule gives a subagent a key that differs from the key of its parent. The section "Verified sources per agent" records which field or header separates the calls of a subagent from the main calls. For Claude Code, the subagent calls send the session ID of the parent and also `x-claude-code-agent-id`, so the first entry of the list of session headers gives them their own key.
 
 ## Session scope
 
@@ -155,5 +155,7 @@ The verification captures real requests through the proxy. It records only heade
 
 | Agent | Version | Session header | `metadata.user_id` shape | `prompt_cache_key` present | Account source | Subagent separation |
 |---|---|---|---|---|---|---|
-| Claude Code | 2.1.304 | to be verified | to be verified | to be verified | to be verified | to be verified |
-| Pi | 1.3.0 | to be verified | to be verified | to be verified | to be verified | to be verified |
+| Claude Code | 2.1.304 | `x-claude-code-session-id` on every call; `x-claude-code-agent-id` also on each subagent call | a JSON object string with the keys `account_uuid`, `device_id`, `session_id` | no | `metadata.user_id` | `x-claude-code-agent-id`, first in the list of session headers; the calls of one subagent form their own session |
+| Pi | 1.3.0 | none | absent | no | `credential:authorization` | not applicable; Pi has no subagent, and the key source is `opening` |
+
+The verification ran on 2026-10-20 with the local release binary, `LOUPE_IDLE_SECS=60`, and one proxy token, with model `claude-haiku-5-5`. Each agent made one or more rows in `calls` with `input` plus `cache_read` plus `output` above 0. Every segment closed by the idle step after 60 seconds. Pi gets its credential from the extension `pi-cc-auth`, which reads the Claude Code login, so its account comes from the OAuth token. That token refreshes, so each refresh starts a new account.

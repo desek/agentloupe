@@ -105,7 +105,7 @@ The capture keeps each header name and replaces a redacted value with the litera
 
 The capture redacts a request header if its lowercase name is one of these:
 
-1. `authorization`, `proxy-authorization`, `x-api-key`, `cookie`, or `chatgpt-account-id`.
+1. `authorization`, `proxy-authorization`, `x-api-key`, `cookie`, `chatgpt-account-id`, or `x-claude-code-agent-id`.
 2. A name that contains `key`, `token`, `secret`, or `session`.
 
 The capture redacts a response header if its lowercase name is one of these:
