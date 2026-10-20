@@ -127,6 +127,46 @@ path = "tests/summary.day.rs"
 name = "retention_worker"
 path = "tests/retention.worker.rs"
 
+[[test]]
+name = "day_boundary"
+path = "tests/day.boundary.rs"
+
+[[test]]
+name = "day_build"
+path = "tests/day.build.rs"
+
+[[test]]
+name = "day_store"
+path = "tests/day.store.rs"
+
+[[test]]
+name = "publish_due"
+path = "tests/publish.due.rs"
+
+[[test]]
+name = "publish_worker"
+path = "tests/publish.worker.rs"
+
+[[test]]
+name = "publish_activity"
+path = "tests/publish.activity.rs"
+
+[[test]]
+name = "cli_aggregate"
+path = "tests/cli.aggregate.rs"
+
+[[test]]
+name = "cli_day"
+path = "tests/cli.day.rs"
+
+[[test]]
+name = "api_days"
+path = "tests/api.days.rs"
+
+[[test]]
+name = "api_allowlist"
+path = "tests/api.allowlist.rs"
+
 [dependencies]
 aes-gcm = "0.10"
 axum = "0.8"

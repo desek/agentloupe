@@ -103,10 +103,19 @@ async fn skip_and_failures() {
 async fn no_credential_is_disabled() {
     let fake = fake::spawn().await;
     let l = one_closed(fake, 2).await;
+    // The close of the segment queued its day; the final status queues it again.
+    assert_eq!(
+        text(&l, "SELECT reason FROM agg_queue").unwrap(),
+        "session_closed"
+    );
     let out = loupe::summarize(
         l.data.path(),
         &["--once"],
         &[("LOUPE_SUMMARY_BASE_URL", &base(fake, "line_nocred"))],
+    );
+    assert_eq!(
+        text(&l, "SELECT reason FROM agg_queue").unwrap(),
+        "summary_final"
     );
     assert!(
         out.status.success(),

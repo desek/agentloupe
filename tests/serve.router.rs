@@ -21,7 +21,8 @@ async fn reserved_routes_take_precedence() {
 
 async fn check_reserved(l: &Loupe) {
     assert_eq!(reqwest::get(l.url("/healthz")).await.unwrap().status(), 200);
-    for path in ["/v1/days", "/", "/assets/app.js", "/favicon.ico"] {
+    assert_eq!(reqwest::get(l.url("/v1/days")).await.unwrap().status(), 200);
+    for path in ["/v1/other", "/", "/assets/app.js", "/favicon.ico"] {
         assert_eq!(
             reqwest::get(l.url(path)).await.unwrap().status(),
             404,

@@ -43,6 +43,8 @@ async fn parse_twice_adds_nothing() {
         String::from_utf8_lossy(&first.stderr)
     );
     assert_eq!(scalar(&l, "SELECT count(*) FROM calls"), 6);
+    // Each new call puts its day in the aggregation queue in the same transaction.
+    assert!(scalar(&l, "SELECT count(*) FROM agg_queue WHERE reason = 'call'") >= 1);
     let parsed_at = |l: &Loupe| -> String {
         l.db()
             .query_row("SELECT group_concat(parsed_at) FROM exchanges", [], |r| {

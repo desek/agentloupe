@@ -58,9 +58,9 @@ fn healthz_returns_ok() {
         "{resp}"
     );
     assert!(resp.ends_with(r#"{"status":"ok"}"#), "{resp}");
+    // The health route is public, so other sites can read it.
     assert!(
-        !resp
-            .to_ascii_lowercase()
-            .contains("access-control-allow-origin")
+        resp.to_ascii_lowercase()
+            .contains("access-control-allow-origin: *")
     );
 }

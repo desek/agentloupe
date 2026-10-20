@@ -32,6 +32,8 @@ async fn public_routes_have_no_token_data() {
     let l = Loupe::start_in(data, fake, &[], &[]);
     for path in [
         "/v1/days",
+        "/v1/days/2026-10-10",
+        "/v1/days?from=bad",
         "/v1/sessions",
         "/v1/calls",
         "/v1/projects",
