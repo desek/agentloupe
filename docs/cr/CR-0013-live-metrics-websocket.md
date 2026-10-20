@@ -103,23 +103,23 @@ sequenceDiagram
 7. The binary **MUST** hold one live hub: a `tokio::sync::broadcast` channel with a capacity of `LOUPE_LIVE_BUFFER` (default 1024).
 8. The capture **MUST** send `exchange.start` when it forwards a request and `exchange.end` when the response ends, with or without an error. A send **MUST NOT** wait. A send with no receiver **MUST** be a no-op.
 9. The parser **MUST** send `call.stored` for each call that it stores and `segments.open` when the count of open segments changes after a parse pass.
-10. **Named parameter `live_access`, pending the human (Open Question 1).** The access mode of the live route and the field set of each live event depend on the answer. Each live event **MUST** hold only the fields of the allowlist of the selected option:
+10. **Named parameter `live_access`, decided: option (c) (Decision 1).** The live route `/live` is public and sends only counts and token sums. The full allowlist applies only to a later private feed on the private page of CR-0011. Each live event **MUST** hold only the fields of the column for its route:
 
-| Kind | Option (a) public, full allowlist | Option (b) private, admin token of CR-0011 | Option (c) public counts, full allowlist on the private page |
-|---|---|---|---|
-| `exchange.start` | `ts`, `agent` | `ts`, `agent` | public: `ts`; private: `ts`, `agent` |
-| `exchange.end` | `ts`, `agent`, `status`, `ttfb_ms`, `duration_ms` | same as (a) | public: `ts`, `status`; private: as (a) |
-| `call.stored` | `ts`, `agent`, `model`, `input`, `output`, `cache_read`, `cache_write`, `reasoning`, `cost_usd` | same as (a) | public: `ts`, the five token counts, `cost_usd`; private: as (a) |
-| `segments.open` | `ts`, `count` | same as (a) | same as (a) |
-| `heartbeat` | `ts` | same as (a) | same as (a) |
-| `snapshot` | `date`, `calls`, `tokens` (five counts), `cost_usd`, `segments_open`, `in_flight`, `live_enabled` | same as (a) | same as (a) |
-| `calls.batch` | `ts`, `calls`, the five token counts, `cost_usd`, `by_agent` (per agent label: `calls`, five token counts, `cost_usd`) | same as (a) | public: as (a) with no `by_agent`; private: as (a) |
-| `exchanges.batch` | `ts`, `started`, `ended`, `in_flight` | same as (a) | same as (a) |
+| Kind | Public route `/live` (this CR) | Private feed (later, when CR-0011 lands) |
+|---|---|---|
+| `exchange.start` | `ts` | `ts`, `agent` |
+| `exchange.end` | `ts`, `status` | `ts`, `agent`, `status`, `ttfb_ms`, `duration_ms` |
+| `call.stored` | `ts`, the five token counts, `cost_usd` | `ts`, `agent`, `model`, `input`, `output`, `cache_read`, `cache_write`, `reasoning`, `cost_usd` |
+| `segments.open` | `ts`, `count` | same as public |
+| `heartbeat` | `ts` | same as public |
+| `snapshot` | `date`, `calls`, `tokens` (five counts), `cost_usd`, `segments_open`, `in_flight`, `live_enabled` | same as public |
+| `calls.batch` | `ts`, `calls`, the five token counts, `cost_usd` | as public, plus `by_agent` (per agent label: `calls`, five token counts, `cost_usd`) |
+| `exchanges.batch` | `ts`, `started`, `ended`, `in_flight` | same as public |
 
-`status` is the HTTP status. The five token counts are `input`, `output`, `cache_read`, `cache_write`, `reasoning`. `cost_usd` is the API-equivalent cost from CR-0005 pricing, `null` if no price. Under option (b) the route **MUST** require the admin token of CR-0011 and the public page **MUST NOT** show the live section. Under option (c) the public route **MUST** use the public column, and the private column applies only on the private page of CR-0011.
+`status` is the HTTP status. The five token counts are `input`, `output`, `cache_read`, `cache_write`, `reasoning`. `cost_usd` is the API-equivalent cost from CR-0005 pricing, `null` if no price. The public route **MUST** use the public column and **MUST NOT** require authentication. The private column is out of scope of this CR; it applies only on the private page of CR-0011, in a later change.
 
 11. A live event **MUST NOT** hold a prompt, a body, a path, a query, a header, a session key, a segment ID, an account, a proxy token, a token ID, a token name, an upstream URL, or a summary. A serializer test **MUST** prove the allowlist for each kind of the table of requirement 10, including `snapshot`, `calls.batch`, and `exchanges.batch`.
-12. Where the selected allowlist holds `agent` or `by_agent`, the value **MUST** be the agent label of the exchange, the same value that `by_agent` in the public API shows.
+12. Where an allowlist holds `agent` or `by_agent`, the value **MUST** be the agent label of the exchange, the same value that `by_agent` in the public API shows.
 
 **Envelope and snapshot**
 
@@ -128,7 +128,7 @@ sequenceDiagram
 
 **Rate and coalescing**
 
-15. The route **MUST** send at most `LOUPE_LIVE_MAX_RATE` frames per second to one client (default 10). Above the rate, the route **MUST** coalesce: it sums `call.stored` counts into one `calls.batch` frame (`ts`, `calls`, five token counts, `cost_usd`, per-agent sums) and keeps only the last `segments.open`. Exchange start and end above the rate **MUST** become one `exchanges.batch` frame with `started`, `ended`, and `in_flight`.
+15. The route **MUST** send at most `LOUPE_LIVE_MAX_RATE` frames per second to one client (default 10). Above the rate, the route **MUST** coalesce: it sums `call.stored` counts into one `calls.batch` frame (`ts`, `calls`, five token counts, `cost_usd`; no per-agent sums on the public route) and keeps only the last `segments.open`. Exchange start and end above the rate **MUST** become one `exchanges.batch` frame with `started`, `ended`, and `in_flight`.
 16. The route **MUST** send a `heartbeat` frame every 15 seconds when it sends no other frame.
 
 **Connections and back-pressure**
@@ -138,7 +138,7 @@ sequenceDiagram
 
 **Live section on the page**
 
-19. The dashboard **MUST** show a live section under the headline with four figures for the current day: calls, tokens (sum of the five counts), open segments, and API-equivalent cost, plus a count of exchanges in flight. This metric set is provisional, pending Open Question 2 (named parameter `live_metrics`, provisional value option (a)).
+19. The dashboard **MUST** show a live section under the headline with four figures for the current day: calls, tokens (sum of the five counts), open segments, and API-equivalent cost, plus a count of exchanges in flight. This metric set is decided: named parameter `live_metrics`, option (a) (Decision 2).
 20. The live section **MUST** show a rolling chart of tokens per 10-second bucket for the last 10 minutes, in inline SVG, with the design tokens of CR-0008 (`docs/specification/dashboard.md`).
 21. The page **MUST** open the socket at `ws://` or `wss://` of the page origin, path `/live`. On a close, the page **MUST** reconnect with backoff of 1, 2, 4, 8, 16, and 30 seconds, and **MUST** reset the backoff after a snapshot.
 22. When the socket is closed, the section **MUST** show the state "Live feed paused, reconnecting" and keep the last figures in a muted style. Because a browser WebSocket cannot read the HTTP status of a failed upgrade, the page **MUST** hide the section when 3 connects in a row fail with no `snapshot` frame received since the page load. The section **MUST** stay hidden until a reload. A browser that blocks the connection (for example a browser below the baseline of CR-0008) therefore shows the paused state and then hides the section.
@@ -148,7 +148,7 @@ sequenceDiagram
 **CSP, configuration, and taxonomy**
 
 25. The CSP `connect-src 'self'` covers a same-origin `ws:` and `wss:` in the CSP Level 3 browsers of the baseline of CR-0008 (`docs/specification/dashboard.md`). Older Safari versions did not match `ws:` to `'self'`; in such a browser the page shows the behaviour of requirement 22. The CSP **MUST NOT** change. A test **MUST** assert the header and a browser scenario **MUST** prove the connection under it.
-26. The configuration **MUST** add `LOUPE_LIVE_ENABLED` (default `true`), `LOUPE_LIVE_ALLOWED_ORIGIN` (optional, an origin, default unset), `LOUPE_LIVE_MAX_RATE` (1 to 50, default 10, provisional pending Open Question 3, named parameter `live_max_rate_default`), `LOUPE_LIVE_MAX_CONNECTIONS` (1 to 1024, default 32), and `LOUPE_LIVE_BUFFER` (64 to 65536, default 1024). A value out of range **MUST** stop the start-up with an actionable error that names the variable.
+26. The configuration **MUST** add `LOUPE_LIVE_ENABLED` (default `true`), `LOUPE_LIVE_ALLOWED_ORIGIN` (optional, an origin, default unset), `LOUPE_LIVE_MAX_RATE` (1 to 50, default 10, named parameter `live_max_rate_default`, decided in Decision 3), `LOUPE_LIVE_MAX_CONNECTIONS` (1 to 1024, default 32), and `LOUPE_LIVE_BUFFER` (64 to 65536, default 1024). A value out of range **MUST** stop the start-up with an actionable error that names the variable.
 27. `loupe config show` **MUST** print `live_enabled`, `live_allowed_origin`, `live_max_rate`, `live_max_connections`, and `live_buffer`, each with its source.
 28. The `.taxonomy` **MUST** get these four rows in the category of the dashboard:
 
@@ -197,7 +197,7 @@ sequenceDiagram
 - Per-token streaming of a response, or any content of a prompt or response.
 - History older than the snapshot of the current day; the rolling chart starts empty on load.
 - A live feed through the GitHub-published site (CR-0009); the static site has no socket.
-- Authentication of the live route, unless the human selects the private option (Open Question 1).
+- Authentication of the live route, and the private feed with the full allowlist; the private feed follows CR-0011 (Decision 1).
 
 ## Alternative Approaches Considered
 
@@ -209,7 +209,7 @@ sequenceDiagram
 
 ### User Impact
 
-The reader sees the activity as it occurs. A public reader also sees when the owner works, which the daily records do not show (Open Question 1).
+The reader sees the activity as it occurs. A public reader also sees when the owner works, which the daily records do not show. The public feed holds no agent label and no model, so it does not show which agent works (Decision 1).
 
 ### Technical Impact
 
@@ -259,7 +259,7 @@ flowchart LR
 | `tests/live.events.rs` | `exchange_events_in_order` | Capture | one proxied exchange | `exchange.start` then `exchange.end` with status and timing | 8 |
 | `tests/live.events.rs` | `call_stored_after_parse` | Parser | one exchange with usage | `call.stored` with five counts equal to the `calls` row | 9 |
 | `tests/live.events.rs` | `segments_open_after_parse` | Parser | one segment opens, then closes on idle | `segments.open` with count 1, then 0 | 9 |
-| `tests/live.events.rs` | `allowlist_per_kind` | Privacy | each kind of requirement 10 (also `snapshot`, `calls.batch`, `exchanges.batch`) for the selected `live_access` option, seeded secrets in body, path, token | keys equal the allowlist, no seeded secret in any frame | 10, 11, 12 |
+| `tests/live.events.rs` | `allowlist_per_kind` | Privacy | each kind of requirement 10 (also `snapshot`, `calls.batch`, `exchanges.batch`) for the public column of `live_access` option (c), seeded secrets in body, path, token | keys equal the allowlist, no seeded secret in any frame | 10, 11, 12 |
 | `tests/live.events.rs` | `snapshot_matches_day_rules` | Snapshot | seeded calls across midnight in `LOUPE_TZ` | totals of the current day only | 14 |
 | `tests/live.rate.rs` | `coalesces_above_rate` | Rate | 500 calls in 1 s, rate 10 | at most 10 frames per second, sums equal 500 calls | 15 |
 | `tests/live.rate.rs` | `heartbeat_when_idle` | Heartbeat | 16 s idle (paused clock) | one `heartbeat` | 16 |
@@ -316,7 +316,8 @@ Then the upgrade returns 101
 ```gherkin
 Given an exchange whose body, path, and headers hold a seeded secret
 When the exchange passes the proxy and the parser stores its call
-Then each frame on the socket holds only the fields of the allowlist for its kind
+Then each frame on the socket holds only the fields of the public allowlist for its kind
+  And no frame holds an agent label, a model, or a by_agent split
   And no frame holds the seeded secret, a session key, an account, or a token name
 ```
 
@@ -426,7 +427,7 @@ node --test web/tests/
 
 ### Risk 1: A public feed reveals the work hours of the owner in real time
 
-Mitigation: the field allowlist, the switch `LOUPE_LIVE_ENABLED`, and Open Question 1 on public or private.
+Mitigation: the field allowlist, the switch `LOUPE_LIVE_ENABLED`, and the public allowlist of Decision 1, which holds only counts and token sums.
 
 ### Risk 2: A burst of calls floods the clients
 
@@ -444,7 +445,7 @@ Mitigation: the page shows the paused state; README.md states the upgrade header
 
 - CR-0008 (dashboard) implemented: the page, the CSP, the design tokens.
 - CR-0005 (pricing) implemented: `cost_usd`.
-- CR-0011 (private reports page): option (a) of Open Question 1 does not depend on it; option (b) needs it implemented before this CR; option (c) needs it only for the private column of requirement 10, so the public part can land first.
+- CR-0011 (private reports page): this CR does not depend on it. Only the later private feed, the private column of requirement 10, depends on it (Decision 1).
 - Cargo: enable the `ws` feature of `axum` 0.8 in `Cargo.toml`.
 
 ## Estimated Effort
@@ -453,7 +454,7 @@ Medium: about 3 to 4 units of work (Layer 2, hub and events, route, page).
 
 ## Decision Outcome
 
-Pending the reviewer agent and the open questions.
+Pending the reviewer agent. The human answered the three open questions on 2026-10-20 (see Decisions).
 
 ## Decided Questions
 
@@ -461,11 +462,17 @@ Pending the reviewer agent and the open questions.
 - **WebSocket over SSE.** The request names WebSockets. Judgement call.
 - **Scheme ignored in the origin check.** A front proxy can end TLS, so the host and port decide; `LOUPE_LIVE_ALLOWED_ORIGIN` covers a proxy that changes `Host`. Judgement call.
 
+## Decisions
+
+Answered by the human on 2026-10-20. Each answer equals the recommendation of the draft.
+
+1. **Public or private feed?** (named parameter `live_access`, requirement 10). Answer: option (c). The live route is public and sends only counts and token sums, with no agent label and no model. The full per-agent and per-model feed goes on the private page when CR-0011 lands.
+2. **Which metrics in the first version?** (named parameter `live_metrics`, requirement 19). Answer: option (a): calls, tokens, open segments, cost, and exchanges in flight.
+3. **Update rate?** (named parameter `live_max_rate_default`, requirement 26). Answer: 10 frames per second for each client by default, configurable through `LOUPE_LIVE_MAX_RATE`.
+
 ## Open Questions
 
-1. **Public or private feed?** Options: (a) public at `/live`, same as the dashboard, with the allowlist; (b) private, behind the admin token of CR-0011, shown only on the private reports page; (c) public with reduced data (counts only, no agent label and no model). Pending the human; this is the named parameter `live_access` of requirement 10. Recommendation: (c) public with only counts and token sums on the public page, and the full allowlist on the private page when CR-0011 lands. Reason: it keeps the public page live and limits what a stranger learns about each agent in real time.
-2. **Which metrics in the first version?** Options: (a) calls, tokens, open segments, cost, exchanges in flight; (b) also time to first byte and per-agent split; (c) calls and tokens only. Recommendation: (a). Reason: each figure is observable now and the size budget holds. Pending the human; requirement 19 uses (a) as the provisional value.
-3. **Update rate?** Options: 1, 10, or 50 frames per second for each client. Recommendation: 10 frames per second by default, configurable. Reason: it shows bursts smoothly and keeps the load low with 32 clients. Pending the human; requirement 26 uses 10 as the provisional default.
+None is open.
 
 ## Related Items
 
