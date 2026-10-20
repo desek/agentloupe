@@ -1,6 +1,17 @@
 //! @agents-index Command-line surface of loupe: the clap definitions and the dispatch to each subcommand.
 
+mod aggregate;
 mod config_show;
+#[path = "day.approve.rs"]
+mod day_approve;
+#[path = "day.common.rs"]
+mod day_common;
+#[path = "day.delete.rs"]
+mod day_delete;
+#[path = "day.edit.rs"]
+mod day_edit;
+#[path = "day.restore.rs"]
+mod day_restore;
 mod gen_key;
 mod parse;
 mod price;
@@ -83,6 +94,28 @@ enum Command {
         #[command(subcommand)]
         command: PriceCommand,
     },
+    /// Build one day now and write its record, also when the day is not due.
+    ///
+    /// Prints day, calls, sessions, cost_usd, unpriced_calls, summary (present or absent), revision,
+    /// written as key: value lines. Exit codes: 0 success, 2 bad input (for example --date), 1 internal error.
+    Aggregate {
+        /// The day: YYYY-MM-DD, or today, in LOUPE_TZ. Default: the previous day in LOUPE_TZ.
+        #[arg(long, value_name = "YYYY-MM-DD|today")]
+        date: Option<String>,
+        /// Print the same lines with written: false; write nothing and ask for no day line.
+        #[arg(long)]
+        dry_run: bool,
+        #[command(flatten)]
+        args: ConfigArgs,
+    },
+    /// Review, edit, delete, or restore the record of one day.
+    ///
+    /// Each command prints day, state, summary (present or absent), written as key: value lines.
+    /// Exit codes: 0 success, 2 bad input or a refused change, 1 internal error.
+    Day {
+        #[command(subcommand)]
+        command: DayCommand,
+    },
     /// Inspect the configuration.
     Config {
         #[command(subcommand)]
@@ -100,6 +133,37 @@ enum ConfigCommand {
         #[arg(long)]
         human: bool,
     },
+}
+
+/// The flags that every loupe day command takes.
+#[derive(Args)]
+struct DayArgs {
+    /// The day, YYYY-MM-DD in LOUPE_TZ, or today.
+    #[arg(long, value_name = "YYYY-MM-DD|today")]
+    date: String,
+    /// Print the lines with written: false and write nothing.
+    #[arg(long)]
+    dry_run: bool,
+    #[command(flatten)]
+    args: ConfigArgs,
+}
+
+#[derive(Subcommand)]
+enum DayCommand {
+    /// Set a pending_review day to published.
+    Approve(DayArgs),
+    /// Write TEXT as the summary of the day; it survives each rebuild.
+    Edit {
+        /// The summary text of the day; not empty.
+        #[arg(long)]
+        summary: String,
+        #[command(flatten)]
+        day: DayArgs,
+    },
+    /// Make the day a tombstone; the publisher never creates it again.
+    Delete(DayArgs),
+    /// Build the day again, clear the deletion, and publish it (or send it to review in manual).
+    Restore(DayArgs),
 }
 
 #[derive(Subcommand)]
@@ -236,6 +300,19 @@ pub fn run() -> ExitCode {
                 args,
             } => price::show(&args, &model, &upstream),
             PriceCommand::Backfill { dry_run, args } => price::backfill(&args, dry_run),
+        },
+        Command::Aggregate {
+            date,
+            dry_run,
+            args,
+        } => aggregate::run(&args, date.as_deref(), dry_run),
+        Command::Day { command } => match command {
+            DayCommand::Approve(d) => day_approve::run(&d.args, &d.date, d.dry_run),
+            DayCommand::Edit { summary, day: d } => {
+                day_edit::run(&d.args, &d.date, &summary, d.dry_run)
+            }
+            DayCommand::Delete(d) => day_delete::run(&d.args, &d.date, d.dry_run),
+            DayCommand::Restore(d) => day_restore::run(&d.args, &d.date, d.dry_run),
         },
         Command::Config {
             command: ConfigCommand::Show { args, human },

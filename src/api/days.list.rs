@@ -11,11 +11,7 @@ use std::sync::Arc;
 
 /// The stored record texts of the published days in [from, to], and the latest build time of
 /// all published days.
-fn read(
-    s: &ApiState,
-    from: &str,
-    to: &str,
-) -> rusqlite::Result<(Vec<String>, Option<String>)> {
+fn read(s: &ApiState, from: &str, to: &str) -> rusqlite::Result<(Vec<String>, Option<String>)> {
     let conn = s.conn.lock().unwrap_or_else(|p| p.into_inner());
     let records = conn
         .prepare_cached(

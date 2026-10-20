@@ -20,7 +20,9 @@ impl ApiError {
             status: StatusCode::BAD_REQUEST,
             code,
             message,
-            fix: format!("send a query such as {EXAMPLE}, with from and to as YYYY-MM-DD, from not after to, and at most 400 days"),
+            fix: format!(
+                "send a query such as {EXAMPLE}, with from and to as YYYY-MM-DD, from not after to, and at most 400 days"
+            ),
         }
     }
 

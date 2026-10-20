@@ -4,11 +4,11 @@ pub mod activity;
 pub mod allowlist;
 pub mod boundary;
 pub mod build;
+#[path = "override.rs"]
+pub mod overrides;
+pub mod queue;
 pub mod rebuild;
 pub mod record;
 pub mod state;
 pub mod store;
 pub mod sum;
-#[path = "override.rs"]
-pub mod overrides;
-pub mod queue;

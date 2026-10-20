@@ -46,7 +46,10 @@ fn derived(cfg: &Loaded) -> Vec<(String, String, &'static str)> {
             let t = crate::publish::due::next_due(chrono::Utc::now().timestamp_millis(), tz, at);
             (t.to_rfc3339(), crate::publish::due::utc(t).to_rfc3339())
         }
-        _ => ("invalid: LOUPE_TZ or LOUPE_PUBLISH_AT".into(), "invalid".into()),
+        _ => (
+            "invalid: LOUPE_TZ or LOUPE_PUBLISH_AT".into(),
+            "invalid".into(),
+        ),
     };
     out.push(("publish_next_due_local".into(), local, "derived"));
     out.push(("publish_next_due_utc".into(), utc, "derived"));

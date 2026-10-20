@@ -38,7 +38,11 @@ impl Sums {
         self.output += c.output;
         self.calls += 1;
         self.sessions.insert(c.session_id);
-        match c.cost_usd.as_deref().and_then(|t| Decimal::from_str(t).ok()) {
+        match c
+            .cost_usd
+            .as_deref()
+            .and_then(|t| Decimal::from_str(t).ok())
+        {
             Some(d) => self.cost += d,
             None => self.unpriced += 1,
         }
