@@ -2,8 +2,8 @@
 name: "CR-0004 parser, sessions, and provider accounts"
 description: "Adds the parser worker that reads stored exchanges into calls, groups calls into sessions and segments per agent and proxy token, and derives the provider account of each call, with a verification of the account ID sources against real captures."
 id: "CR-0004"
-status: "approved"
-date: 2026-10-19
+status: "proposed"
+date: 2026-10-20
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
@@ -137,17 +137,24 @@ stateDiagram-v2
 19. Close on idle: an idle step **MUST** run with the parser worker. It **MUST** close an open segment only when `last_call_at + LOUPE_IDLE_SECS` is before the parse watermark, and **MUST** set `closed_at = last_call_at + LOUPE_IDLE_SECS`. The parse watermark is the `started_at` of the oldest unparsed exchange, or the current time when no backlog exists. Thus a backlog that the worker parses late gives the same segments as a live parse.
 20. The close of a segment **MUST** be the only event that a later CR (CR-0006 summaries) reads to start its work. This CR **MUST** add a column `sessions.closed_at` and an index on (state, closed_at), and **MUST NOT** add the summary step.
 
+35. A subagent is a session. The calls of a subagent inside one agent run **MUST** form their own session, separate from the session of the main agent. The session key rule **MUST** give a subagent a key that differs from the key of its parent. The verification of requirement 30 **MUST** find and record in `docs/specification/parser.md` which request field or header separates subagent calls from main calls (for example the session hint, `metadata.user_id`, or the opening hash), and **MUST** correct requirement 13 if the listed sources join them.
+36. The default of `LOUPE_IDLE_SECS` **MUST** be `3600` (60 minutes).
+
 **Provider accounts**
 
 21. The account of a call **MUST** come from the first present source, per README section "Accounts": (a) `exchanges.account_id_hash` (header account ID, source `header:<name>`); (b) the account UUID in `metadata.user_id` of the request body, hashed by the worker with HMAC-SHA256 under `LOUPE_ACCOUNT_KEY`, source `metadata.user_id`; (c) `exchanges.credential_hash`, source `credential:<header name>`.
 22. The worker **MUST NOT** compute a credential hash again. It **MUST** use only the columns that the capture wrote (CR-0002 requirements 22 and 24).
 23. A new table `accounts` **MUST** hold one row per (hash, source): id, hash, source, first seen, last seen. Each call **MUST** store the account id. A call with no source **MUST** store a null account id.
 24. The proxy token ID and the account id **MUST** be independent columns on `calls`, so an analysis can group by token, by account, or both.
-25. A route under `/v1/` **MUST NOT** read `accounts`, a key hash, or a proxy token ID.
+25. A route under `/v1/` **MUST NOT** read `accounts`, a key hash, or a proxy token ID. The count of provider accounts is private: a public route and a day record **MUST NOT** show it.
+
+**Retention**
+
+37. The parser and every later step **MUST** keep the rows of `calls` and `sessions` forever. A step **MUST NOT** delete them by age. The deletion of raw bodies after `LOUPE_RAW_RETENTION_HOURS` (CR-0006) **MUST NOT** delete a call or a session row.
 
 **Commands and configuration**
 
-26. `loupe config show` **MUST** print `LOUPE_IDLE_SECS` and `LOUPE_PARSE_INTERVAL_SECS` with their sources.
+26. `loupe config show` **MUST** print `LOUPE_IDLE_SECS` (default `3600`, 60 minutes) and `LOUPE_PARSE_INTERVAL_SECS` with their sources.
 27. A command `loupe parse --once` **MUST** run one parse pass and one idle step, then print one summary line per stage on stdout (`exchanges_read`, `calls_added`, `sessions_opened`, `sessions_closed`, as `key: value`), and exit 0. It **MUST** be safe to run again and **MUST** support `--dry-run`, which reports the counts and writes nothing.
 28. The Layer 2 document `docs/specification/parser.md` **MUST** describe the formats, the token columns, the session key order, the segment rules, and the account sources before the code lands.
 29. `.taxonomy` **MUST** update the rows for call, session, and provider account, and **MUST** add rows for segment, session key, and session hint.
@@ -158,7 +165,7 @@ stateDiagram-v2
 31. The verification **MUST** read the header names (never the values) and the field paths of the request body, and **MUST** record in `docs/specification/parser.md`, per agent and version: which session header is present, the shape of `metadata.user_id`, whether `prompt_cache_key` is present, and which account source applies.
 32. If a listed source does not exist in the capture, or a new stable source exists, the implementer **MUST** correct the lists of requirements 1, 13, and 21 in code and in the Layer 2 document. The credential hash **MUST** stay the last fallback.
 33. The verification **MUST NOT** write a header value, a body, or a credential to the repository, a log file, or the report. It **MUST** write only names, paths, and booleans.
-34. The README "Accounts" section is the human's master document. This CR **MUST NOT** edit README.md. The result of requirement 31 **MUST** be reported to the human with a proposed README text.
+34. After the verification of requirement 31, the implementer **MUST** update the README section "Accounts" to state the verified account and session sources per agent version. This CR **MUST NOT** edit other README sections.
 
 ### Non-Functional Requirements
 
@@ -182,7 +189,8 @@ stateDiagram-v2
 
 * New: migrations for `calls`, `sessions`, `accounts`, `worker_cursors`, and the new `exchanges` columns; `src/parse/`, `src/session/`, `src/account/`, `src/capture/session_hint.rs`, `src/cli/parse.rs`; `docs/specification/parser.md`; `tests/parse.*.rs`; `.agents/scripts/parser.bench.sh`; `.agents/scenarios/parser.*.md`; fixtures under `tests/fixtures/parse/`.
 * Changed: the capture writer (session hint), `loupe serve` (start the worker), the configuration loader (two variables), `.env.example` (comments only), `.taxonomy`, `docs/specification/proxy.md` (link to the session hint).
-* Not changed: README.md, `vendor/litellm/`, the public API, the dashboard.
+* Changed after the verification: README.md, section "Accounts" only (requirement 34).
+* Not changed: other README sections, `vendor/litellm/`, the public API, the dashboard.
 
 ## Scope Boundaries
 
@@ -204,7 +212,8 @@ stateDiagram-v2
 * The dashboard: CR-0008. GitHub: CR-0009.
 * The full end-to-end acceptance on macOS with the dashboard: CR-0010. This CR uses real agents only for the verification of requirement 30.
 * Codex. The `chatgpt-account-id` header stays in the list from CR-0002, but this CR verifies only Claude Code and Pi.
-* An edit of README.md.
+* An edit of a README section other than "Accounts".
+* A delete of call or session rows by age.
 
 ## Alternative Approaches Considered
 
@@ -295,7 +304,7 @@ Not applicable: no test covers removed behaviour.
 | Scenario | User Goal | User Surface | Success Condition | Criteria Proved | Scenario Record |
 |----------|-----------|--------------|-------------------|-----------------|-----------------|
 | Fake upstream calls become sessions | The operator sees each proxied call as a row and a session | command line | after `loupe parse --once`, `sqlite3` shows the calls with token ID and a closed segment after the idle time | AC-1, AC-3, AC-4 | `.agents/scenarios/parser.sessions.md` |
-| Real agents through the proxy | The operator sees the calls of `claude -p` and `pi -p` | command line | one or more `calls` rows per agent label, model `claude-haiku-5-5`, account source recorded | AC-6, AC-7 | `.agents/scenarios/parser.real-agents.md` |
+| Real agents through the proxy | The operator sees the calls of `claude -p` and `pi -p` | command line | one or more `calls` rows per agent label, model `claude-haiku-5-5`, account source recorded, subagent calls in their own session | AC-6, AC-7, AC-9 | `.agents/scenarios/parser.real-agents.md` |
 
 ## Acceptance Criteria
 
@@ -369,7 +378,24 @@ When the operator runs "claude -p" and "pi -p" with model claude-haiku-5-5 throu
   And runs "loupe parse --once"
 Then "select agent_label, count(*) from calls group by agent_label" shows claude-code and pi with 1 or more rows each
   And docs/specification/parser.md records the verified session and account sources per agent version
-  And the report to the human contains a proposed text for the README section "Accounts"
+  And the README section "Accounts" states the verified sources per agent version
+```
+
+### AC-9: A subagent is its own session
+
+```gherkin
+Given a Claude Code run that starts one subagent through the proxy
+When the operator runs "loupe parse --once"
+Then the subagent calls are in a sessions row that holds no call of the main agent
+  And docs/specification/parser.md records the field that separates subagent calls
+```
+
+### AC-10: Calls and sessions stay
+
+```gherkin
+Given calls and sessions older than LOUPE_RAW_RETENTION_HOURS
+When the raw body deletion runs
+Then the counts of rows in calls and sessions do not change
 ```
 
 ### AC-8: No secret in logs
@@ -459,9 +485,14 @@ Chosen approach: "a separate parser worker with a transactional cursor, HMAC ses
 
 1. **Session hint header list.** The initial list comes from the prototype and is not verified. Provisional default: the list of requirement 1, corrected by the verification of requirement 30.
 2. **The shape of `metadata.user_id` in Claude Code 2.1.302.** It can hold an account UUID and a session ID. Provisional default: parse it as JSON first, then as the `user_<hash>_account_<uuid>_session_<uuid>` string, and record the verified shape.
-3. **README change.** The README "Accounts" section must change after the verification. Provisional default: this CR proposes the text to the human and does not edit README.md.
 
 ### Decided
+
+* **Idle time** (Q15). Decided by the human on 2026-10-20: `LOUPE_IDLE_SECS` default is `3600` (60 minutes). Requirements 26 and 36.
+* **Subagent calls** (Q17). Decided by the human on 2026-10-20: a subagent is a session. The detection rule is verified at capture time. Requirement 35, AC-9.
+* **Provider account count** (Q18). Decided by the human on 2026-10-20: the count stays private. Requirement 25.
+* **README change** (Q19, former open question 3). Decided by the human on 2026-10-20: the README section "Accounts" can change after the verification. Requirement 34.
+* **Retention of calls and sessions** (Q45). Decided by the human on 2026-10-20: kept forever. Requirement 37, AC-10.
 
 * **Pi credential for the verification** (former open question 4). Decided by the human on 2026-10-19: Pi gets its credential from the environment variable `ANTHROPIC_OAUTH_TOKEN`. It holds the subscription token that the human makes one time with `claude setup-token`. Nothing is copied or linked from `~/.pi/agent`. CR-0010 uses the same credential.
 
