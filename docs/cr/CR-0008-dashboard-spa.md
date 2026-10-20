@@ -2,7 +2,7 @@
 name: "CR-0008 Stateless dashboard SPA built into the binary"
 description: "Adds the public dashboard at GET /: a stateless single-page app in plain HTML, CSS, and JavaScript with no build step, built into the loupe binary, with self-hosted Geist fonts, that reads only the public API, shows token velocity as the headline, a configurable site title, the subscription cost next to the API-equivalent cost, and the README dashboard sections with clear empty states."
 id: "CR-0008"
-status: "approved"
+status: "implemented"
 date: 2026-10-20
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
