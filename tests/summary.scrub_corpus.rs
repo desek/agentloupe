@@ -1,6 +1,6 @@
 //! @agents-index Measurement test: runs the scrubber over the corpus file and prints leaks, which must be 0.
 
-#[allow(dead_code)]
+#[allow(dead_code, unused_imports)]
 #[path = "../src/summary/scrub.rs"]
 mod scrub;
 
@@ -21,7 +21,6 @@ fn identifying_left(out: &str, public: &[String]) -> bool {
     })
 }
 
-#[test]
 fn scrub_corpus_has_no_leaks() {
     let corpus = include_str!("fixtures/summary/scrub_corpus.txt");
     let public = scrub::public_projects(PUBLIC);
@@ -60,4 +59,10 @@ fn scrub_corpus_has_no_leaks() {
     assert!(lines >= 50, "the corpus needs at least 50 lines");
     assert_eq!(leaks, 0);
     assert_eq!(lost, 0);
+}
+
+/// Runs without the test harness, so `cargo test` prints the measured counts on success too.
+fn main() {
+    scrub_corpus_has_no_leaks();
+    println!("test scrub_corpus_has_no_leaks ... ok");
 }

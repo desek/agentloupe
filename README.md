@@ -103,8 +103,9 @@ Configuration:
 | `LOUPE_ACCOUNT_KEY` | yes | Secret for the HMAC hashes of accounts and pull requests. |
 | `LOUPE_BOOTSTRAP_TOKEN` | no | A proxy token from a secret (see "Proxy tokens"). |
 | `LOUPE_GITHUB_TOKEN_<LABEL>` | no | One or more GitHub tokens (see "GitHub"). |
-| `LOUPE_SUMMARY_API_KEY` or `LOUPE_SUMMARY_OAUTH_TOKEN` | no | Anthropic credential for the one-line summaries: an API key, or the subscription token from `claude setup-token`. Without one, no summaries. |
-| `LOUPE_SUMMARY_MODEL` | no | Model for the summaries. Default `claude-haiku-5-5`. Another model needs `LOUPE_SUMMARY_API_KEY`, because a subscription token works only with Haiku. |
+| `LOUPE_SUMMARY_API_KEY` | no | Console API key for the one-line summaries. Either this key or `LOUPE_SUMMARY_OAUTH_TOKEN` enables the summaries; if both are set, the key is used. Without one, no summaries. |
+| `LOUPE_SUMMARY_OAUTH_TOKEN` | no | Claude subscription token from `claude setup-token`, sent as `Authorization: Bearer`. Works with `claude-haiku-5-5` only. |
+| `LOUPE_SUMMARY_MODEL` | no | Model for the summaries. Default `claude-haiku-5-5`. A model other than `claude-haiku-5-5` needs `LOUPE_SUMMARY_API_KEY`, because a subscription token works only with Haiku. |
 | `LOUPE_TZ` | no | Time zone that cuts the days. Default `Europe/Stockholm`. |
 | `LOUPE_PUBLISH_AT` | no | Time to publish the previous day. Default `01:00`. |
 | `LOUPE_IDLE_SECS` | no | Seconds without calls before a session closes. Default `3600`. |
@@ -332,8 +333,18 @@ the public API.
 | Calls | Model, status, token counts, cost |
 | Public data | Daily totals, totals per agent and per model, PR and line counts, one summary line per day |
 
-The summary model gets the transcript as data, without the system prompt. It must not write
-names of people, companies, products, repositories, files, paths, URLs, or numbers.
+The summary model gets the transcript as data, without the system prompt, the tool definitions,
+or system-reminder blocks. Its rules: a neutral tone in the third person, with no opinion and no
+praise; one line of at most 12 words for a session, which starts with a past-tense verb; no names of
+people, clients, companies, products, repositories, files, or tools; no paths, URLs, email
+addresses, or numbers; no other non-public information. Only the projects in
+`LOUPE_PUBLIC_PROJECTS` can be named. A trivial or failed session also gets a line that says what
+was tried. The day line is one paragraph of 3 to 8 sentences, built from the session lines of the
+day under the same rules.
+
+A scrubber runs on every line before storage. It removes URLs, email addresses, paths, and every
+token with a digit, except a name in `LOUPE_PUBLIC_PROJECTS`. Raw bodies are deleted 168 hours
+(`LOUPE_RAW_RETENTION_HOURS`) after parse and summary; the calls and sessions stay.
 
 ## Open work
 

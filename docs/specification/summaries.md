@@ -40,7 +40,7 @@ A segment whose transcript is empty after the removals gets the status `skipped`
 
 ## Summary client
 
-The client sends one `POST /v1/messages` request to `LOUPE_SUMMARY_BASE_URL` (default `https://api.anthropic.com`). The request uses the model `LOUPE_SUMMARY_MODEL` (default `claude-haiku-5-5`) and `temperature` 0. `max_tokens` is 64 for a session line and 600 for a day paragraph. The timeout of a request is 30 seconds.
+The client sends one `POST /v1/messages` request to `LOUPE_SUMMARY_BASE_URL` (default `https://api.anthropic.com`). The request uses the model `LOUPE_SUMMARY_MODEL` (default `claude-haiku-5-5`). The request has no `temperature` field, because the API refuses `temperature` for `claude-haiku-5-5` with a `400` ("`temperature` is deprecated for this model", observed on 2026-10-20). `max_tokens` is 64 for a session line and 600 for a day paragraph. The timeout of a request is 30 seconds.
 
 The client never sends the request through the proxy routes of `loupe serve`. A summary request makes no row in `exchanges` or `calls`. It does not count in a session, a day record, or a cost.
 
@@ -77,14 +77,21 @@ A subscription token works on the raw Messages API for Haiku models only. Thus `
 
 ### Headers of the OAuth path
 
-With `oauth_token`, the client sends this header set. The set is confirmed at implementation against the installed Claude Code; this section then records the final set and the version.
+With `oauth_token`, the client sends this header set. The set was confirmed on 2026-10-20 with a live request from Claude Code 2.1.304 on this machine, and with the captured Claude Code traffic of the `pi-cc-auth` extension.
 
 | Header | Value |
 |---|---|
 | `authorization` | `Bearer <token>` |
 | `anthropic-version` | `2023-06-01` |
-| `anthropic-beta` | Confirmed at implementation. |
-| Other headers | Confirmed at implementation. |
+| `anthropic-beta` | `oauth-2025-04-20,claude-code-20250219` |
+| `x-app` | `cli` |
+| `content-type` | `application/json` |
+
+The OAuth request also puts one text block first in `system`, before the rule text:
+
+> x-anthropic-billing-header: cc_version=2.1.304; cc_entrypoint=sdk-cli;
+
+Without this block, a request with the rule text gets a `429` with the message `Error` and no `retry-after` header. With the block, the same request gets a `200`. The `api_key` path sends `x-api-key` and `anthropic-version` only, and no billing block.
 
 ### Credential errors
 
