@@ -2,7 +2,7 @@
 name: "CR-0011 Private reports page per proxy token and tag"
 description: "Adds a private page and a private API that show usage, API-equivalent cost, and sessions per proxy token and per tag. The admin token LOUPE_ADMIN_TOKEN protects both, through a header or a login form with an HttpOnly cookie. Without an admin token the private page is off. Private data never reaches the public API."
 id: "CR-0011"
-status: "proposed"
+status: "approved"
 date: 2026-10-20
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
@@ -353,7 +353,7 @@ About 3 days for one implementation agent, in 6 commits.
 
 ## Decision Outcome
 
-Pending the reviewer agent.
+Approved by an independent reviewer agent on 2026-10-20 after the answered questions were recorded.
 
 ## Implementation Status
 
