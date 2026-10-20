@@ -6,7 +6,7 @@ This directory describes how the `loupe` binary behaves. Each file covers one pr
 | File | Covers |
 |---|---|
 | `proxy.md` | The proxy routes, the forward to the upstream, the capture of each exchange, and the redaction of credentials. |
-| `tokens.md` | The proxy tokens and the `loupe token` subcommands. |
+| `proxy.tokens.md` | The proxy tokens, the `loupe token` subcommands, the bootstrap token, and the token gate. |
 | `accounts.md` | The hash of the provider account and its sources. |
 | `parser-sessions.md` | The parser that finds calls in exchanges, and the sessions that group the calls. |
 | `cost.md` | The API-equivalent cost of each call from the vendored price file. |

@@ -9,6 +9,8 @@ One source file holds the list of reserved first path segments. The list is `hea
 
 Every other path has the form `/<agent>/<upstream>/<path>`. The route parser returns one typed route: the agent label, the upstream name, the rest of the path, and the query. The parser is one function behind one interface, so a later change can add an optional leading segment without a change to the forwarder or the capture.
 
+A path can start with an optional token segment, as `/<token>/<agent>/<upstream>/<path>`. A first segment that starts with `lpt_` is the presented token, and the route carries it. The token gate checks it before the forwarder. See `proxy.tokens.md`.
+
 ## Names
 
 The agent label and the upstream name must match `^[a-z0-9][a-z0-9-]{0,31}$`. A name in the reserved list is not a valid agent label or upstream name.
@@ -75,9 +77,10 @@ The proxy stores one exchange for each forwarded request in the table `exchanges
 | `agent` | The agent label. |
 | `upstream` | The upstream name. |
 | `method` | The request method. |
-| `path` | The rest of the path. |
+| `path` | The rest of the path. It never holds the token segment. |
 | `query` | The query. |
 | `status` | The response status. |
+| `proxy_token_id` | The ID of the proxy token that passed the token gate, or null in no-token mode. See `proxy.tokens.md`. |
 | `request_size` | The size of the request body in bytes, as forwarded. |
 | `response_size` | The size of the response body in bytes, as forwarded. |
 | `request_headers` | The redacted request headers, as JSON. |
