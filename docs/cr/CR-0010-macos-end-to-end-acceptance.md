@@ -2,7 +2,7 @@
 name: "CR-0010 End-to-end acceptance on macOS with Claude Code and Pi"
 description: "Proves the definition of done of the CR set: the loupe container runs on the human's Mac, claude -p and pi -p reach Anthropic through the proxy with claude-haiku-5-5, and the sessions are captured, parsed, priced, summarized, published, and shown on the dashboard. Adds the connect script, the README instructions, and the persisted user scenario."
 id: "CR-0010"
-status: "proposed"
+status: "approved"
 date: 2026-10-20
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
@@ -463,3 +463,4 @@ Chosen approach: "a connect script that prints per-invocation environment and an
 * 2026-10-19: Recorded the human decisions D6 and D7 (requirements 7 and 22, AC-4, AC-5, Risk 1). Added requirement 23, a check of the Pi model list with a named fallback that the scenario adds by hand. Moved requirements 22 and 23 after requirement 21. The status is "proposed" until the next review.
 * 2026-10-19: Re-approved by an independent reviewer agent on 2026-10-19 after the human decisions were recorded.
 * 2026-10-20: Recorded the human decisions D8 to D12. Added requirements 24 to 27. Changed requirements 11, 14, and 22, AC-5, AC-6, and the scope. The status is "proposed" until the next review.
+* 2026-10-20: Approved by an independent reviewer agent on 2026-10-20 after the answered questions were recorded.
