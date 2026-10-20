@@ -1,7 +1,7 @@
 ---
 id: "CR-0002"
-status: "approved"
-date: 2026-10-18
+status: "proposed"
+date: 2026-10-20
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
@@ -95,9 +95,9 @@ sequenceDiagram
 12. The capture **MUST** redact the value of each request header whose lowercase name is `authorization`, `proxy-authorization`, `x-api-key`, `cookie`, or `chatgpt-account-id`, or contains `key`, `token`, `secret`, or `session`. On the response side, the capture **MUST** redact the value of `set-cookie` and of each header whose lowercase name contains `key`, `secret`, or `session`, and **MUST NOT** apply the substring `token` to response headers. The rate-limit headers (each response header whose lowercase name starts with `anthropic-ratelimit-` or `x-ratelimit-`) **MUST** stay unredacted, because they hold counts and not credentials. The stored value **MUST** be the literal `redacted`. The header name **MUST** stay, because CR-0004 reads which credential type a request used.
 13. The capture **MUST** encrypt each body with AES-256-GCM under `LOUPE_DATA_KEY`, with a new random 96-bit nonce for each body. The additional authenticated data **MUST** be the exchange id plus the part name (`request` or `response`), so a body cannot be moved to another row without a decryption failure. The stored value **MUST** be one versioned blob: a version byte, the nonce, and the ciphertext with its tag.
 14. The source **MUST** have one decrypt function that a later CR uses to read a body. A test **MUST** prove that the decrypt of a stored body gives the bytes that the client and the upstream sent.
-15. Capture **MUST NOT** delay, block, change, or fail the forwarded stream. The tap **MUST** copy each chunk into a bounded buffer for each body. If a body is larger than the capture limit, the tap **MUST** stop the copy, set the truncated flag, and keep the size count. The capture limit **MUST** be the configuration value `LOUPE_CAPTURE_MAX_BYTES`, with the default 33554432 (32 MiB).
-16. The hand-off from the forwarder to the capture writer **MUST** use a bounded queue that never waits. The queue size **MUST** be the configuration value `LOUPE_CAPTURE_QUEUE`, with the default 256 exchange records, and `loupe config show` **MUST** print it with its source. If the queue is full, the proxy **MUST** drop the exchange record, log one warning line with the count of dropped records, and increment a counter. The forwarded response **MUST** stay unchanged.
-17. A failure of the capture writer (encryption, database, disk) **MUST** log an actionable error and **MUST NOT** stop `loupe serve` or change any later forwarded request.
+15. Capture **MUST NOT** delay, block, change, or fail the forwarded stream. The tap **MUST** copy each chunk into a bounded buffer for each body. If a body is larger than the capture limit, the tap **MUST** stop the copy, set the truncated flag, and keep the size count. The capture limit **MUST** be the configuration value `LOUPE_CAPTURE_MAX_BYTES`, with the default 33554432 (32 MiB). (Decided by the human on 2026-10-20: the limit of 32 MiB for each body is confirmed.)
+16. The hand-off from the forwarder to the capture writer **MUST** use a bounded queue that never waits. The queue size **MUST** be the configuration value `LOUPE_CAPTURE_QUEUE`, with the default 256 exchange records, and `loupe config show` **MUST** print it with its source. If the queue is full, the proxy **MUST NOT** drop the exchange record. It **MUST** spill the record to disk: a task off the request path seals (encrypts) the record with `LOUPE_DATA_KEY` and writes it as one file in `<LOUPE_DATA_DIR>/spill/`. The proxy **MUST** log one warning line with the count of spilled records and increment a spill counter. The capture writer **MUST** import the spill files in the order of their start time when the queue has space and at the start of `loupe serve`, and **MUST** delete each file after its row is committed. An import of the same file twice **MUST NOT** make a second row. The forwarded response **MUST** stay unchanged. (Decided by the human on 2026-10-20: spill to disk, no drop.)
+17. A failure of the capture writer or of a spill write (encryption, database, disk) **MUST** log an actionable error and **MUST NOT** stop `loupe serve` or change any later forwarded request.
 18. If the client closes the connection during a streamed response, the proxy **MUST** close the upstream request and store the exchange with the bytes that it received and the outcome `client_aborted`. If the upstream closes during the response, the proxy **MUST** end the client stream and store the outcome `upstream_aborted`.
 19. The proxy **MUST NOT** write a header value, a body, or a part of a body to a log line. A log line for an exchange **MUST** hold only the exchange id, the agent label, the upstream name, the method, the path, the status, the sizes, the timing, and the outcome.
 20. The repository **MUST** contain a fake upstream for the tests, written in Rust inside the test tree, that serves a JSON response, an SSE stream of chunks with a set delay, a stream that it closes in the middle, a slow response, and an echo of the request method, path, query, headers, and body.
@@ -109,9 +109,9 @@ sequenceDiagram
 ### Non-Functional Requirements
 
 1. The added time to the first byte of a streamed response through the proxy **MUST** be at most 20 milliseconds at the 95th percentile against the local fake upstream, measured by the command in "Measurable Targets".
-2. The memory that capture uses **MUST** be bounded by the capture limit times the number of concurrent exchanges plus the queue size. A code path **MUST NOT** hold a full body in memory outside the capture buffer.
+2. The memory that capture uses **MUST** be bounded by the capture limit times the number of concurrent exchanges plus the queue size. A spilled record **MUST** go to disk and **MUST NOT** stay in memory after its file is written. A code path **MUST NOT** hold a full body in memory outside the capture buffer.
 3. A secret (`LOUPE_DATA_KEY`, `LOUPE_ACCOUNT_KEY`, a credential header value) **MUST NOT** appear in the database file outside the encrypted blobs, in a log file, or on stderr.
-4. The source files **MUST** follow the small-file rule with hierarchical names, for example `src/proxy/route.rs`, `src/proxy/upstreams.rs`, `src/proxy/forward.rs`, `src/proxy/headers.rs`, `src/capture/tap.rs`, `src/capture/redact.rs`, `src/capture/seal.rs`, `src/capture/writer.rs`, `src/serve/router.rs`.
+4. The source files **MUST** follow the small-file rule with hierarchical names, for example `src/proxy/route.rs`, `src/proxy/upstreams.rs`, `src/proxy/forward.rs`, `src/proxy/headers.rs`, `src/capture/tap.rs`, `src/capture/redact.rs`, `src/capture/seal.rs`, `src/capture/writer.rs`, `src/capture/spill.rs`, `src/serve/router.rs`.
 5. Each new file **MUST** carry one `@agents-index` line. A governance identifier **MUST NOT** appear in source, comments, test names, or `docs/specification/`.
 
 ## Affected Components
@@ -142,14 +142,15 @@ sequenceDiagram
 * The dashboard files at `/`: CR-0008. `/` returns 404 until then, but it is reserved.
 * GitHub: CR-0009.
 * The runs of `claude -p` and `pi -p` with the real Anthropic API: CR-0010. This CR proves the proxy only against the fake upstream and one manual check with `curl`.
-* WebSocket upgrade. The `upgrade` header is removed, so a WebSocket request is not supported.
+* WebSocket upgrade. The `upgrade` header is removed, so a WebSocket request is not supported. A later CR can add WebSocket support. (Decided by the human on 2026-10-20: WebSocket is out of scope for this CR.)
 
 ## Alternative Approaches Considered
 
 * **Buffer the full response, then send it.** Rejected: it breaks SSE and adds the full generation time to the first byte.
 * **Store bodies in files on the volume.** Rejected: one SQLite file keeps backup and deletion simple, and the bodies are bounded by the capture limit.
 * **Capture in the request task with a database write before the response ends.** Rejected: a slow disk would then delay the client.
-* **A queue that waits when full.** Rejected: it lets capture block forwarding. A dropped record is visible in the log and in the counter.
+* **A queue that waits when full.** Rejected: it lets capture block forwarding.
+* **A queue that drops a record when full.** Rejected by the human on 2026-10-20: a lost record makes the public totals wrong. A spill to disk keeps the record and does not block forwarding.
 * **Keep `accept-encoding`.** Rejected per the README: the capture needs plain bytes for the parser, so the proxy asks for an uncompressed response.
 
 ## Impact Assessment
@@ -209,7 +210,8 @@ flowchart LR
 | `src/capture/redact.rs` (unit) | `keeps_rate_limit_response_headers` | Redaction exceptions | response `anthropic-ratelimit-tokens-remaining: 9000`, `x-ratelimit-remaining-tokens: 5`, `set-cookie: a=b` | the two rate-limit values kept, `set-cookie` value `redacted` |
 | `src/capture/credential.rs` (unit) | `hashes_bearer_then_api_key` | Credential hash | `authorization: Bearer abc`; only `x-api-key: xyz`; none | HMAC-SHA256 of `abc` with source `authorization`; of `xyz` with source `x-api-key`; both null |
 | `src/capture/credential.rs` (unit) | `hashes_account_id_header` | Account ID hash | `chatgpt-account-id: acct-1`; none | HMAC-SHA256 of `acct-1` with source `chatgpt-account-id`; both null |
-| `src/capture/writer.rs` (unit) | `full_queue_drops_and_counts` | Queue bound | `LOUPE_CAPTURE_QUEUE=2`, writer paused, 5 exchanges | 3 drops on the counter, one warning line with the count, each response unchanged |
+| `src/capture/writer.rs` (unit) | `full_queue_spills_and_counts` | Queue bound | `LOUPE_CAPTURE_QUEUE=2`, writer paused, 5 exchanges | 3 encrypted files in `spill/`, 3 on the spill counter, one warning line with the count, each response unchanged |
+| `src/capture/spill.rs` (unit) | `spill_import_is_idempotent_and_deletes` | Spill import | 3 spill files, one imported twice | 3 rows, no duplicate, `spill/` empty after import |
 | `src/capture/seal.rs` (unit) | `seal_then_open_round_trips` | Encryption | random bytes, id, part | same bytes |
 | `src/capture/seal.rs` (unit) | `open_fails_on_wrong_id_or_part` | AAD binding | blob opened with another id or part | error |
 | `src/capture/seal.rs` (unit) | `nonce_is_unique` | Nonce | 1000 seals of one body | 1000 different nonces |
@@ -217,7 +219,7 @@ flowchart LR
 | `tests/proxy.forward.rs` (integration) | `forwards_request_unchanged` | Pass-through | POST with body, query, custom header to the echo route | echo shows the same method, path, query, header, body bytes |
 | `tests/proxy.capture.rs` (integration) | `credential_hash_stored_raw_absent` | Credential hash | request with `x-api-key: sk-test-123` | `credential_hash` equals the HMAC-SHA256 of `sk-test-123`, `credential_source` is `x-api-key`, `grep -c sk-test-123` on the database file is 0 |
 | `tests/proxy.capture.rs` (integration) | `large_body_truncated_client_gets_all` | Capture limit | `LOUPE_CAPTURE_MAX_BYTES=1048576`, 3 MiB response | client gets 3 MiB, row has the truncated flag and response size 3145728 |
-| `tests/proxy.queue.rs` (integration) | `full_queue_keeps_responses` | Queue bound | `LOUPE_CAPTURE_QUEUE=1`, blocked writer, 10 parallel requests | every client gets status 200 and the full body, drop counter above 0, warning line present |
+| `tests/proxy.queue.rs` (integration) | `full_queue_keeps_responses` | Queue bound | `LOUPE_CAPTURE_QUEUE=1`, blocked writer, 10 parallel requests | every client gets status 200 and the full body, spill counter above 0, warning line present, after the writer resumes the table has 10 rows and `spill/` is empty |
 | `tests/proxy.failure.rs` (integration) | `slow_headers_under_timeout_pass` | Timeout | `LOUPE_UPSTREAM_HEADERS_TIMEOUT_SECS=2`, slow route that waits 1 s before headers | status 200, row outcome `complete` |
 | `tests/proxy.failure.rs` (integration) | `slow_headers_over_timeout_is_502` | Timeout | `LOUPE_UPSTREAM_HEADERS_TIMEOUT_SECS=1`, slow route that waits 3 s before headers | 502 JSON body names the timeout, row `upstream_unreachable` |
 | `tests/proxy.forward.rs` (integration) | `unknown_upstream_is_404` | Allowlist | `/claude-code/nope/x` | 404, body lists known names, no row |
@@ -374,13 +376,16 @@ Then the client gets all 3145728 bytes
   And the row in "exchanges" has the response truncated flag set and the response size 3145728
 ```
 
-### AC-14: A full capture queue drops records and keeps responses
+### AC-14: A full capture queue spills records to disk and keeps responses
 
 ```gherkin
 Given "loupe serve" runs with "LOUPE_CAPTURE_QUEUE=1" and a capture writer that cannot keep up
 When 10 clients send requests through the proxy at the same time
 Then every client gets status 200 and the full body
-  And the log has a warning line with the count of dropped records
+  And the log has a warning line with the count of spilled records
+When the capture writer catches up
+Then the table "exchanges" has 10 rows
+  And the directory "spill" under "LOUPE_DATA_DIR" is empty
 ```
 
 ### AC-15: The timeout for the response headers is applied
@@ -449,11 +454,11 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8787/claude-code/nope/
 **Impact:** medium
 **Mitigation:** The tap only copies into a bounded buffer, and the hand-off never waits. The latency target measures it.
 
-### Risk 3: Dropped capture records go unseen
+### Risk 3: Spill files fill the disk
 
 **Likelihood:** low
 **Impact:** medium
-**Mitigation:** Each drop logs a warning with the count. The default `LOUPE_CAPTURE_QUEUE` of 256 records is large compared to the request rate of two local agents, and a test fills the queue.
+**Mitigation:** Each spill logs a warning with the count. The default `LOUPE_CAPTURE_QUEUE` of 256 records is large compared to the request rate of two local agents, and the writer deletes each file after import. A failed spill write logs an actionable error, per requirement 17.
 
 ### Risk 4: An upstream sends a compressed response although `accept-encoding` is removed
 
@@ -477,9 +482,7 @@ Chosen approach: "streamed pass-through with a non-blocking tap and an asynchron
 
 ## Open Questions
 
-1. **Full capture queue.** Provisional default: drop the record and log a warning (requirement 16). The alternative is a spill to disk. The README says capture must never block, but it does not state the behaviour when capture falls behind.
-2. **Capture limit.** Provisional default: `LOUPE_CAPTURE_MAX_BYTES` = 32 MiB per body, with a truncated flag. The README does not state a limit. A truncated response can lose the usage block that CR-0004 reads.
-3. **Reserved static asset names.** Provisional default: CR-0008 adds its asset directory names to the reserved list, and the list here holds `healthz`, `v1`, `assets`, and `favicon.ico`.
+1. **Reserved static asset names.** Provisional default: CR-0008 adds its asset directory names to the reserved list, and the list here holds `healthz`, `v1`, `assets`, and `favicon.ico`.
 
 ## Implementation Status
 
