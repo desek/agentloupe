@@ -1,4 +1,4 @@
-//! @agents-index Test helper: starts loupe serve on a free port with a temp data dir, reads rows and stderr, runs token commands.
+//! @agents-index Test helper: starts loupe serve on a free port with a temp data dir, reads rows and stderr, runs token and parse commands.
 #![allow(dead_code)]
 
 use std::net::{TcpListener, TcpStream};
@@ -43,6 +43,35 @@ pub fn cmd(data: &std::path::Path, args: &[&str]) -> std::process::Output {
         .env("LOUPE_DATA_DIR", data)
         .output()
         .unwrap()
+}
+
+/// Runs `loupe parse <args>` against `data` with the test keys, as a second process would.
+pub fn parse(data: &std::path::Path, args: &[&str]) -> std::process::Output {
+    parse_command(data, args).output().unwrap()
+}
+
+/// The `loupe parse <args>` command with the test keys, for a test that must spawn and kill it.
+pub fn parse_command(data: &std::path::Path, args: &[&str]) -> Command {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_loupe"));
+    c.arg("parse")
+        .args(args)
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .env_clear()
+        .env("LOUPE_DATA_DIR", data)
+        .env("LOUPE_DATA_KEY", KEY)
+        .env("LOUPE_ACCOUNT_KEY", KEY);
+    c
+}
+
+/// The value of `key: value` lines of stdout.
+pub fn count(out: &std::process::Output, key: &str) -> i64 {
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .find_map(|l| {
+            l.strip_prefix(&format!("{key}: "))
+                .map(|v| v.parse().unwrap())
+        })
+        .unwrap_or_else(|| panic!("no {key} in {}", String::from_utf8_lossy(&out.stdout)))
 }
 
 /// Creates a token named `name` in `data` and returns the raw value.

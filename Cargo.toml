@@ -69,6 +69,18 @@ path = "tests/token.secrets.rs"
 name = "api_privacy"
 path = "tests/api.privacy.rs"
 
+[[test]]
+name = "parse_worker"
+path = "tests/parse.worker.rs"
+
+[[test]]
+name = "parse_end_to_end"
+path = "tests/parse.end_to_end.rs"
+
+[[test]]
+name = "parse_secrets"
+path = "tests/parse.secrets.rs"
+
 [dependencies]
 aes-gcm = "0.10"
 axum = "0.8"
