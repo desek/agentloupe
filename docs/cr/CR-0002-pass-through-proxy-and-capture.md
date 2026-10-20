@@ -1,6 +1,6 @@
 ---
 id: "CR-0002"
-status: "approved"
+status: "implemented"
 date: 2026-10-20
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)

@@ -43,6 +43,7 @@ The forwarder sends the request to `<base URL><rest of the path>?<query>`. It ke
 1. It removes `accept-encoding`.
 2. It removes the hop-by-hop headers: `connection`, `keep-alive`, `proxy-connection`, `te`, `trailer`, `transfer-encoding`, `upgrade`, and each header that `connection` names.
 3. It sets `host` to the host of the base URL.
+4. If the request has no `accept` header, the HTTP client of the forwarder adds `accept: */*`. The client library adds this default and gives no way to remove it. A request that has an `accept` header is not changed.
 
 Because the forwarder removes `upgrade`, the proxy does not support a WebSocket request.
 
