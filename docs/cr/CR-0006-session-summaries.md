@@ -514,6 +514,7 @@ Approved by an independent reviewer agent on 2026-10-20 after the answered quest
 * D10: neutral tone; the session line stays one line; the day line is one paragraph of 3 to 8 sentences; trivial or failed sessions are still summarized, with no `SKIP`; the summarizer cost is not counted (requirements 12, 14, 23, 33). Decided by the human on 2026-10-20.
 * D11: the default model stays `claude-haiku-5-5` with `LOUPE_SUMMARY_OAUTH_TOKEN`. Another `LOUPE_SUMMARY_MODEL` needs `LOUPE_SUMMARY_API_KEY` (requirement 18). Decided by the human on 2026-10-20.
 * D12: `LOUPE_RAW_RETENTION_HOURS` defaults to 168. Calls and sessions are kept forever (requirements 39, 42). Decided by the human on 2026-10-20.
+* D13: deviations found at implementation on 2026-10-20. The live Messages API refuses `temperature` for `claude-haiku-5-5` with a 400, so the client sends no temperature (requirement 11). The OAuth path needs the Claude Code billing block as the first system entry, else the API answers 429 with no `retry-after`; the client sends it on the OAuth path only (requirement 19). `docs/specification/summaries.md` records both.
 
 ## Open Questions
 
