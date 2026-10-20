@@ -43,8 +43,21 @@ async fn parse_twice_adds_nothing() {
         String::from_utf8_lossy(&first.stderr)
     );
     assert_eq!(scalar(&l, "SELECT count(*) FROM calls"), 6);
+    let parsed_at = |l: &Loupe| -> String {
+        l.db()
+            .query_row("SELECT group_concat(parsed_at) FROM exchanges", [], |r| {
+                r.get(0)
+            })
+            .unwrap()
+    };
+    assert_eq!(
+        scalar(&l, "SELECT count(*) FROM exchanges WHERE parsed_at IS NULL"),
+        0
+    );
+    let first_times = parsed_at(&l);
     let second = loupe::parse(l.data.path(), &["--once"]);
     assert!(second.status.success());
+    assert_eq!(parsed_at(&l), first_times);
     assert_eq!(loupe::count(&second, "calls_added"), 0);
     assert_eq!(loupe::count(&second, "exchanges_read"), 0);
     assert_eq!(scalar(&l, "SELECT count(*) FROM calls"), 6);

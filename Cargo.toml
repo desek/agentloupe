@@ -106,6 +106,22 @@ path = "tests/upstreams.rs"
 name = "prices_vendor"
 path = "tests/prices.vendor.rs"
 
+[[test]]
+name = "summary_scrub_corpus"
+path = "tests/summary.scrub_corpus.rs"
+
+[[test]]
+name = "summary_worker"
+path = "tests/summary.worker.rs"
+
+[[test]]
+name = "summary_day"
+path = "tests/summary.day.rs"
+
+[[test]]
+name = "retention_worker"
+path = "tests/retention.worker.rs"
+
 [dependencies]
 aes-gcm = "0.10"
 axum = "0.8"

@@ -1,4 +1,4 @@
-//! @agents-index Fake upstream for tests and scripts: JSON, SSE, abort, slow, echo, bytes, and model calls with usage blocks.
+//! @agents-index Fake upstream for tests and scripts: JSON, SSE, abort, slow, echo, bytes, model calls, and summary replies by mode.
 #![allow(dead_code)]
 
 use axum::Router;
@@ -16,6 +16,34 @@ type Params = Query<HashMap<String, String>>;
 
 /// The count of requests that reached the fake upstream, so a test can prove that none did.
 pub static HITS: AtomicUsize = AtomicUsize::new(0);
+
+/// The count of summary requests per mode, so a test can prove that a disabled worker sent none.
+static SUMMARY_HITS: std::sync::Mutex<Vec<(String, usize)>> = std::sync::Mutex::new(Vec::new());
+
+/// The count of summary requests to `mode` in this process; a test uses a mode name of its own.
+pub fn summary_hits(mode: &str) -> usize {
+    SUMMARY_HITS
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(m, _)| m == mode)
+        .map_or(0, |(_, n)| *n)
+}
+
+fn hit(mode: &str) {
+    let mut h = SUMMARY_HITS.lock().unwrap();
+    match h.iter_mut().find(|(m, _)| m == mode) {
+        Some((_, n)) => *n += 1,
+        None => h.push((mode.to_string(), 1)),
+    }
+}
+
+/// The text that the `line` summary mode returns: identifying tokens that the scrubber must remove.
+pub const SUMMARY_LINE: &str =
+    "Fixed the parser in src/main.rs per https://x.io/a for bob@corp.com in 42 places";
+
+/// The text of the `day` mode: four sentences, one with a URL.
+pub const SUMMARY_DAY: &str = "Worked on the parser. Read https://example.com/docs today. Fixed the session close. Added tests for the scrubber. Reviewed the retention rules.";
 
 fn num(p: &HashMap<String, String>, k: &str, d: u64) -> u64 {
     p.get(k).and_then(|v| v.parse().ok()).unwrap_or(d)
@@ -190,9 +218,44 @@ async fn chat(req: Request) -> Response {
         .unwrap()
 }
 
+fn message(text: &str) -> Response {
+    json(serde_json::json!({"id":"msg_s","type":"message","role":"assistant","model":"claude-haiku-5-5",
+        "content":[{"type":"text","text":text}],"usage":{"input_tokens":1,"output_tokens":1}}).to_string())
+}
+
+fn status(code: u16, retry_after: Option<&str>) -> Response {
+    let mut b = Response::builder()
+        .status(code)
+        .header(header::CONTENT_TYPE, "application/json");
+    if let Some(r) = retry_after {
+        b = b.header("retry-after", r);
+    }
+    b.body(Body::from(
+        r#"{"type":"error","error":{"type":"fake","message":"fake"}}"#,
+    ))
+    .unwrap()
+}
+
+/// A summary reply chosen by the path segment: line, day, day_short, skip, 429, 429_retry, 500, 401, bad.
+async fn summary(axum::extract::Path(mode): axum::extract::Path<String>) -> Response {
+    hit(&mode);
+    match mode.as_str() {
+        "line" | "line_counted" | "line_nocred" => message(SUMMARY_LINE),
+        "day" => message(SUMMARY_DAY),
+        "day_short" => message("Worked on the parser."),
+        "skip" => message(" SKIP\n"),
+        "429" => status(429, None),
+        "429_retry" => status(429, Some("7200")),
+        "500" => status(500, None),
+        "401" => status(401, None),
+        _ => json(r#"{"not":"a message"}"#.into()),
+    }
+}
+
 pub fn app() -> Router {
     Router::new()
         .route("/v1/messages", post(messages))
+        .route("/summary/{mode}/v1/messages", post(summary))
         .route("/v1/messages/count_tokens", post(count_tokens))
         .route("/v1/responses", post(responses))
         .route("/v1/chat/completions", post(chat))

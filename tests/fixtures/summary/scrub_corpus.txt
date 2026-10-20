@@ -1,0 +1,53 @@
+# kind<TAB>text<TAB>forbidden substrings, | separated<TAB>public names that must stay, | separated
+line	Fixed the login bug in src/auth/login.rs for acme	login.rs|src/auth	
+line	updated docs at https://docs.acme.io/start and tidied up	https|acme.io	
+line	emailed jane.doe@acme.com about the release plan	jane.doe|@	
+line	bumped the version to 2.4.1 in the manifest	2.4.1	
+line	refactored C:\Users\bob\proj\main.py into modules	C:|bob|main.py	
+line	improved agentloupe scrubber rules		agentloupe
+line	worked on loupe2 parser and acme-web3 deploy	acme-web3	loupe2
+line	added tests for config.yaml loading	config.yaml	
+line	reviewed PR 1234 for the payments service	1234	
+line	debugged www.internal-corp.net timeouts	www.internal	
+line	migrated 15 tables to the new schema	15	
+line	wrote handler in ./lib/handler.ts with retries	./lib|handler.ts	
+line	Agentloupe got a new day line builder		Agentloupe
+line	fixed issue #42 in the tracker	42	
+line	configured ssh://git@host.example/repo.git remote	ssh|git@|repo.git	
+line	ran benchmark at 3pm on node 7	3pm|7	
+line	cleaned up the README.md and the CHANGELOG	README.md	
+line	investigated a failing build on ubuntu-22.04	22.04	
+line	checked the token sk-ant-abc123def for expiry	sk-ant-abc123def	
+line	explored /var/log/syslog for kernel errors	/var/log	
+line	updated deps in package.json and Cargo.toml	package.json|Cargo.toml	
+line	talked to ops@company.org about backups	ops@company.org	
+line	added an endpoint http://localhost:8080/v1/users	localhost|8080	
+line	renamed variables in utils.py	utils.py	
+line	traced a panic in thread 0x7ffe for agentloupe	0x7ffe	agentloupe
+line	fixed the parser in src/main.rs per https://x.io/a for bob@corp.com in 42 places	main.rs|x.io|bob@|42	
+line	wrote a migration script under scripts/migrate	scripts/migrate	
+line	tuned the cache to 512MB	512MB	
+line	designed a schema for invoices v2	v2	
+line	patched CVE-2024-1234 in the image	CVE-2024-1234	
+line	"quoted" `code` names were removed from output	`|"	
+line	set up the repo at github.com/acme/secret-project	github.com/acme	
+line	answered questions about 10.0.0.12 routing	10.0.0.12	
+line	updated the Dockerfile and compose.yml	compose.yml	
+line	fixed loupe2 and agentloupe tests with care		loupe2|agentloupe
+line	handled the error for user id 99812	99812	
+line	created branch feature/billing-v3	feature/billing	
+line	documented the api at api.acme.dev/docs	api.acme.dev	
+line	processed data.csv and report.xlsx files	data.csv|report.xlsx	
+line	edited ~/.zshrc aliases	~/.zshrc|zshrc	
+day	Worked on the parser. Read https://example.com/docs today. Fixed main.rs crash. Talked to bob@x.io about it. Added 3 tests.	https|example.com|main.rs|bob@|3 tests	
+day	Improved agentloupe summaries. Moved code to src/summary/scrub.rs. Fixed issue 77 in tracker.	src/summary|scrub.rs|77	agentloupe
+day	Updated the build for loupe2. Checked https://ci.acme.io/run/991. Reviewed notes.md content.	ci.acme.io|991|notes.md	loupe2
+day	Cleaned logs under /tmp/x. Configured host 192.168.1.2. Wrote docs.	/tmp|192.168	
+day	Fixed tests. Mailed a@b.co twice. Edited app.tsx and lib.rs today. Merged branch fix/abc.	a@b.co|app.tsx|lib.rs|fix/abc	
+day	Reviewed version 1.2.3 release. Shipped agentloupe and acme2 changes. Planned the week.	1.2.3|acme2	agentloupe
+day	Explored C:\code\proj notes. Wrote www.site.com copy. Read the spec.	C:|www.site	
+day	Investigated failing job 4411. Patched the parser. Improved logs.	4411	
+day	Read token ghp_abc123xyz carefully. Rotated keys. Updated config.toml values.	ghp_abc123xyz|config.toml	
+day	Wrote tests for loupe2 in tests/a.rs. Fixed the http://127.0.0.1:9 target. Documented it.	tests/a.rs|127.0.0.1	loupe2
+day	Debugged the server at 3 am. Fixed the queue. Wrote a report for jim@corp.io.	3 am|jim@	
+day	Built the image v12. Tagged the release. Pushed to registry.acme.io/img.	v12|registry.acme.io	

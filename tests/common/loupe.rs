@@ -68,6 +68,43 @@ pub fn parse_command(data: &std::path::Path, args: &[&str]) -> Command {
     c
 }
 
+/// Runs `loupe summarize <args>` against `data` with the test keys and the extra `env`.
+pub fn summarize(
+    data: &std::path::Path,
+    args: &[&str],
+    env: &[(&str, &str)],
+) -> std::process::Output {
+    let mut c = Command::new(env!("CARGO_BIN_EXE_loupe"));
+    c.arg("summarize")
+        .args(args)
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .env_clear()
+        .env("LOUPE_DATA_DIR", data)
+        .env("LOUPE_DATA_KEY", KEY)
+        .env("LOUPE_ACCOUNT_KEY", KEY);
+    for (k, v) in env {
+        c.env(k, v);
+    }
+    c.output().unwrap()
+}
+
+/// Runs `loupe parse --once` with `LOUPE_IDLE_SECS=1`, waits past the idle time, and parses again,
+/// so every segment of the sent calls is closed.
+pub fn parse_and_close(data: &std::path::Path) {
+    for _ in 0..2 {
+        let out = parse_command(data, &["--once"])
+            .env("LOUPE_IDLE_SECS", "1")
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        std::thread::sleep(Duration::from_millis(1200));
+    }
+}
+
 /// The value of `key: value` lines of stdout.
 pub fn count(out: &std::process::Output, key: &str) -> i64 {
     String::from_utf8_lossy(&out.stdout)
