@@ -28,6 +28,14 @@ pub fn run(cfg: &Config, upstreams: Upstreams) -> Result<(), Box<dyn Error>> {
     if let Some(w) = gate.state()?.warning() {
         tracing::warn!("{w}");
     }
+    let t0 = std::time::Instant::now();
+    let index = crate::price::index::Index::embedded();
+    tracing::info!(
+        entries = index.len(),
+        price_commit = crate::price::embed::PRICE_COMMIT,
+        load_ms = t0.elapsed().as_millis() as u64,
+        "price index loaded"
+    );
     let spill_dir = cfg.data_dir.join("spill");
     let (capture, rx) = Capture::new(cfg.capture_queue, spill_dir.clone(), cfg.data_key);
     let writer = writer::start(
@@ -43,6 +51,7 @@ pub fn run(cfg: &Config, upstreams: Upstreams) -> Result<(), Box<dyn Error>> {
             data_key: cfg.data_key,
             account_key: cfg.account_key,
             idle_secs: cfg.idle_secs,
+            providers: proxy::upstreams::providers(&upstreams),
         },
         cfg.parse_interval,
     );

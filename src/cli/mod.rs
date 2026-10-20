@@ -3,6 +3,7 @@
 mod config_show;
 mod gen_key;
 mod parse;
+mod price;
 mod serve;
 mod token;
 
@@ -47,6 +48,13 @@ enum Command {
         #[command(flatten)]
         args: ConfigArgs,
     },
+    /// Inspect the embedded prices and price the calls that have no price commit.
+    ///
+    /// Exit codes: 0 done, 1 a database or runtime failure, 2 bad input or configuration.
+    Price {
+        #[command(subcommand)]
+        command: PriceCommand,
+    },
     /// Inspect the configuration.
     Config {
         #[command(subcommand)]
@@ -63,6 +71,29 @@ enum ConfigCommand {
         /// Print a table instead of one JSON object per line.
         #[arg(long)]
         human: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum PriceCommand {
+    /// Print the price entry that a call of MODEL through UPSTREAM gets, as key: value lines, or match: none.
+    Show {
+        /// The model name of the call, for example claude-haiku-5-5.
+        #[arg(long)]
+        model: String,
+        /// The upstream name from the upstreams file, for example anthropic.
+        #[arg(long)]
+        upstream: String,
+        #[command(flatten)]
+        args: ConfigArgs,
+    },
+    /// Price only the calls with a null price_commit; prints calls_priced, calls_unpriced, price_commit.
+    Backfill {
+        /// Print the counts and write nothing.
+        #[arg(long)]
+        dry_run: bool,
+        #[command(flatten)]
+        args: ConfigArgs,
     },
 }
 
@@ -153,6 +184,14 @@ pub fn run() -> ExitCode {
             human,
             args,
         } => parse::run(&args, once, dry_run, human),
+        Command::Price { command } => match command {
+            PriceCommand::Show {
+                model,
+                upstream,
+                args,
+            } => price::show(&args, &model, &upstream),
+            PriceCommand::Backfill { dry_run, args } => price::backfill(&args, dry_run),
+        },
         Command::Config {
             command: ConfigCommand::Show { args, human },
         } => config_show::run(&args, human),

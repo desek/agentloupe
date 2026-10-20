@@ -51,7 +51,11 @@ pub async fn handle(state: Arc<ProxyState>, req: Request<Body>) -> Response {
         Decision::Accept(t) => t,
         Decision::Refuse(code) => return error::token(code),
     };
-    let Some(base) = state.upstreams.get(&route.upstream).cloned() else {
+    let Some(base) = state
+        .upstreams
+        .get(&route.upstream)
+        .map(|u| u.base_url.clone())
+    else {
         let known: Vec<&String> = state.upstreams.keys().collect();
         return error::json(
             StatusCode::NOT_FOUND,

@@ -1,0 +1,1 @@
+{"sample_spec": {"litellm_provider": "x"}, "claude-haiku-4-5": {"litellm_provider": "anthropic", "input_cost_per_token": 1e-06}}

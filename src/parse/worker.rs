@@ -16,6 +16,8 @@ pub struct Settings {
     pub data_key: [u8; 32],
     pub account_key: [u8; 32],
     pub idle_secs: u64,
+    /// Upstream name to its litellm_provider, from the allowlist file; selects the prices of a call.
+    pub providers: std::collections::BTreeMap<String, String>,
 }
 
 /// The counts that `loupe parse` prints.
@@ -103,7 +105,7 @@ fn one(
                     Ok(u) => (
                         parsed.format,
                         Outcome::Call,
-                        super::call::store(conn, &s.account_key, s.idle_secs, &row, &request, &u)?,
+                        super::call::store(conn, s, &row, &request, &u)?,
                     ),
                     Err(o) => (parsed.format, o, Default::default()),
                 }

@@ -4,7 +4,9 @@
 pub mod anthropic_json;
 #[path = "anthropic.sse.rs"]
 pub mod anthropic_sse;
+pub mod backfill;
 pub mod call;
+pub mod cost;
 pub mod cursor;
 pub mod exchange;
 pub mod format;

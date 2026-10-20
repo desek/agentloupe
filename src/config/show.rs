@@ -11,17 +11,61 @@ fn shown(e: &Entry) -> String {
     }
 }
 
+/// The derived lines after the variables: the price commit, the size of the price index, and
+/// each subscription with the total. A subscription that is not valid prints as invalid.
+fn derived(cfg: &Loaded) -> Vec<(String, String, &'static str)> {
+    let mut out = vec![
+        (
+            "price_commit".to_string(),
+            crate::price::embed::PRICE_COMMIT.to_string(),
+            "build",
+        ),
+        (
+            "price_entries".to_string(),
+            crate::price::index::Index::embedded().len().to_string(),
+            "build",
+        ),
+    ];
+    let pairs = cfg
+        .entries
+        .iter()
+        .filter_map(|e| e.value.as_ref().map(|v| (e.name.as_str(), v.expose())));
+    match crate::subscription::config::parse_all(pairs) {
+        Ok(subs) => {
+            let total: rust_decimal::Decimal = subs.iter().map(|s| s.usd_per_month).sum();
+            for s in subs {
+                out.push((
+                    format!("subscription.{}", s.name),
+                    s.usd_per_month.to_string(),
+                    "derived",
+                ));
+            }
+            out.push((
+                "subscription_total_per_month".into(),
+                total.to_string(),
+                "derived",
+            ));
+        }
+        Err(e) => out.push((
+            "subscription_total_per_month".into(),
+            format!("invalid: {}", e.variable),
+            "derived",
+        )),
+    }
+    out
+}
+
 /// One JSON object per line when `table` is false, else an aligned table for a human.
 pub fn render(cfg: &Loaded, table: bool) -> String {
+    let extra = derived(cfg);
     if !table {
-        return cfg
-            .entries
-            .iter()
-            .map(|e| {
-                let line = serde_json::json!({"name": e.name, "value": shown(e), "source": e.source.to_string(), "secret": e.secret});
-                format!("{line}\n")
-            })
-            .collect();
+        let vars = cfg.entries.iter().map(|e| {
+            serde_json::json!({"name": e.name, "value": shown(e), "source": e.source.to_string(), "secret": e.secret})
+        });
+        let more = extra.iter().map(
+            |(n, v, s)| serde_json::json!({"name": n, "value": v, "source": s, "secret": false}),
+        );
+        return vars.chain(more).map(|l| format!("{l}\n")).collect();
     }
     let width = cfg
         .entries
@@ -30,6 +74,12 @@ pub fn render(cfg: &Loaded, table: bool) -> String {
         .max()
         .unwrap_or(4)
         .max(4);
+    let width = extra
+        .iter()
+        .map(|(n, _, _)| n.len())
+        .max()
+        .unwrap_or(0)
+        .max(width);
     let mut out = format!("{:width$}  {:8}  VALUE\n", "NAME", "SOURCE");
     for e in &cfg.entries {
         out.push_str(&format!(
@@ -38,6 +88,9 @@ pub fn render(cfg: &Loaded, table: bool) -> String {
             e.source.to_string(),
             shown(e)
         ));
+    }
+    for (n, v, s) in &extra {
+        out.push_str(&format!("{n:width$}  {s:8}  {v}\n"));
     }
     out
 }
@@ -75,6 +128,12 @@ mod tests {
             }
         }
         let json = render(&cfg, false);
+        assert!(json.contains(&format!(
+            "\"name\":\"price_commit\",\"value\":\"{}\"",
+            crate::price::embed::PRICE_COMMIT
+        )));
+        assert!(json.contains("\"name\":\"price_entries\",\"value\":\"4"));
+        assert!(json.contains("\"name\":\"subscription_total_per_month\",\"value\":\"0\""));
         assert!(
             json.lines()
                 .filter(|l| l.contains("\"secret\":true"))

@@ -60,6 +60,11 @@ pub fn parse_command(data: &std::path::Path, args: &[&str]) -> Command {
         .env("LOUPE_DATA_DIR", data)
         .env("LOUPE_DATA_KEY", KEY)
         .env("LOUPE_ACCOUNT_KEY", KEY);
+    // The upstreams file of start_in maps the fake upstream to a provider, so its calls get a price.
+    let up = data.join("upstreams.toml");
+    if up.exists() {
+        c.env("LOUPE_UPSTREAMS_FILE", up);
+    }
     c
 }
 
@@ -117,10 +122,13 @@ impl Loupe {
         env: &[(&str, &str)],
     ) -> Loupe {
         let mut file = format!(
-            "anthropic = \"https://api.anthropic.com\"\nfake = \"http://127.0.0.1:{fake_port}\"\n"
+            "[anthropic]\nbase_url = \"https://api.anthropic.com\"\nlitellm_provider = \"anthropic\"\n\
+             [fake]\nbase_url = \"http://127.0.0.1:{fake_port}\"\nlitellm_provider = \"anthropic\"\n"
         );
         for (k, v) in more {
-            file.push_str(&format!("{k} = \"{v}\"\n"));
+            file.push_str(&format!(
+                "[{k}]\nbase_url = \"{v}\"\nlitellm_provider = \"anthropic\"\n"
+            ));
         }
         let up = data.path().join("upstreams.toml");
         std::fs::write(&up, file).unwrap();

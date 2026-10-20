@@ -59,7 +59,7 @@ wait_port() { for _ in $(seq 1 100); do curl -s -o /dev/null "http://127.0.0.1:$
 fport="$(free_port)"; lport="$(free_port)"
 "$BIN/examples/fake_upstream" "$fport" >>"$LOG" 2>&1 & pids+=($!)
 wait_port "$fport" json || fail "the fake upstream did not start on port $fport" "check the log for a bind error"
-printf 'fake = "http://127.0.0.1:%s"\n' "$fport" >"$work/upstreams.toml"
+printf '[fake]\nbase_url = "http://127.0.0.1:%s"\nlitellm_provider = "anthropic"\n' "$fport" >"$work/upstreams.toml"
 key="$("$BIN/loupe" gen-key)"
 prefix=""
 if [[ $with_token -eq 1 ]]; then

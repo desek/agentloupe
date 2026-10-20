@@ -57,7 +57,7 @@ wait_port() { for _ in $(seq 1 100); do curl -s -o /dev/null "http://127.0.0.1:$
 fport="$(free_port)"; lport="$(free_port)"
 "$BIN/examples/fake_upstream" "$fport" >>"$LOG" 2>&1 & pids+=($!)
 wait_port "$fport" json || fail "the fake upstream did not start on port $fport" "check the log for a bind error"
-printf 'fake = "http://127.0.0.1:%s"\n' "$fport" >"$work/upstreams.toml"
+printf '[fake]\nbase_url = "http://127.0.0.1:%s"\nlitellm_provider = "anthropic"\n' "$fport" >"$work/upstreams.toml"
 key="$("$BIN/loupe" gen-key)"
 envs=(PATH="$PATH" LOUPE_DATA_DIR="$work" LOUPE_DATA_KEY="$key" LOUPE_ACCOUNT_KEY="$key" LOUPE_UPSTREAMS_FILE="$work/upstreams.toml" LOUPE_PARSE_INTERVAL_SECS=86400)
 (cd "$ROOT" && env -i "${envs[@]}" LOUPE_LISTEN="127.0.0.1:$lport" "$BIN/loupe" serve) 2>>"$LOG" & serve_pid=$!; pids+=($serve_pid)

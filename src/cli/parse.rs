@@ -49,10 +49,15 @@ pub fn run(args: &ConfigArgs, once: bool, dry_run: bool, human: bool) -> ExitCod
     if !dry_run && let Err(e) = crate::store::migrate::migrate(&mut conn) {
         return db_fail(e.to_string());
     }
+    let upstreams = match crate::proxy::upstreams::load(&cfg.upstreams_file) {
+        Ok(u) => u,
+        Err(e) => return fail(EXIT_CONFIG, e),
+    };
     let s = Settings {
         data_key: cfg.data_key,
         account_key: cfg.account_key,
         idle_secs: cfg.idle_secs,
+        providers: crate::proxy::upstreams::providers(&upstreams),
     };
     let c = match worker::pass(&conn, &s, chrono::Utc::now().timestamp_millis(), dry_run) {
         Ok(c) => c,

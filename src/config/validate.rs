@@ -73,15 +73,8 @@ fn check(e: &Entry) -> Result<(), ConfigError> {
             | "LOUPE_UPSTREAMS_FILE",
             Some(""),
         ) => Err(bad(n, "is empty", "a value that is not empty")),
-        _ if n.starts_with(SUBSCRIPTION_PREFIX)
-            && v.and_then(|v| v.parse::<f64>().ok())
-                .is_none_or(|x| x < 0.0) =>
-        {
-            Err(bad(
-                n,
-                "is not a price in USD",
-                "a number such as 20 or 100.5",
-            ))
+        _ if n.starts_with(SUBSCRIPTION_PREFIX) => {
+            crate::subscription::config::parse(n, v.unwrap_or("")).map(|_| ())
         }
         _ if n.starts_with(GITHUB_TOKEN_PREFIX)
             && (n.len() == GITHUB_TOKEN_PREFIX.len() || v == Some("")) =>

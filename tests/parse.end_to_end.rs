@@ -77,4 +77,9 @@ async fn proxied_sse_call_becomes_call_row() {
     );
     assert_eq!((row.6, row.7, row.8, row.9, row.10), (10, 20, 4, 3, 5));
     assert_eq!((row.11.as_str(), row.12.as_str()), ("open", "fake"));
+    let commit: Option<String> = l
+        .db()
+        .query_row("SELECT price_commit FROM calls", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(commit.map(|c| c.len()), Some(40));
 }
