@@ -6,7 +6,7 @@ Insight into your work with AI coding agents, and transparency about it.
 
 Agentloupe publishes a public, nightly record of the work that I do with AI coding agents. It
 shows how many tokens the agents used, what those tokens cost at API list prices, how many pull
-requests I opened and merged, how many lines changed, and one line per day that describes the
+requests I opened and merged, how many lines changed, and one paragraph per day that describes the
 kind of work. No prompt, no code, and no detail that identifies a project leaves the machine.
 
 The product domains are `agentloupe.dev` and `agentloupe.app`.
@@ -60,8 +60,10 @@ GitHub API ─► GitHub worker (PRs, lines) ───────────�
 3. A parser reads the stored exchanges. It finds model calls from the usage block in the
    response (Anthropic Messages, OpenAI Responses, OpenAI Chat Completions).
 4. The parser prices each call from the vendored LiteLLM price file (see "Cost").
-5. The parser groups the calls into sessions. A session closes after 30 minutes with no calls.
-6. A small model writes one line for each closed session, under strict rules. A scrubber then
+5. The parser groups the calls into sessions. A session closes after 60 minutes with no calls. A subagent is its own session.
+   A session that spans midnight counts on each day that has a call.
+6. A small model writes one line for each closed session, and one paragraph of 3 to 8 sentences
+   for each day, in a neutral tone. A scrubber then
    removes URLs, paths, email addresses, and numbers from the line.
 7. The GitHub worker counts the pull requests and the changed lines of the day (see "GitHub").
 8. At 01:00 (Europe/Stockholm) the binary builds the previous day and publishes it on
@@ -80,6 +82,8 @@ One binary holds the full product: the proxy, the workers, the public API, and t
   - `loupe serve`: the proxy, the workers, the public API, and the dashboard.
   - `loupe aggregate [--date YYYY-MM-DD]`: build one day now.
   - `loupe gen-key`: print a new 32-byte key for `LOUPE_DATA_KEY` or `LOUPE_ACCOUNT_KEY`.
+  - `loupe day edit | delete | restore | approve --date YYYY-MM-DD`: change a published day. A
+    deleted day is marked, so the nightly publish does not create it again.
   - `loupe token generate | create | list | revoke`: manage the proxy tokens (see "Proxy
     tokens").
 - Routes:
@@ -100,11 +104,16 @@ Configuration:
 | `LOUPE_BOOTSTRAP_TOKEN` | no | A proxy token from a secret (see "Proxy tokens"). |
 | `LOUPE_GITHUB_TOKEN_<LABEL>` | no | One or more GitHub tokens (see "GitHub"). |
 | `LOUPE_SUMMARY_API_KEY` or `LOUPE_SUMMARY_OAUTH_TOKEN` | no | Anthropic credential for the one-line summaries: an API key, or the subscription token from `claude setup-token`. Without one, no summaries. |
-| `LOUPE_SUMMARY_MODEL` | no | Model for the summaries. Default `claude-haiku-5-5`. |
+| `LOUPE_SUMMARY_MODEL` | no | Model for the summaries. Default `claude-haiku-5-5`. Another model needs `LOUPE_SUMMARY_API_KEY`, because a subscription token works only with Haiku. |
 | `LOUPE_TZ` | no | Time zone that cuts the days. Default `Europe/Stockholm`. |
 | `LOUPE_PUBLISH_AT` | no | Time to publish the previous day. Default `01:00`. |
-| `LOUPE_IDLE_SECS` | no | Seconds without calls before a session closes. Default `1800`. |
-| `LOUPE_RAW_RETENTION_HOURS` | no | Hours to keep raw bodies after parse and summary. Default `24`. |
+| `LOUPE_IDLE_SECS` | no | Seconds without calls before a session closes. Default `3600`. |
+| `LOUPE_RAW_RETENTION_HOURS` | no | Hours to keep raw bodies after parse and summary. Default `168`. |
+| `LOUPE_SITE_TITLE` | no | Title of the public page. Default `AI agent activity`. |
+| `LOUPE_PUBLIC_PROJECTS` | no | Comma-separated names of public projects that summaries may name. Default empty. |
+| `LOUPE_DAY_REVIEW` | no | `auto` publishes days with no review, `manual` waits for `loupe day approve`. Default `auto`. |
+| `LOUPE_SUBSCRIPTION_<NAME>` | no | Monthly price in USD of a subscription, shown next to the API-equivalent cost. |
+| `LOUPE_ADMIN_TOKEN` | no | Secret for the private page. Without it, the private page is off. |
 
 A day has a record when it has agent calls or GitHub activity. A day with neither has no record,
 and the dashboard shows it as zero. The day line is published with no manual review. To change a
@@ -133,11 +142,11 @@ it shows is public.
 
 | Section | Data |
 |---|---|
-| Header | Title "Agentloupe", time of the last update, range selector (3M, 6M, 1Y) |
+| Header | Title from `LOUPE_SITE_TITLE`, token velocity as the headline, time of the last update, range selector (3M, 6M, 1Y) |
 | Pull requests | PRs opened and PRs merged for the range, bar chart per week |
 | Lines changed | Lines added, lines removed, and net lines for the selected range |
 | Tokens per day | Input and output, two line charts, each on its own scale |
-| Cost (API-equivalent) | A card in the totals row: the total for the range, and a daily line chart in the style of the token charts. The label says that the figure is a list price, not money paid. |
+| Cost (API-equivalent) | A card in the totals row: the total for the range, and a daily line chart in the style of the token charts. The label says that the figure is a list price, not money paid. Next to it, the subscription cost from `LOUPE_SUBSCRIPTION_<NAME>`, spread over the days of the range. |
 | Token usage, last 12 months | Heatmap per day, five levels from quartiles |
 | Daily log | One line per day, with the PR count and the token count |
 | Footer | The sources that the page covers, today Claude Code and Pi |
@@ -297,6 +306,12 @@ A classic token also works, but it is not recommended. For private repositories 
 `repo` scope, which also gives write access to all of them. For public repositories only, a
 classic token with no scope is sufficient.
 
+## Private page
+
+A private page at `/private/` shows usage, cost, and sessions per proxy token and per tag. It
+needs `LOUPE_ADMIN_TOKEN`, sent as a header or through a login form. Its data never appears in
+the public API.
+
 ## Privacy model
 
 | Data | What happens to it |
@@ -306,7 +321,7 @@ classic token with no scope is sufficient.
 | Proxy tokens | SHA-256 hash, name, tags, and dates. Never the raw token, never in the public API |
 | GitHub tokens | Environment only, never stored |
 | Pull requests | HMAC-SHA256 hash, token label, dates, line counts. Never the repository, number, or URL |
-| Request and response bodies | Encrypted with `LOUPE_DATA_KEY`, deleted 24 hours after parse and summary |
+| Request and response bodies | Encrypted with `LOUPE_DATA_KEY`, deleted 168 hours after parse and summary |
 | Exchange metadata | Agent, upstream, method, path, status, sizes, timing |
 | Calls | Model, status, token counts, cost |
 | Public data | Daily totals, totals per agent and per model, PR and line counts, one summary line per day |
