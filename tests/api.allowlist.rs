@@ -82,7 +82,7 @@ async fn api_routes_read_only_days_table() {
     c.execute_batch(include_str!("../migrations/0014_days.sql"))
         .unwrap();
     c.execute(
-        "INSERT INTO days (day, record, content_hash, revision, built_at, state, published_at) VALUES ('2026-10-10', '{\"day\":\"2026-10-10\"}', 'h', 1, 't', 'published', 't')",
+        "INSERT INTO days (day, record, content_hash, revision, built_at, state, published_at) VALUES ('2026-10-10', '{\"day\":\"2026-10-10\",\"detail\":{\"by_agent\":{},\"by_model\":{},\"github\":{\"failed_tokens\":1}}}', 'h', 1, 't', 'published', 't')",
         [],
     )
     .unwrap();
@@ -105,4 +105,17 @@ async fn api_routes_read_only_days_table() {
             .unwrap();
         assert_eq!(r.status().as_u16(), want, "{method} {path}");
     }
+    // The allowlist holds github and failed_tokens, and nothing else under detail.github.
+    let body: serde_json::Value = client
+        .get(format!("{base}/v1/days"))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(body["days"][0]["detail"]["github"]["failed_tokens"], 1);
+    assert!(allowlist::envelope_violations(&body).is_empty(), "{body}");
+    let bad = serde_json::json!({"detail": {"github": {"failed_tokens": 1, "labels": ["A"]}}});
+    assert_eq!(allowlist::violations(&bad), ["detail.github.labels"]);
 }

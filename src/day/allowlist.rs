@@ -21,7 +21,10 @@ pub const RECORD: &[&str] = &[
     "detail",
 ];
 
-pub const DETAIL: &[&str] = &["by_agent", "by_model"];
+pub const DETAIL: &[&str] = &["by_agent", "by_model", "github"];
+
+/// The fields of detail.github.
+pub const GITHUB: &[&str] = &["failed_tokens"];
 
 /// The fields of one value of by_agent.
 pub const AGENT: &[&str] = &[
@@ -67,6 +70,7 @@ pub fn violations(record: &serde_json::Value) -> Vec<String> {
     check(record, RECORD, "", &mut out);
     let detail = &record["detail"];
     check(detail, DETAIL, "detail.", &mut out);
+    check(&detail["github"], GITHUB, "detail.github.", &mut out);
     for (map, allowed) in [("by_agent", AGENT), ("by_model", MODEL)] {
         if let Some(m) = detail[map].as_object() {
             for (k, v) in m {

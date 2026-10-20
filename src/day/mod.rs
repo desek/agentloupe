@@ -4,6 +4,7 @@ pub mod activity;
 pub mod allowlist;
 pub mod boundary;
 pub mod build;
+pub mod github;
 #[path = "override.rs"]
 pub mod overrides;
 pub mod queue;

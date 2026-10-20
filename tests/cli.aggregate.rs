@@ -2,6 +2,8 @@
 
 #[path = "common/days.rs"]
 mod days;
+#[path = "common/fake_github.rs"]
+mod fake_github;
 
 fn seeded_today() -> (tempfile::TempDir, String) {
     let (dir, c) = days::db();
@@ -78,4 +80,26 @@ fn aggregate_bad_date_exits_2() {
     ] {
         assert!(help.contains(needle), "{needle} in {help}");
     }
+}
+
+#[test]
+fn dry_run_does_not_call_github() {
+    let f = fake_github::start(fake_github::world("tok", "u"));
+    let (dir, today) = seeded_today();
+    let out = days::loupe(
+        dir.path(),
+        &["aggregate", "--date", &today, "--dry-run"],
+        &[
+            ("LOUPE_GITHUB_TOKEN_A", "tok"),
+            ("LOUPE_GITHUB_API_URL", &f.url),
+        ],
+    );
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(f.requests(), 0);
+    let c = rusqlite::Connection::open(dir.path().join("loupe.db")).unwrap();
+    assert_eq!(days::scalar(&c, "SELECT count(*) FROM github_fetches"), 0);
 }

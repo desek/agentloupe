@@ -21,7 +21,7 @@ fn text(e: &Entry) -> Option<&str> {
     e.value.as_ref().map(|v| v.expose())
 }
 
-/// The summary base URL rule: https, or http only for a loopback host that the tests use.
+/// The rule of the summary and GitHub base URLs: https, or http only for a loopback host that the tests use.
 fn https_or_loopback(url: &str) -> bool {
     reqwest::Url::parse(url).is_ok_and(|u| {
         u.scheme() == "https"
@@ -68,6 +68,11 @@ fn check(e: &Entry) -> Result<(), ConfigError> {
             n,
             "is not an https URL or an http URL of 127.0.0.1 or localhost",
             "an https URL such as https://api.anthropic.com",
+        )),
+        ("LOUPE_GITHUB_API_URL", Some(v)) if !https_or_loopback(v) => Err(bad(
+            n,
+            "is not an https URL or an http URL of 127.0.0.1 or localhost",
+            "an https URL such as https://api.github.com",
         )),
         ("LOUPE_TZ", Some(v)) if v.parse::<chrono_tz::Tz>().is_err() => Err(bad(
             n,
@@ -169,6 +174,19 @@ impl Loaded {
                         .iter()
                         .filter_map(|e| text(e).map(|v| (e.name.as_str(), v))),
                 )?,
+            },
+            github: super::GithubConfig {
+                api_url: get("LOUPE_GITHUB_API_URL"),
+                tokens: self
+                    .entries
+                    .iter()
+                    .filter(|e| e.name.starts_with(GITHUB_TOKEN_PREFIX))
+                    .filter_map(|e| {
+                        e.value
+                            .clone()
+                            .map(|v| (e.name[GITHUB_TOKEN_PREFIX.len()..].to_uppercase(), v))
+                    })
+                    .collect(),
             },
             summary: super::SummaryConfig {
                 credential,

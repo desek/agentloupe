@@ -62,13 +62,20 @@ pub fn run(cfg: &Config, upstreams: Upstreams) -> Result<(), Box<dyn Error>> {
         crate::summary::settings(cfg),
         cfg.summary.interval,
     );
+    let github = crate::github::Settings::from_config(cfg);
+    match &github {
+        None => tracing::info!("github: disabled, no token"),
+        Some(g) => tracing::info!(labels = g.tokens.len(), "github: enabled"),
+    }
     // The publisher builds each due day and each queued day; it reads time only through its clock.
+    // The GitHub fetches run in its thread, so the proxy latency does not change.
     let _publisher = crate::publish::worker::start(
         crate::store::open::open(&cfg.data_dir)?,
         crate::publish::worker::Settings {
             ctx: crate::day::rebuild::Ctx::from_config(cfg),
             publish_at: cfg.days.publish_at,
             sources: crate::day::activity::registered(),
+            github,
         },
         Box::new(crate::publish::clock::System),
         cfg.days.publish_interval,

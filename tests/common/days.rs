@@ -80,6 +80,7 @@ pub fn ctx(review: Review, subscriptions: Vec<Subscription>) -> Ctx {
             max_attempts: 1,
             tz: chrono_tz::UTC,
         },
+        github_labels: vec![],
     }
 }
 

@@ -1,4 +1,4 @@
-//! @agents-index build_day: the pure day builder over calls, sessions, day summaries, and overrides; it reads no clock.
+//! @agents-index build_day: the pure day builder over calls, sessions, day summaries, overrides, and the GitHub tables; it reads no clock.
 
 use super::boundary;
 use super::record::{AgentTotals, Detail, ModelTotals, Record};
@@ -65,11 +65,13 @@ pub fn subscription_cost(day: NaiveDate, subscriptions: &[Subscription]) -> Deci
 }
 
 /// Builds the record of `day`. The same rows give the same record, whatever their order.
+/// `github_labels` are the configured GitHub token labels; none keeps the four GitHub fields null.
 pub fn build_day(
     conn: &Connection,
     day: NaiveDate,
     tz: Tz,
     subscriptions: &[Subscription],
+    github_labels: &[String],
 ) -> rusqlite::Result<Record> {
     let mut all = Sums::default();
     let mut agents: BTreeMap<String, Sums> = BTreeMap::new();
@@ -80,6 +82,7 @@ pub fn build_day(
         models.entry(c.model.clone()).or_default().add(&c);
     }
     let key = day.to_string();
+    let gh = super::github::fields(conn, &key, github_labels)?;
     Ok(Record {
         summary: summary(conn, &key)?,
         day: key,
@@ -93,10 +96,10 @@ pub fn build_day(
         cost_usd: all.cost_rounded(),
         unpriced_calls: all.unpriced,
         subscription_cost_usd: subscription_cost(day, subscriptions),
-        prs_opened: None,
-        prs_merged: None,
-        lines_added: None,
-        lines_removed: None,
+        prs_opened: gh.as_ref().map(|g| g.prs_opened),
+        prs_merged: gh.as_ref().map(|g| g.prs_merged),
+        lines_added: gh.as_ref().map(|g| g.lines_added),
+        lines_removed: gh.as_ref().map(|g| g.lines_removed),
         detail: Detail {
             by_agent: agents
                 .iter()
@@ -106,6 +109,9 @@ pub fn build_day(
                 .iter()
                 .map(|(k, s)| (k.clone(), ModelTotals::from(s)))
                 .collect(),
+            github: gh.map(|g| super::record::GithubDetail {
+                failed_tokens: g.failed_tokens,
+            }),
         },
     })
 }

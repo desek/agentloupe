@@ -156,6 +156,22 @@ name = "cli_aggregate"
 path = "tests/cli.aggregate.rs"
 
 [[test]]
+name = "github_fetch"
+path = "tests/github.fetch.rs"
+
+[[test]]
+name = "github_privacy"
+path = "tests/github.privacy.rs"
+
+[[test]]
+name = "day_github"
+path = "tests/day.github.rs"
+
+[[test]]
+name = "publish_github"
+path = "tests/publish.github.rs"
+
+[[test]]
 name = "cli_day"
 path = "tests/cli.day.rs"
 
@@ -179,7 +195,7 @@ futures-util = "0.3"
 getrandom = "0.3"
 hex = "0.4"
 hmac = "0.12"
-reqwest = { version = "0.12", default-features = false, features = ["stream", "rustls-tls", "json"] }
+reqwest = { version = "0.12", default-features = false, features = ["stream", "rustls-tls", "json", "blocking"] }
 rusqlite = { version = "0.37", features = ["bundled"] }
 rust_decimal = { version = "1.43.0", features = ["serde-with-str"] }
 serde = { version = "1", features = ["derive"] }

@@ -16,6 +16,8 @@ pub struct Ctx {
     pub subscriptions: Vec<Subscription>,
     pub review: Review,
     pub summary: crate::summary::worker::Settings,
+    /// The GitHub token labels; empty when no token is set.
+    pub github_labels: Vec<String>,
 }
 
 impl Ctx {
@@ -26,6 +28,7 @@ impl Ctx {
             subscriptions: cfg.days.subscriptions.clone(),
             review: cfg.days.review,
             summary: crate::summary::settings(cfg),
+            github_labels: cfg.github.tokens.iter().map(|(l, _)| l.clone()).collect(),
         }
     }
 }
@@ -74,7 +77,7 @@ pub fn rebuild(
 ) -> rusqlite::Result<Built> {
     let key = day.to_string();
     if dry_run {
-        let record = build::build_day(conn, day, ctx.tz, &ctx.subscriptions)?;
+        let record = build::build_day(conn, day, ctx.tz, &ctx.subscriptions, &ctx.github_labels)?;
         let row = store::read(conn, &key)?;
         return Ok(Built {
             record,
@@ -86,7 +89,7 @@ pub fn rebuild(
     }
     let not_ready = day_line(conn, ctx, day)?;
     atomic(conn, || {
-        let record = build::build_day(conn, day, ctx.tz, &ctx.subscriptions)?;
+        let record = build::build_day(conn, day, ctx.tz, &ctx.subscriptions, &ctx.github_labels)?;
         let json = record.json();
         let up = store::upsert(
             conn,

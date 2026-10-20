@@ -1,4 +1,4 @@
-//! @agents-index Integration test: build_day sums, cost rounding, unpriced calls, null PR fields, sessions per day, subscriptions, overrides, shape.
+//! @agents-index Integration test: build_day sums, cost rounding, unpriced calls, PR fields null without token, sessions per day, subscriptions, overrides, shape.
 
 #[path = "common/days.rs"]
 mod days;
@@ -14,7 +14,7 @@ const D: &str = "2026-10-18";
 const AT: &str = "2026-10-18T10:00:00.000Z";
 
 fn json(c: &rusqlite::Connection, day: &str) -> serde_json::Value {
-    let r = build_day(c, date(day), chrono_tz::UTC, &[]).unwrap();
+    let r = build_day(c, date(day), chrono_tz::UTC, &[], &[]).unwrap();
     serde_json::from_str(&r.json()).unwrap()
 }
 
@@ -61,7 +61,7 @@ fn cost_rounds_half_even_to_four_digits() {
         one(&c, [1, 0, 0, 0, 1], Some(cost), "m");
     }
     // The exact sum is 0.20005000005; 4 digits give 0.2001. A half case: 0.00005 rounds to 0.0000.
-    let r = build_day(&c, date(D), chrono_tz::UTC, &[]).unwrap();
+    let r = build_day(&c, date(D), chrono_tz::UTC, &[], &[]).unwrap();
     assert_eq!(r.cost_usd, Decimal::new(2001, 4));
     assert_eq!(json(&c, D)["cost_usd"], 0.2001);
     assert_eq!(
@@ -86,7 +86,7 @@ fn unpriced_calls_counted_and_excluded_from_cost() {
 }
 
 #[test]
-fn pr_fields_are_null() {
+fn pr_fields_null_without_token_numbers_with_token() {
     let (_d, c) = days::db();
     one(&c, [1, 0, 0, 0, 1], None, "m");
     let v = json(&c, D);
@@ -94,7 +94,25 @@ fn pr_fields_are_null() {
         assert!(v.as_object().unwrap().contains_key(k));
         assert!(v[k].is_null(), "{k}");
     }
+    assert!(v["detail"].get("github").is_none());
     assert_eq!(v["cost_usd"], 0);
+    c.execute_batch(&format!(
+        "INSERT INTO github_prs (pr_hash, opened_day, merged_day, additions, deletions, updated_at) VALUES ('h1', '{D}', '{D}', 7, 2, 't'); \
+         INSERT INTO github_fetches (day, label, status, cause, fetched_at) VALUES ('{D}', 'A', 'ok', NULL, 't')"
+    ))
+    .unwrap();
+    let r = build_day(&c, date(D), chrono_tz::UTC, &[], &["A".to_string()]).unwrap();
+    let v: serde_json::Value = serde_json::from_str(&r.json()).unwrap();
+    assert_eq!(
+        [
+            &v["prs_opened"],
+            &v["prs_merged"],
+            &v["lines_added"],
+            &v["lines_removed"]
+        ],
+        [1, 1, 7, 2]
+    );
+    assert_eq!(v["detail"]["github"]["failed_tokens"], 0);
 }
 
 #[test]
@@ -125,7 +143,7 @@ fn subscription_cost_is_prorated() {
         name: "claude_max".into(),
         usd_per_month: Decimal::from(200),
     }];
-    let r = build_day(&c, date(D), chrono_tz::UTC, &subs).unwrap();
+    let r = build_day(&c, date(D), chrono_tz::UTC, &subs, &[]).unwrap();
     let v: serde_json::Value = serde_json::from_str(&r.json()).unwrap();
     assert_eq!(v["subscription_cost_usd"], 6.4516);
     assert!(!r.json().contains("claude_max"));
@@ -182,7 +200,7 @@ fn record_bytes_are_deterministic() {
                 },
             );
         }
-        let r = build_day(&c, date(D), chrono_tz::UTC, &[]).unwrap();
+        let r = build_day(&c, date(D), chrono_tz::UTC, &[], &[]).unwrap();
         agent_loupe::day::record::content_hash(&r.json())
     };
     let a = hash(&[("pi", "z"), ("claude-code", "a"), ("codex", "m")]);

@@ -1,4 +1,4 @@
-//! @agents-index The publisher worker: on each wake, writes each due day with activity and no row, then builds again each queued due day.
+//! @agents-index The publisher worker: on each wake, runs the GitHub scan and retry, writes each due day with activity and no row, then each queued day.
 
 use super::clock::Clock;
 use super::due;
@@ -14,6 +14,8 @@ pub struct Settings {
     pub ctx: Ctx,
     pub publish_at: NaiveTime,
     pub sources: Vec<Box<dyn Source>>,
+    /// None when no GitHub token is set: the wake calls no network.
+    pub github: Option<crate::github::Settings>,
 }
 
 /// The counts of one wake.
@@ -42,6 +44,12 @@ pub fn wake(conn: &Connection, s: &Settings, clock: &dyn Clock) -> rusqlite::Res
     let now = time::text(now_ms);
     let tz = s.ctx.tz;
     let mut c = Counts::default();
+    // The GitHub scan and retry end before the due days are selected, so a day with pull
+    // requests and no call is due on the same wake.
+    if let Some(g) = &s.github {
+        crate::github::scan::run(conn, g, tz, s.publish_at, now_ms, &now)?;
+        crate::github::refetch::run(conn, g, tz, now_ms, &now)?;
+    }
     let rows = store::days_with_row(conn)?;
     let mut day = activity::first(&s.sources, conn, tz)?;
     while let Some(d) = day {

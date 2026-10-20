@@ -180,6 +180,7 @@ mod tests {
         assert_eq!(value("subscription_total_per_month"), "0");
         assert_eq!(value("summary_credential"), "api_key");
         assert_eq!(value("LOUPE_SUMMARY_BASE_URL"), "https://api.anthropic.com");
+        assert_eq!(value("LOUPE_GITHUB_API_URL"), "https://api.github.com");
         assert_eq!(value("LOUPE_SUMMARY_INTERVAL_SECS"), "30");
         assert_eq!(value("LOUPE_SUMMARY_MAX_ATTEMPTS"), "5");
         assert_eq!(value("LOUPE_RAW_RETENTION_HOURS"), "168");

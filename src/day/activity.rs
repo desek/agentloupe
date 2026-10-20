@@ -1,4 +1,4 @@
-//! @agents-index The activity source interface (has_activity, first_activity_day) and the calls source, the only registered source.
+//! @agents-index The activity source interface (has_activity, first_activity_day), the calls source, and the registered sources.
 
 use super::boundary;
 use chrono::NaiveDate;
@@ -40,9 +40,10 @@ impl Source for Calls {
     }
 }
 
-/// The registered sources. A later source adds itself here, with no change to the publisher.
+/// The registered sources: the calls and the GitHub pull requests. A new source adds itself
+/// here, with no change to the publisher.
 pub fn registered() -> Vec<Box<dyn Source>> {
-    vec![Box::new(Calls)]
+    vec![Box::new(Calls), Box::new(crate::github::source::Github)]
 }
 
 /// True when one or more of `sources` report activity on `day`.

@@ -36,6 +36,15 @@ pub struct Config {
     pub site_title: String,
     pub summary: SummaryConfig,
     pub days: DayConfig,
+    pub github: GithubConfig,
+}
+
+/// The values of the GitHub worker; no token means the worker does not start.
+pub struct GithubConfig {
+    /// The base URL of the GitHub API: https, or http for a loopback host in tests.
+    pub api_url: String,
+    /// Each label in uppercase with its token, sorted by label.
+    pub tokens: Vec<(String, secret::Secret)>,
 }
 
 /// The values of the day records and the publisher; the time zone is `summary.tz`.

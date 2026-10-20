@@ -23,6 +23,11 @@ pub const VARS: &[Var] = &[
     var("LOUPE_DATA_KEY", None, true),
     var("LOUPE_ACCOUNT_KEY", None, true),
     var("LOUPE_BOOTSTRAP_TOKEN", None, true),
+    var(
+        "LOUPE_GITHUB_API_URL",
+        Some("https://api.github.com"),
+        false,
+    ),
     var("LOUPE_SUMMARY_API_KEY", None, true),
     var("LOUPE_SUMMARY_OAUTH_TOKEN", None, true),
     var("LOUPE_SUMMARY_MODEL", Some("claude-haiku-5-5"), false),

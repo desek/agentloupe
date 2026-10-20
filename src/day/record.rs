@@ -46,6 +46,15 @@ pub struct Record {
 pub struct Detail {
     pub by_agent: BTreeMap<String, AgentTotals>,
     pub by_model: BTreeMap<String, ModelTotals>,
+    /// Present only when a GitHub token is set; it never holds a label name.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub github: Option<GithubDetail>,
+}
+
+/// The number of labels with no ok fetch for the day.
+#[derive(Serialize, Debug, Clone, Default)]
+pub struct GithubDetail {
+    pub failed_tokens: i64,
 }
 
 #[derive(Serialize, Debug, Clone)]

@@ -32,6 +32,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (14, include_str!("../../migrations/0014_days.sql")),
     (15, include_str!("../../migrations/0015_agg_queue.sql")),
     (16, include_str!("../../migrations/0016_day_overrides.sql")),
+    (17, include_str!("../../migrations/0017_github.sql")),
 ];
 
 /// Applies each migration not yet recorded; returns how many it applied.
@@ -79,7 +80,7 @@ mod tests {
             .query_row("SELECT count(*) FROM schema_version", [], |r| r.get(0))
             .unwrap();
         assert_eq!(rows as usize, super::MIGRATIONS.len());
-        assert_eq!(rows, 16);
+        assert_eq!(rows, 17);
         let tokens: i64 = conn
             .query_row("SELECT count(*) FROM proxy_tokens", [], |r| r.get(0))
             .unwrap();

@@ -13,6 +13,7 @@ fn settings() -> Settings {
         ctx: days::ctx(Review::Auto, vec![]),
         publish_at: chrono::NaiveTime::from_hms_opt(1, 0, 0).unwrap(),
         sources: activity::registered(),
+        github: None,
     }
 }
 

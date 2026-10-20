@@ -1,4 +1,4 @@
-//! @agents-index The aggregate subcommand: builds one day now with build_day and writes it with the upsert rule, or a dry run.
+//! @agents-index The aggregate subcommand: fetches the day from GitHub, builds it with build_day, and writes it with the upsert rule, or a dry run.
 
 use super::ConfigArgs;
 use super::day_common as common;
@@ -19,7 +19,12 @@ pub fn run(args: &ConfigArgs, date: Option<&str>, dry_run: bool) -> ExitCode {
     };
     let ctx = rebuild::Ctx::from_config(&cfg);
     let key = day.to_string();
+    let github = crate::github::Settings::from_config(&cfg);
     let run = || -> rusqlite::Result<Vec<(&'static str, String)>> {
+        // A dry run calls no network and builds from the stored rows.
+        if let (Some(g), false) = (&github, dry_run) {
+            crate::github::fetch::fetch_all(&conn, g, day, ctx.tz, &common::now())?;
+        }
         let active = activity::any(&activity::registered(), &conn, day, ctx.tz)?;
         let row = store::read(&conn, &key)?;
         let tombstone = row.as_ref().is_some_and(|r| r.state == state::DELETED);
