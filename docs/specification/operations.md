@@ -100,6 +100,6 @@ Each entry point has `--help`, a machine output by default, and `--human` for th
 | Headline size | `.agents/scripts/web.render.sh --days 400` prints `headline_ratio`, and `headline_above_fold` at 360 px and at 1440 px | `headline_ratio` 2.12, `headline_above_fold: true` at 360 px and at 1440 px, on 2026-10-20 | `headline_ratio` at least 2.0, `headline_above_fold: true` at both widths |
 | Remote requests of the page | `.agents/scripts/web.render.sh --days 400` prints `remote_requests` | `remote_requests: 0` on 2026-10-20 | `remote_requests: 0` |
 | Proxy time to first byte with the static routes, 95th percentile | `.agents/scripts/proxy.latency.sh --requests 200 --with-token` | the value after the day records and the API: `p95_added_ms` 0.21 on 2026-10-20 | `p95_added_ms` at most 20, and at most 2 above the baseline |
-| Verdict time with the web stage | total time that `pipeline.verdict.sh` prints, warm cache, second run | 45.4 seconds after the day records and the API | at most 180 seconds, every stage `status: passed`, with the stage `web` |
+| Verdict time with the web stage | total time that `pipeline.verdict.sh` prints, warm cache, second run | 45.4 seconds after the day records and the API; 50.5 seconds and 49.3 seconds, exit code 0, every stage `status: passed`, on 2026-10-20 | at most 180 seconds, every stage `status: passed`, with the stage `web` |
 
 The time to a full verdict is the time of the local loop. The first measured value at the end of the foundation change is the baseline. A later change that makes it longer must state the reason.
