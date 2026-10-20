@@ -67,8 +67,8 @@ Each entry point has `--help`, a machine output by default, and `--human` for th
 
 | Metric | Method | Baseline | Threshold |
 |---|---|---|---|
-| Verdict result | `.agents/scripts/pipeline.verdict.sh; echo $?` | none | exit code 0, every stage `status: passed` |
+| Verdict result | `.agents/scripts/pipeline.verdict.sh; echo $?` | exit code 0, every stage `status: passed`, measured on 2026-10-20 | exit code 0, every stage `status: passed` |
 | Time to a full verdict, warm cache | total time that `pipeline.verdict.sh` prints, second run | 1.9 seconds, measured on 2026-10-20 on Apple silicon | at most 180 seconds |
-| Time from container start to healthy | `docker compose up -d && time sh -c 'until curl -sf http://127.0.0.1:8787/healthz; do sleep 0.2; done'` | none | at most 5 seconds |
+| Time from container start to healthy | `docker compose up -d && time sh -c 'until curl -sf http://127.0.0.1:8787/healthz; do sleep 0.2; done'` | 0.02 seconds to the first 200 from `/healthz`, and 1.3 seconds to the `healthy` status of Docker, measured on 2026-10-20 on Apple silicon | at most 5 seconds |
 
 The time to a full verdict is the time of the local loop. The first measured value at the end of the foundation change is the baseline. A later change that makes it longer must state the reason.

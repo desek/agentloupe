@@ -26,7 +26,7 @@ ENV LOUPE_ENV=container
 USER loupe
 EXPOSE 8787
 VOLUME ["/data"]
-HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --start-interval=1s --retries=3 \
   CMD ["bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8787 && printf 'GET /healthz HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '\"status\":\"ok\"' <&3"]
 ENTRYPOINT ["loupe"]
 CMD ["serve"]
