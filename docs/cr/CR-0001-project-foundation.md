@@ -2,7 +2,7 @@
 name: cr-0001-project-foundation
 description: Project foundation for the loupe binary, with the crate, configuration, logging, storage, container, and verdict pipeline.
 id: "CR-0001"
-status: "approved"
+status: "implemented"
 date: 2026-10-18
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
