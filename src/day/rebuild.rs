@@ -18,6 +18,18 @@ pub struct Ctx {
     pub summary: crate::summary::worker::Settings,
 }
 
+impl Ctx {
+    /// The context of `loupe serve`, `loupe aggregate`, and `loupe day` from the configuration.
+    pub fn from_config(cfg: &crate::config::Config) -> Ctx {
+        Ctx {
+            tz: cfg.summary.tz,
+            subscriptions: cfg.days.subscriptions.clone(),
+            review: cfg.days.review,
+            summary: crate::summary::settings(cfg),
+        }
+    }
+}
+
 /// The result of one build.
 pub struct Built {
     pub record: Record,

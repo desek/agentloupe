@@ -48,6 +48,7 @@ fn check(e: &Entry) -> Result<(), ConfigError> {
             | "LOUPE_PARSE_INTERVAL_SECS"
             | "LOUPE_SUMMARY_INTERVAL_SECS"
             | "LOUPE_SUMMARY_MAX_ATTEMPTS"
+            | "LOUPE_PUBLISH_INTERVAL_SECS"
             | "LOUPE_CAPTURE_MAX_BYTES"
             | "LOUPE_CAPTURE_QUEUE"
             | "LOUPE_UPSTREAM_CONNECT_TIMEOUT_SECS"
@@ -83,7 +84,7 @@ fn check(e: &Entry) -> Result<(), ConfigError> {
                 ],
             )
         }),
-        ("LOUPE_PUBLISH_AT", Some(v)) if chrono::NaiveTime::parse_from_str(v, "%H:%M").is_err() => {
+        ("LOUPE_PUBLISH_AT", Some(v)) if super::publish_at(v).is_none() => {
             Err(bad(n, "is not a time in HH:MM", "a time such as 01:00"))
         }
         ("LOUPE_DAY_REVIEW", Some(v)) if v != "auto" && v != "manual" => {
@@ -149,6 +150,18 @@ impl Loaded {
                 .map(|v| super::secret::Secret::new(v.to_string())),
             idle_secs: num("LOUPE_IDLE_SECS"),
             parse_interval: std::time::Duration::from_secs(num("LOUPE_PARSE_INTERVAL_SECS")),
+            days: super::DayConfig {
+                publish_at: super::publish_at(&get("LOUPE_PUBLISH_AT")).expect("checked above"),
+                publish_interval: std::time::Duration::from_secs(num(
+                    "LOUPE_PUBLISH_INTERVAL_SECS",
+                )),
+                review: crate::day::state::Review::parse(&get("LOUPE_DAY_REVIEW")),
+                subscriptions: crate::subscription::config::parse_all(
+                    self.entries
+                        .iter()
+                        .filter_map(|e| text(e).map(|v| (e.name.as_str(), v))),
+                )?,
+            },
             summary: super::SummaryConfig {
                 credential,
                 model,

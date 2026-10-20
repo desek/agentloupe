@@ -9,6 +9,7 @@ pub mod log;
 pub mod parse;
 pub mod price;
 pub mod proxy;
+pub mod publish;
 pub mod retention;
 pub mod serve;
 pub mod session;

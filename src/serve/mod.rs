@@ -62,6 +62,17 @@ pub fn run(cfg: &Config, upstreams: Upstreams) -> Result<(), Box<dyn Error>> {
         crate::summary::settings(cfg),
         cfg.summary.interval,
     );
+    // The publisher builds each due day and each queued day; it reads time only through its clock.
+    let _publisher = crate::publish::worker::start(
+        crate::store::open::open(&cfg.data_dir)?,
+        crate::publish::worker::Settings {
+            ctx: crate::day::rebuild::Ctx::from_config(cfg),
+            publish_at: cfg.days.publish_at,
+            sources: crate::day::activity::registered(),
+        },
+        Box::new(crate::publish::clock::System),
+        cfg.days.publish_interval,
+    );
     let _retention = crate::retention::worker::start(
         crate::store::open::open(&cfg.data_dir)?,
         cfg.summary.raw_retention_hours,

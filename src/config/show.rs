@@ -39,6 +39,17 @@ fn derived(cfg: &Loaded) -> Vec<(String, String, &'static str)> {
     )
     .ok()
     .flatten();
+    let tz = get("LOUPE_TZ").and_then(|v| v.parse::<chrono_tz::Tz>().ok());
+    let at = get("LOUPE_PUBLISH_AT").and_then(super::publish_at);
+    let (local, utc) = match (tz, at) {
+        (Some(tz), Some(at)) => {
+            let t = crate::publish::due::next_due(chrono::Utc::now().timestamp_millis(), tz, at);
+            (t.to_rfc3339(), crate::publish::due::utc(t).to_rfc3339())
+        }
+        _ => ("invalid: LOUPE_TZ or LOUPE_PUBLISH_AT".into(), "invalid".into()),
+    };
+    out.push(("publish_next_due_local".into(), local, "derived"));
+    out.push(("publish_next_due_utc".into(), utc, "derived"));
     out.push((
         "summary_credential".into(),
         crate::summary::credential::kind(kind.as_ref()).to_string(),
@@ -162,6 +173,12 @@ mod tests {
         assert_eq!(value("LOUPE_SUMMARY_MAX_ATTEMPTS"), "5");
         assert_eq!(value("LOUPE_RAW_RETENTION_HOURS"), "168");
         assert_eq!(value("LOUPE_PUBLIC_PROJECTS"), "");
+        assert_eq!(value("LOUPE_TZ"), "Europe/Stockholm");
+        assert_eq!(value("LOUPE_PUBLISH_AT"), "01:00");
+        assert_eq!(value("LOUPE_PUBLISH_INTERVAL_SECS"), "60");
+        assert_eq!(value("LOUPE_DAY_REVIEW"), "auto");
+        assert!(value("publish_next_due_local").contains("T01:00:00+0"));
+        assert!(value("publish_next_due_utc").ends_with("+00:00"));
         assert!(
             json.lines()
                 .filter(|l| l.contains("\"secret\":true"))

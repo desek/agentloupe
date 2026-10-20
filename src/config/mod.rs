@@ -33,6 +33,25 @@ pub struct Config {
     /// The time between two passes of the parser worker.
     pub parse_interval: std::time::Duration,
     pub summary: SummaryConfig,
+    pub days: DayConfig,
+}
+
+/// The values of the day records and the publisher; the time zone is `summary.tz`.
+pub struct DayConfig {
+    /// The local time on D plus one at which the day D is due.
+    pub publish_at: chrono::NaiveTime,
+    pub publish_interval: std::time::Duration,
+    pub review: crate::day::state::Review,
+    pub subscriptions: Vec<crate::subscription::config::Subscription>,
+}
+
+/// Parses LOUPE_PUBLISH_AT: exactly HH:MM, hour 00 to 23, minute 00 to 59.
+pub fn publish_at(v: &str) -> Option<chrono::NaiveTime> {
+    let b = v.as_bytes();
+    let shape = b.len() == 5 && b[2] == b':' && [0, 1, 3, 4].iter().all(|&i| b[i].is_ascii_digit());
+    shape
+        .then(|| chrono::NaiveTime::parse_from_str(v, "%H:%M").ok())
+        .flatten()
 }
 
 /// The values of the summary worker, the day line, and the raw-body retention.
