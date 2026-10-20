@@ -67,4 +67,15 @@ If a required value is missing or not valid, `loupe serve` stops before it opens
 
 The subcommand prints each effective value with its source. It prints every secret as `set` or `unset`. It never prints a secret value or a part of a secret value.
 
+The subcommand also prints these lines:
+
+1. `price_commit`, the commit of the embedded price file.
+2. The number of entries in the price index.
+3. One line `subscription.<name>: <USD per month>` for each subscription.
+4. `subscription_total_per_month: <sum>`.
+
+## Subscription variables
+
+`LOUPE_SUBSCRIPTION_<NAME>` is a prefix, not one variable. Each variable with this prefix declares one subscription. `<NAME>` matches `[A-Z0-9_]+`. The value is a non-negative decimal in US dollars per month, with at most 2 fraction digits. A name or a value that is not valid stops the start with an actionable error. `cost.md` gives the full rules.
+
 When stdout is not a terminal, the output is one JSON object per line. Under `--human`, or on a terminal, the output is a table.

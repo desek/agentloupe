@@ -71,8 +71,13 @@ Each row of `calls` holds these columns:
 | `cache_write_5m` | The input tokens written to the cache with a 5 minute lifetime. |
 | `cache_write_1h` | The input tokens written to the cache with a 1 hour lifetime. |
 | `output` | The output tokens. |
+| `cost_usd` | The API-equivalent cost as decimal text, or null. See `cost.md`. |
+| `price_commit` | The price commit that priced the call, or null. See `cost.md`. |
+| `unpriced_reason` | The reason that the call has no price, or null. See `cost.md`. |
 
 The proxy token ID and the account id are independent columns. Thus an analysis can group by token, by account, or by both.
+
+The parser worker writes the three cost columns in the same transaction as the call row. [cost.md](cost.md) gives the rules.
 
 ### Token columns
 

@@ -17,13 +17,27 @@ The agent label and the upstream name must match `^[a-z0-9][a-z0-9-]{0,31}$`. A 
 
 ## Allowlist
 
-The file `upstreams.toml` at the root of the repository is the allowlist. The container image also holds it. Each entry maps an upstream name to a base URL. The file holds at least these entries:
+The file `upstreams.toml` at the root of the repository is the allowlist. The container image also holds it. Each entry is a table that has the upstream name as its key. The table holds exactly two keys: `base_url` and `litellm_provider`. The provider selects the prices of the upstream. See `cost.md`. The file holds at least these entries:
 
-| Upstream | Base URL |
-|---|---|
-| `anthropic` | `https://api.anthropic.com` |
-| `openai` | `https://api.openai.com` |
-| `chatgpt` | `https://chatgpt.com` |
+| Upstream | `base_url` | `litellm_provider` |
+|---|---|---|
+| `anthropic` | `https://api.anthropic.com` | `anthropic` |
+| `openai` | `https://api.openai.com` | `openai` |
+| `chatgpt` | `https://chatgpt.com` | `openai` |
+
+An entry has this shape:
+
+```toml
+[anthropic]
+base_url = "https://api.anthropic.com"
+litellm_provider = "anthropic"
+```
+
+An inline table is the same TOML value, and the loader also accepts it:
+
+```toml
+anthropic = { base_url = "https://api.anthropic.com", litellm_provider = "anthropic" }
+```
 
 `LOUPE_UPSTREAMS_FILE` overrides the path of the file. `loupe config show` prints the path with its source.
 
@@ -33,8 +47,12 @@ The file `upstreams.toml` at the root of the repository is the allowlist. The co
 2. The file is not valid TOML.
 3. A name does not match the name rule.
 4. A base URL is not `https`. The only exception is a host of `127.0.0.1` or `localhost`, which the tests use.
+5. An entry is a string, for example `anthropic = "https://api.anthropic.com"`. This is the old shape.
+6. An entry has no `base_url` or no `litellm_provider`.
+7. An entry has a key that is not `base_url` or `litellm_provider`.
+8. A `litellm_provider` is not a non-empty string.
 
-The error names the file, the entry, the fix, and the check, which is `loupe config show`.
+The error names the file, the entry, the key, the expected shape, the fix, and the check, which is `loupe config show`.
 
 A request for an upstream name that is not in the allowlist gets status 404. The JSON error body names the unknown upstream, lists the known names, and points to `upstreams.toml`. The proxy does not forward this request and stores no exchange for it.
 
