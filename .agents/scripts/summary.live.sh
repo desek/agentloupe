@@ -66,7 +66,7 @@ wait_port "$port" || fail "loupe serve did not start on port $port" "check the l
 
 claude_version="$(claude --version | awk '{print $1}')"
 env -u CLAUDECODE ANTHROPIC_BASE_URL="http://127.0.0.1:$port/$token/claude-code/anthropic" \
-  claude -p "Explain in two sentences what a binary search does." --model claude-haiku-5-5 >>"$LOG" 2>&1 \
+  claude -p "Explain in two sentences what a binary search does." --model claude-haiku-5-5 >/dev/null 2>>"$LOG" \
   || fail "claude -p through the proxy failed" "check that Claude Code is logged in"
 
 db="$work/loupe.db"

@@ -3,7 +3,7 @@ date: 2026-10-20
 source: cr (CR-0006)
 surface: cli
 outcome: reproduced
-runs: "1 of 1 passed; last run 2026-10-20"
+runs: "2 of 2 passed; last run 2026-10-20"
 ---
 
 ## Scenario: bodies go away after retention
@@ -28,3 +28,4 @@ The operator confirms that prompts do not stay on disk after the parse and the s
 ### Result on 2026-10-20
 
 - `bodies_left: 0`, `calls_unchanged: true`, `sessions_unchanged: true`.
+- Second run (regression): `bodies_left: 0`, `calls_unchanged: true`, `sessions_unchanged: true`.

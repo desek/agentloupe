@@ -3,7 +3,7 @@ date: 2026-10-20
 source: cr (CR-0006)
 surface: cli, with a real agent and a real summary request
 outcome: reproduced
-runs: "1 of 2 passed; the first run failed with bad_request (temperature refused), the second passed after the change; last run 2026-10-20"
+runs: "2 of 3 passed; the first run failed with bad_request (temperature refused), the next two passed; last run 2026-10-20"
 ---
 
 ## Scenario: a real session gets a safe line
@@ -30,3 +30,4 @@ The operator sees one non-identifying line for a finished `claude -p` session.
 
 - First run: `status: failed`, error kind `bad_request`. The API refused `temperature` for `claude-haiku-5-5`, and without the billing block the OAuth path gave a `429` with no `retry-after`.
 - Second run, with no `temperature` and with the billing block: `status: done`, `failed: 0`, a line of 8 words, `line_safe: yes`.
+- Third run (regression): `status: done`, `failed: 0`, a line of 9 words, `line_safe: yes`, Claude Code 2.1.304.
