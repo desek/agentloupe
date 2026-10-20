@@ -20,6 +20,15 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (8, include_str!("../../migrations/0008_calls.sql")),
     (9, include_str!("../../migrations/0009_worker_cursors.sql")),
     (10, include_str!("../../migrations/0010_calls_cost.sql")),
+    (
+        11,
+        include_str!("../../migrations/0011_session_summaries.sql"),
+    ),
+    (12, include_str!("../../migrations/0012_day_summaries.sql")),
+    (
+        13,
+        include_str!("../../migrations/0013_exchanges_retention.sql"),
+    ),
 ];
 
 /// Applies each migration not yet recorded; returns how many it applied.
@@ -67,7 +76,7 @@ mod tests {
             .query_row("SELECT count(*) FROM schema_version", [], |r| r.get(0))
             .unwrap();
         assert_eq!(rows as usize, super::MIGRATIONS.len());
-        assert_eq!(rows, 10);
+        assert_eq!(rows, 13);
         let tokens: i64 = conn
             .query_row("SELECT count(*) FROM proxy_tokens", [], |r| r.get(0))
             .unwrap();
@@ -80,7 +89,14 @@ mod tests {
             )
             .unwrap();
         assert_eq!(col, 1);
-        for table in ["calls", "sessions", "accounts", "worker_cursors"] {
+        for table in [
+            "calls",
+            "sessions",
+            "accounts",
+            "worker_cursors",
+            "session_summaries",
+            "day_summaries",
+        ] {
             let n: i64 = conn
                 .query_row(&format!("SELECT count(*) FROM {table}"), [], |r| r.get(0))
                 .unwrap();
@@ -88,12 +104,12 @@ mod tests {
         }
         let hint: i64 = conn
             .query_row(
-                "SELECT count(*) FROM pragma_table_info('exchanges') WHERE name IN ('session_hint_hash', 'session_hint_source', 'parse_outcome')",
+                "SELECT count(*) FROM pragma_table_info('exchanges') WHERE name IN ('session_hint_hash', 'session_hint_source', 'parse_outcome', 'parsed_at', 'bodies_deleted_at')",
                 [],
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!(hint, 3);
+        assert_eq!(hint, 5);
         let exchanges: i64 = conn
             .query_row("SELECT count(*) FROM exchanges", [], |r| r.get(0))
             .unwrap();

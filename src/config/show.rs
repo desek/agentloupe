@@ -26,6 +26,24 @@ fn derived(cfg: &Loaded) -> Vec<(String, String, &'static str)> {
             "build",
         ),
     ];
+    let get = |n: &str| {
+        cfg.get(n)
+            .and_then(|e| e.value.as_ref())
+            .map(|v| v.expose())
+    };
+    // An invalid model rule still prints the kind; the start error names the fix.
+    let kind = crate::summary::credential::select(
+        get("LOUPE_SUMMARY_API_KEY"),
+        get("LOUPE_SUMMARY_OAUTH_TOKEN"),
+        crate::summary::credential::HAIKU,
+    )
+    .ok()
+    .flatten();
+    out.push((
+        "summary_credential".into(),
+        crate::summary::credential::kind(kind.as_ref()).to_string(),
+        "derived",
+    ));
     let pairs = cfg
         .entries
         .iter()
@@ -138,6 +156,12 @@ mod tests {
         assert_eq!(value("price_commit"), crate::price::embed::PRICE_COMMIT);
         assert!(value("price_entries").parse::<usize>().unwrap() > 4000);
         assert_eq!(value("subscription_total_per_month"), "0");
+        assert_eq!(value("summary_credential"), "api_key");
+        assert_eq!(value("LOUPE_SUMMARY_BASE_URL"), "https://api.anthropic.com");
+        assert_eq!(value("LOUPE_SUMMARY_INTERVAL_SECS"), "30");
+        assert_eq!(value("LOUPE_SUMMARY_MAX_ATTEMPTS"), "5");
+        assert_eq!(value("LOUPE_RAW_RETENTION_HOURS"), "168");
+        assert_eq!(value("LOUPE_PUBLIC_PROJECTS"), "");
         assert!(
             json.lines()
                 .filter(|l| l.contains("\"secret\":true"))

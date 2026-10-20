@@ -32,4 +32,21 @@ pub struct Config {
     pub idle_secs: u64,
     /// The time between two passes of the parser worker.
     pub parse_interval: std::time::Duration,
+    pub summary: SummaryConfig,
+}
+
+/// The values of the summary worker, the day line, and the raw-body retention.
+pub struct SummaryConfig {
+    /// The active credential; None means every closed segment gets the status disabled.
+    pub credential: Option<crate::summary::credential::Credential>,
+    pub model: String,
+    /// The target of the summary client; never a proxy route of loupe serve.
+    pub base_url: String,
+    pub interval: std::time::Duration,
+    pub max_attempts: u32,
+    /// Hours after the later of the parse and the summary before the bodies go; 0 is the next pass.
+    pub raw_retention_hours: u64,
+    pub public_projects: Vec<String>,
+    /// The time zone that cuts the days.
+    pub tz: chrono_tz::Tz,
 }

@@ -112,16 +112,12 @@ fn one(
                 // The plain bodies drop here, at the end of this arm.
             }
         };
+        let now = time::text(chrono::Utc::now().timestamp_millis());
         conn.execute(
-            "UPDATE exchanges SET parse_outcome = ?2 WHERE rowid = ?1",
-            params![rowid, outcome.as_str()],
+            "UPDATE exchanges SET parse_outcome = ?2, parsed_at = ?3 WHERE rowid = ?1",
+            params![rowid, outcome.as_str(), now],
         )?;
-        cursor::set(
-            conn,
-            PARSER,
-            rowid,
-            &time::text(chrono::Utc::now().timestamp_millis()),
-        )?;
+        cursor::set(conn, PARSER, rowid, &now)?;
         tracing::debug!(exchange_id = %row.id, format = fmt, outcome = outcome.as_str(), calls = added.calls, "exchange parsed");
         c.exchanges_read += 1;
         c.calls_added += added.calls;

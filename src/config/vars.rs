@@ -26,6 +26,13 @@ pub const VARS: &[Var] = &[
     var("LOUPE_SUMMARY_API_KEY", None, true),
     var("LOUPE_SUMMARY_OAUTH_TOKEN", None, true),
     var("LOUPE_SUMMARY_MODEL", Some("claude-haiku-5-5"), false),
+    var(
+        "LOUPE_SUMMARY_BASE_URL",
+        Some("https://api.anthropic.com"),
+        false,
+    ),
+    var("LOUPE_SUMMARY_INTERVAL_SECS", Some("30"), false),
+    var("LOUPE_SUMMARY_MAX_ATTEMPTS", Some("5"), false),
     var("LOUPE_TZ", Some("Europe/Stockholm"), false),
     var("LOUPE_PUBLISH_AT", Some("01:00"), false),
     var("LOUPE_IDLE_SECS", Some("3600"), false),

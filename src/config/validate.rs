@@ -21,6 +21,14 @@ fn text(e: &Entry) -> Option<&str> {
     e.value.as_ref().map(|v| v.expose())
 }
 
+/// The summary base URL rule: https, or http only for a loopback host that the tests use.
+fn https_or_loopback(url: &str) -> bool {
+    reqwest::Url::parse(url).is_ok_and(|u| {
+        u.scheme() == "https"
+            || (u.scheme() == "http" && matches!(u.host_str(), Some("127.0.0.1" | "localhost")))
+    })
+}
+
 /// Checks one entry; secrets never appear in the problem text.
 fn check(e: &Entry) -> Result<(), ConfigError> {
     let n = e.name.as_str();
@@ -38,7 +46,8 @@ fn check(e: &Entry) -> Result<(), ConfigError> {
         (
             "LOUPE_IDLE_SECS"
             | "LOUPE_PARSE_INTERVAL_SECS"
-            | "LOUPE_RAW_RETENTION_HOURS"
+            | "LOUPE_SUMMARY_INTERVAL_SECS"
+            | "LOUPE_SUMMARY_MAX_ATTEMPTS"
             | "LOUPE_CAPTURE_MAX_BYTES"
             | "LOUPE_CAPTURE_QUEUE"
             | "LOUPE_UPSTREAM_CONNECT_TIMEOUT_SECS"
@@ -48,6 +57,21 @@ fn check(e: &Entry) -> Result<(), ConfigError> {
             n,
             "is not a positive whole number",
             "a positive whole number",
+        )),
+        ("LOUPE_RAW_RETENTION_HOURS", Some(v)) if v.parse::<u64>().is_err() => Err(bad(
+            n,
+            "is not a whole number",
+            "a whole number of hours, 0 or more",
+        )),
+        ("LOUPE_SUMMARY_BASE_URL", Some(v)) if !https_or_loopback(v) => Err(bad(
+            n,
+            "is not an https URL or an http URL of 127.0.0.1 or localhost",
+            "an https URL such as https://api.anthropic.com",
+        )),
+        ("LOUPE_TZ", Some(v)) if v.parse::<chrono_tz::Tz>().is_err() => Err(bad(
+            n,
+            "is not a time zone name",
+            "an IANA time zone name such as Europe/Stockholm",
         )),
         ("LOUPE_BOOTSTRAP_TOKEN", Some(v)) => crate::token::format::parse(v).map_err(|why| {
             ConfigError::new(
@@ -98,6 +122,13 @@ impl Loaded {
         let get = |n: &str| self.get(n).and_then(text).unwrap_or_default().to_string();
         let num = |n: &str| get(n).parse::<u64>().expect("checked above");
         let key = |n: &str| parse_key(&get(n)).expect("checked above");
+        let opt = |n: &str| self.get(n).and_then(text);
+        let model = get("LOUPE_SUMMARY_MODEL");
+        let credential = crate::summary::credential::select(
+            opt("LOUPE_SUMMARY_API_KEY"),
+            opt("LOUPE_SUMMARY_OAUTH_TOKEN"),
+            &model,
+        )?;
         Ok(Config {
             listen: get("LOUPE_LISTEN").parse().expect("checked above"),
             data_dir: get("LOUPE_DATA_DIR").into(),
@@ -118,6 +149,18 @@ impl Loaded {
                 .map(|v| super::secret::Secret::new(v.to_string())),
             idle_secs: num("LOUPE_IDLE_SECS"),
             parse_interval: std::time::Duration::from_secs(num("LOUPE_PARSE_INTERVAL_SECS")),
+            summary: super::SummaryConfig {
+                credential,
+                model,
+                base_url: get("LOUPE_SUMMARY_BASE_URL"),
+                interval: std::time::Duration::from_secs(num("LOUPE_SUMMARY_INTERVAL_SECS")),
+                max_attempts: num("LOUPE_SUMMARY_MAX_ATTEMPTS").min(u32::MAX as u64) as u32,
+                raw_retention_hours: num("LOUPE_RAW_RETENTION_HOURS"),
+                public_projects: crate::summary::scrub::public_projects(&get(
+                    "LOUPE_PUBLIC_PROJECTS",
+                )),
+                tz: get("LOUPE_TZ").parse().expect("checked above"),
+            },
         })
     }
 }

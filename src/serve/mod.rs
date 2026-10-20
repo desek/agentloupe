@@ -1,4 +1,4 @@
-//! @agents-index Runs the HTTP server: migrates the store, bootstrap token step, starts capture and the parser worker, binds, serves.
+//! @agents-index Runs the HTTP server: migrates the store, bootstrap token step, starts capture, parser, summary, and retention workers, binds, serves.
 
 mod health;
 pub mod router;
@@ -54,6 +54,16 @@ pub fn run(cfg: &Config, upstreams: Upstreams) -> Result<(), Box<dyn Error>> {
             providers: proxy::upstreams::providers(&upstreams),
         },
         cfg.parse_interval,
+    );
+    // The summary client sends to LOUPE_SUMMARY_BASE_URL directly, never through the proxy routes.
+    let _summary = crate::summary::worker::start(
+        crate::store::open::open(&cfg.data_dir)?,
+        crate::summary::settings(cfg),
+        cfg.summary.interval,
+    );
+    let _retention = crate::retention::worker::start(
+        crate::store::open::open(&cfg.data_dir)?,
+        cfg.summary.raw_retention_hours,
     );
     let state = Arc::new(ProxyState {
         upstreams,

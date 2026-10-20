@@ -5,6 +5,7 @@ mod gen_key;
 mod parse;
 mod price;
 mod serve;
+mod summarize;
 mod token;
 
 use clap::{Args, Parser, Subcommand};
@@ -40,6 +41,33 @@ enum Command {
         #[arg(long)]
         once: bool,
         /// Report the counts and write nothing.
+        #[arg(long)]
+        dry_run: bool,
+        /// Print a sentence instead of key: value lines.
+        #[arg(long)]
+        human: bool,
+        #[command(flatten)]
+        args: ConfigArgs,
+    },
+    /// Summarize the closed session segments, build a day line, or retry failed summaries.
+    ///
+    /// --once prints segments_read, done, skipped, failed, disabled, retry_later, bodies_deleted,
+    /// bodies_kept_decrypt_failed as key: value lines. --day prints day, status, session_lines.
+    /// --retry prints rows. Exit codes: 0 done, 1 a database or runtime failure, 2 bad input or configuration.
+    Summarize {
+        /// Run one summary pass and one retention pass, then exit.
+        #[arg(long, conflicts_with_all = ["day", "retry"])]
+        once: bool,
+        /// Build the day line of this day, YYYY-MM-DD in LOUPE_TZ.
+        #[arg(long, value_name = "YYYY-MM-DD", conflicts_with = "retry")]
+        day: Option<String>,
+        /// Set failed and disabled summaries back to pending with 0 attempts.
+        #[arg(long)]
+        retry: bool,
+        /// Print the stored day line too (with --day).
+        #[arg(long)]
+        show_line: bool,
+        /// Report the counts; send no model request and write nothing.
         #[arg(long)]
         dry_run: bool,
         /// Print a sentence instead of key: value lines.
@@ -184,6 +212,23 @@ pub fn run() -> ExitCode {
             human,
             args,
         } => parse::run(&args, once, dry_run, human),
+        Command::Summarize {
+            once,
+            day,
+            retry,
+            show_line,
+            dry_run,
+            human,
+            args,
+        } => {
+            let mode = match (once, day, retry) {
+                (true, _, _) => Some(summarize::Mode::Once),
+                (_, Some(d), _) => Some(summarize::Mode::Day(d)),
+                (_, _, true) => Some(summarize::Mode::Retry),
+                _ => None,
+            };
+            summarize::run(&args, mode, dry_run, show_line, human)
+        }
         Command::Price { command } => match command {
             PriceCommand::Show {
                 model,
