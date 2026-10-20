@@ -35,6 +35,7 @@ The flag `--env` or the variable `LOUPE_ENV` gives the name of the environment. 
 | `LOUPE_TZ` | no | no | `Europe/Stockholm` |
 | `LOUPE_PUBLISH_AT` | no | no | `01:00` |
 | `LOUPE_IDLE_SECS` | no | no | `3600` |
+| `LOUPE_PARSE_INTERVAL_SECS` | no | no | `5` |
 | `LOUPE_RAW_RETENTION_HOURS` | no | no | `168` |
 | `LOUPE_SITE_TITLE` | no | no | `AI agent activity` |
 | `LOUPE_PUBLIC_PROJECTS` | no | no | empty |

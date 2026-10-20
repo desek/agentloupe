@@ -93,6 +93,9 @@ The proxy stores one exchange for each forwarded request in the table `exchanges
 | `credential_source` | `authorization` or `x-api-key`, or null. |
 | `account_id_hash` | The account ID hash, or null. |
 | `account_id_source` | The lowercase name of the account ID header, or null. |
+| `session_hint_hash` | The HMAC of the first present session header, or null. See `parser.md`, section "Session hint capture". |
+| `session_hint_source` | The lowercase name of that session header, or null. |
+| `parse_outcome` | The result of the parse, or null before the parse. See `parser.md`, section "Parse outcomes". |
 | `outcome` | `complete`, `client_aborted`, `upstream_aborted`, or `upstream_unreachable`. |
 | `error` | The cause of a failure, or null. |
 
