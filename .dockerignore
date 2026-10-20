@@ -1,0 +1,9 @@
+# @agents-index Keeps the build context to the files that the image build needs.
+*
+!rust-toolchain.toml
+!Cargo.toml
+!Cargo.lock
+!src/
+!migrations/
+!tests/
+!config/

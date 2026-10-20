@@ -1,0 +1,16 @@
+# @agents-index Runs the loupe container with the port on 127.0.0.1 only, a named volume at /data, and secrets from .env.
+services:
+  loupe:
+    build: .
+    image: agent-loupe:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - loupe-data:/data
+    env_file: .env
+    environment:
+      LOUPE_ENV: container
+
+volumes:
+  loupe-data:
