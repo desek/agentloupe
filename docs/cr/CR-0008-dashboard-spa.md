@@ -1,9 +1,9 @@
 ---
 name: "CR-0008 Stateless dashboard SPA built into the binary"
-description: "Adds the public dashboard at GET /: a stateless single-page app in plain HTML, CSS, and JavaScript with no build step, built into the loupe binary, with self-hosted Geist fonts, that reads only the public API and shows the README dashboard sections with clear empty states."
+description: "Adds the public dashboard at GET /: a stateless single-page app in plain HTML, CSS, and JavaScript with no build step, built into the loupe binary, with self-hosted Geist fonts, that reads only the public API, shows token velocity as the headline, a configurable site title, the subscription cost next to the API-equivalent cost, and the README dashboard sections with clear empty states."
 id: "CR-0008"
-status: "approved"
-date: 2026-10-19
+status: "proposed"
+date: 2026-10-20
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
@@ -16,7 +16,7 @@ source-commit: 2dda610
 
 ## Change Summary
 
-After CR-0007, the binary publishes day records on `GET /v1/days`, but `GET /` serves nothing and no person can see the data. This CR adds the dashboard of the README: a stateless single-page app that the `loupe` binary serves at `/` from static files built into the binary. The page reads only the public API and shows the header, the pull requests, the lines changed in the range, the tokens per day, the API-equivalent cost, the 12-month heatmap, the daily log, and the footer, with the design values of the mockup.
+After CR-0007, the binary publishes day records on `GET /v1/days`, but `GET /` serves nothing and no person can see the data. This CR adds the dashboard of the README: a stateless single-page app that the `loupe` binary serves at `/` from static files built into the binary. The page reads only the public API. Its headline is token velocity (tokens per day), which a reader must understand in five seconds. It shows the header with a configurable title, the pull requests, the lines changed in the range, the tokens per day, the API-equivalent cost next to the subscription cost, the 12-month heatmap, the daily log, and the footer, with the design values of the mockup.
 
 ## Motivation and Background
 
@@ -31,6 +31,10 @@ The human decided that the dashboard is a stateless SPA, that it gets data only 
 * README section "Privacy model": the page shows only public data, so it has no login, no cookie, and no state on the server.
 * The definition of done of the CR set: the sessions are available in the dashboard.
 * `local_first`: the page must work with no network access outside `localhost`.
+* The human decided on 2026-10-20 (A1) that the audience is the general public ("scrubbed radical transparency") and that token velocity is the headline metric, readable in five seconds.
+* The human decided on 2026-10-20 (A2) that the product name does not show on the public page by default, and that configuration sets the page title.
+* The human decided on 2026-10-20 (A15) that the dashboard shows the real subscription cost next to the API-equivalent cost.
+* The human decided on 2026-10-20 (A18): dark only, no page per day, totals and no streaks, ranges 3M, 6M, and 1Y.
 
 ## Current State
 
@@ -79,6 +83,8 @@ sequenceDiagram
     L-->>U: files with ETag
     U->>L: GET /v1/days, last 400 days
     L-->>U: envelope with days
+    U->>L: GET /v1/days, from start of range 3M
+    L-->>U: envelope with subscription cost of the range
     U->>U: build view for range 3M
     U->>U: draw sections
 ```
@@ -89,11 +95,12 @@ sequenceDiagram
 
 **Serving**
 
-1. `GET /` **MUST** return `200` with `content-type: text/html; charset=utf-8` and the page `web/index.html`.
+1. `GET /` **MUST** return `200` with `content-type: text/html; charset=utf-8` and the page `web/index.html`, with the site title of requirement 1a in the `<title>` element and in the header heading.
+1a. **Site title.** The configuration variable `LOUPE_SITE_TITLE` **MUST** set the site title. Its default **MUST** be "AI agent activity". The default page **MUST NOT** show the product name "Agentloupe". The binary **MUST** put the title into `index.html` once at start-up, with HTML escape of `&`, `<`, `>`, `"`, and `'`, and **MUST** compute the ETag of requirement 5 from the result. A title that is empty after trim, or longer than 80 characters, **MUST** stop the start-up with an actionable error that names `LOUPE_SITE_TITLE`. `loupe config show` **MUST** print `site_title: <value>`. Decided by the human on 2026-10-20 (A2); the default text is a judgement call of the supervisor.
 2. `GET /assets/<path>` **MUST** return the file `web/assets/<path>` with a content type from its extension: `.js` `text/javascript; charset=utf-8`, `.css` `text/css; charset=utf-8`, `.woff2` `font/woff2`, `.svg` `image/svg+xml`. `GET /favicon.ico` **MUST** return the favicon file. A path that does not match a built-in file **MUST** return `404` with no body from the file system.
-3. The binary **MUST** contain every file of `web/` at compile time. At run time, the static handler **MUST NOT** read the file system. A change to a file of `web/` **MUST** change the binary after `cargo build`.
+3. The binary **MUST** contain every file of `web/` at compile time. At run time, the static handler **MUST NOT** read the file system. The title of requirement 1a is the only run-time change to a built-in file. A change to a file of `web/` **MUST** change the binary after `cargo build`.
 4. The static handler **MUST** reject a path that holds `..`, a backslash, or a percent-encoded slash with `404`.
-5. Every static response **MUST** carry an `etag` header made from a hash of the file content at compile time, and `cache-control: no-cache`. A request with a matching `if-none-match` **MUST** return `304`.
+5. Every static response **MUST** carry an `etag` header made from a hash of the file content at compile time (for `index.html`, of the content after requirement 1a), and `cache-control: no-cache`. A request with a matching `if-none-match` **MUST** return `304`.
 6. The `GET /` response **MUST** carry `content-security-policy: default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`, `x-content-type-options: nosniff`, and `referrer-policy: no-referrer`.
 7. The static routes **MUST NOT** read a cookie or an `authorization` header, **MUST NOT** set a cookie, and **MUST NOT** read a table of the database.
 8. A method other than `GET` and `HEAD` on `/` or `/assets/...` **MUST** return `405` with `allow: GET, HEAD`.
@@ -118,25 +125,30 @@ sequenceDiagram
 
 **Data and range**
 
-21. On load, the page **MUST** fetch `GET /v1/days?from=<today minus 399 days>` and **MUST NOT** send `to`, so the server default of CR-0007 (today in `LOUPE_TZ`) sets the end of the range. The page **MUST** compute `from` as the browser date minus 399 days, and the server limit of 400 days stays met because a browser date is never more than one day from the date in `LOUPE_TZ`; if the server refuses the range, the page **MUST** retry once with `from` one day later. The page **MUST NOT** make a second request for a change of range.
+21. On load, the page **MUST** fetch `GET /v1/days?from=<today minus 399 days>` and **MUST NOT** send `to`, so the server default of CR-0007 (today in `LOUPE_TZ`) sets the end of the range. The page **MUST** compute `from` as the browser date minus 399 days, and the server limit of 400 days stays met because a browser date is never more than one day from the date in `LOUPE_TZ`; if the server refuses the range, the page **MUST** retry once with `from` one day later. The records of this response **MUST** feed every section.
+21a. The subscription cost of a range comes from the envelope field `subscription_cost_usd` of CR-0007 requirement 38, which includes days with no record. For each range, on its first selection, the page **MUST** make one request `GET /v1/days?from=<first day of the range>` with no `to`, and **MUST** keep its `subscription_cost_usd` in memory. A second selection of the same range **MUST NOT** make a new request. The page **MUST NOT** compute the subscription cost itself.
 22. The ranges **MUST** be: `3M` the last 91 days, `6M` the last 182 days, and `1Y` the last 365 days, each ending on the `to` value of the response, both ends included.
 23. A day inside the range with no record **MUST** count as zero for every sum and **MUST** draw as zero in a chart. This follows the rule of CR-0007, decided by the human on 2026-10-19: a day has a record only when it has agent calls or GitHub activity.
 24. The page **MUST** keep the record fields that it does not show out of the DOM, and **MUST** show only fields of the CR-0007 allowlist.
 
 **Sections**
 
-25. **Header.** The page **MUST** show the title "Agentloupe", the time of the last update from `updated_at` as a local date and time with the time zone name, and the range selector with the three buttons `3M`, `6M`, and `1Y`. The selected button **MUST** carry `aria-pressed="true"`. When `updated_at` is `null`, the header **MUST** show "No update yet".
+24a. **Headline: token velocity.** Directly below the header, before every other section, the page **MUST** show the token velocity of the selected range: the sum of `input_total + output` over the days of the range divided by the number of days of the range (days with no record included), rounded to an integer. The figure **MUST** use the short form of requirement 36 (for example `1.3M`), **MUST** carry the label "tokens per day", and **MUST** be the largest text on the page, at least twice the font size of the figures of the totals row. Below it, the page **MUST** show one line with the range in words, for example "average over the last 3 months", and a sparkline of the daily values of the range with no axes. The headline **MUST** be visible with no scroll at a width of 360 px and at 1440 px. A reader **MUST** be able to read the figure and its unit in five seconds (Non-Functional Requirement 9). Decided by the human on 2026-10-20 (A1).
+
+25. **Header.** The page **MUST** show the site title of requirement 1a, the time of the last update from `updated_at` as a local date and time with the time zone name, and the range selector with the three buttons `3M`, `6M`, and `1Y`. The selected button **MUST** carry `aria-pressed="true"`. When `updated_at` is `null`, the header **MUST** show "No update yet".
 26. **Pull requests.** The page **MUST** show the sum of `prs_opened` and the sum of `prs_merged` for the range, and a bar chart per ISO week with two bars per week, opened and merged, in the mockup colors.
 27. **Lines changed in the range.** The page **MUST** show the sum of `lines_added`, the sum of `lines_removed`, and the net value (added minus removed) over the records of the selected range (`3M`, `6M`, or `1Y`), like the other cards. A change of range **MUST** change these figures. The API does not change. This was decided by the human on 2026-10-19.
 28. **Tokens per day.** The page **MUST** show two line charts for the range, one for `input_total` and one for `output`, each with its own vertical scale, and the sum of each for the range.
 29. **Cost (API-equivalent).** The page **MUST** show a card in the totals row with the sum of `cost_usd` for the range in US dollars with two decimals, and a daily line chart in the style of the token charts. The card label **MUST** be "Cost (API-equivalent)" and the card **MUST** show the text "List price of the tokens, not money paid." When the sum of `unpriced_calls` for the range is more than zero, the card **MUST** show "<n> calls not priced".
+29a. **Subscription cost.** Next to the card of requirement 29, in the same row, the page **MUST** show a card with the label "Subscription cost", the value of requirement 21a for the selected range in US dollars with two decimals, and the text "Money paid for subscriptions, pro-rated per day." When the value is `0`, the card **MUST** show "No subscription configured" in place of the figure. The card **MUST NOT** show a subscription name. Decided by the human on 2026-10-20 (A15).
+29b. **Totals, no streaks.** The totals row **MUST** show only sums and the velocity of requirement 24a for the range. The page **MUST NOT** show a streak, a count of active days in a row, or a record day. Decided by the human on 2026-10-20 (A18).
 30. **Token usage, last 12 months.** The page **MUST** show a heatmap of the last 365 days, one cell per day, in columns of weeks from Monday to Sunday. The value of a cell **MUST** be `input_total + output`. The levels **MUST** be five: level 0 for a value of zero, and levels 1 to 4 from the quartiles of the values above zero in the 365 days. Each cell **MUST** carry a `title` with the date and the token count. The heatmap **MUST NOT** change with the range selector.
 31. **Daily log.** The page **MUST** show one row per record in the range, newest first, with the date, the `summary` text, the PR count (`prs_opened`), and the token count (`input_total + output`). A record with `summary` `null` **MUST** show "No summary". The page **MUST** insert the summary as text, never as HTML.
 32. **Footer.** The page **MUST** name the covered sources "Claude Code and Pi", and **MUST** state that claude.ai chats are not covered.
 
 **Empty and error states**
 
-33. When the response holds no record, the page **MUST** show the header, the footer, and one empty state with the text "No days published yet" and the hint "Days appear after the nightly publish, or after `loupe aggregate --date today`." It **MUST NOT** draw an empty chart with axes and no data.
+33. When the response holds no record, the page **MUST** show the header, the headline with the figure `0`, the footer, and one empty state with the text "No days published yet" and the hint "Days appear after the nightly publish, or after `loupe aggregate --date today`." It **MUST NOT** draw an empty chart with axes and no data.
 34. When `prs_opened`, `prs_merged`, `lines_added`, and `lines_removed` are `null` in every record of the response, the pull request and lines sections **MUST** show "GitHub not connected" in place of the figures and charts. A `null` in some records **MUST** count as zero, and the section **MUST** show "Partial GitHub data".
 35. When the fetch fails or returns a status other than `200`, the page **MUST** show "Data not available" with the HTTP status or the error name, and a button "Try again" that fetches again. The page **MUST** show the `error.message` of a `400` body when one exists.
 36. Number formats **MUST** be deterministic: integers with a thin space as the group mark in the totals, and the short forms `k` and `M` with one decimal in chart labels.
@@ -145,8 +157,8 @@ sequenceDiagram
 
 37. The Layer 2 document `docs/specification/dashboard.md` **MUST** describe the routes, the headers, the CSP, the files, the data request, the ranges, each section with its formula, the empty states, the font delivery, and the design tokens, before the code lands.
 38. The design values of `Main.dc.html` **MUST** be written as CSS custom properties in `web/assets/css/tokens.css`, and `docs/specification/dashboard.md` **MUST** list each token with its value. The page **MUST NOT** contain `support.js` or a file from the mockup `vendor/` directory.
-39. `.taxonomy` **MUST** gain rows for `dashboard`, `range`, `heatmap level`, and `empty state`, and **MUST** reuse the rows for `day record`, `API-equivalent cost`, and `public API`.
-40. README.md **MUST** be updated only where the behaviour differs from its text. The ranges of requirement 22 are an addition, and the section "Dashboard" **MUST** state them. The README dashboard row "Lines changed, all time" **MUST** change to state that the lines card shows lines added, removed, and net for the selected range.
+39. `.taxonomy` **MUST** gain rows for `dashboard`, `range`, `heatmap level`, `empty state`, `token velocity`, and `site title`, and **MUST** reuse the rows for `day record`, `API-equivalent cost`, `subscription cost`, and `public API`.
+40. README.md **MUST** be updated only where the behaviour differs from its text. The ranges of requirement 22 are an addition, and the section "Dashboard" **MUST** state them. The README dashboard row "Lines changed, all time" **MUST** change to state that the lines card shows lines added, removed, and net for the selected range. The section "Dashboard" **MUST** name token velocity as the headline, the subscription cost card, and the rule of no streaks. The configuration table **MUST** gain a row for `LOUPE_SITE_TITLE` with the default "AI agent activity", and the README **MUST** state that the public page does not show the product name by default.
 
 ### Non-Functional Requirements
 
@@ -154,10 +166,11 @@ sequenceDiagram
 2. With 400 stored days, the time from navigation start to the first draw of all sections **MUST** be at most 500 ms in a headless browser on the human's machine against the container, measured with `.agents/scripts/web.render.sh`.
 3. The page **MUST** work at a width of 360 px with no horizontal scroll, and at 1440 px.
 4. Color contrast of text on its background **MUST** be at least 4.5 to 1. The range buttons **MUST** be reachable and usable with the keyboard.
-5. The page **MUST** follow the color scheme of the mockup (dark). A light theme is out of scope.
+5. The page **MUST** follow the color scheme of the mockup (dark only). A light theme and a theme switch are out of scope. Decided by the human on 2026-10-20 (A18).
 6. Every Rust source file and every file of `web/` that permits a comment **MUST** carry one `@agents-index` line. Rust files **MUST** follow the small-file rule, for example `src/web/embed.rs`, `src/web/serve.rs`, `src/web/headers.rs`, `src/web/etag.rs`, `src/web/path.rs`.
 7. An identifier of a governance document **MUST NOT** appear in `web/`, `src/`, `tests/`, or the scenario files.
 8. The repository **MUST** contain `.tool-versions` with the exact line `nodejs 22.20.0`. `.agents/scripts/pipeline.web.sh` **MUST** read the Node version from that file and **MUST** stop with a non-zero exit code and an `actionable_errors` payload when `node` is missing or its version differs from the pin. The thin caller **MUST** install Node from this file and **MUST NOT** state a Node version itself.
+9. **Five-second read.** In the scenario `.agents/scenarios/dashboard.headline.md`, a reader that sees the page for the first time **MUST** state the token velocity figure and its unit within five seconds of the first draw. The headline element **MUST** have a font size of at least twice the font size of a totals figure, measured by `.agents/scripts/web.render.sh` as `headline_ratio`.
 
 ## Measurable Targets
 
@@ -167,6 +180,7 @@ sequenceDiagram
 | Verdict | `.agents/scripts/pipeline.verdict.sh; echo $?` | exit 0 after CR-0007 | exit 0, every stage `status: passed`, with the new stage `web` |
 | Web size | `.agents/scripts/web.size.sh` prints `code_kib` and `total_kib` | none, new measurement, added before the page | `code_kib` at most 100, `total_kib` at most 400 |
 | First full draw, 400 days | `.agents/scripts/web.render.sh --days 400` prints `draw_ms` | none, new measurement, added before the sections | `draw_ms` at most 500 |
+| Headline size | `.agents/scripts/web.render.sh --days 400` prints `headline_ratio` and `headline_above_fold` at 360 px and 1440 px | none, new measurement | `headline_ratio` at least 2.0, `headline_above_fold: true` at both widths |
 | Remote requests | `.agents/scripts/web.render.sh --days 400` prints `remote_requests` | none | `remote_requests: 0` |
 | Proxy time to first byte, p95 | `.agents/scripts/proxy.latency.sh --requests 200 --with-token` | value after CR-0007 | at most 20, and at most 2 above the baseline |
 | Time to a full verdict, warm cache | total time of `pipeline.verdict.sh`, second run | value after CR-0007 | at most 180 seconds |
@@ -177,14 +191,14 @@ sequenceDiagram
 * New: `.tool-versions` (Node pin, extends the toolchain pin of CR-0001).
 * Changed: the router of CR-0002 (static handler for `/`, `/assets/`, `/favicon.ico`), the reserved list, `.agents/scripts/pipeline.verdict.sh` (new stage `web`), `Dockerfile` (no change to the runtime files, because the files are in the binary; the build stage copies `web/`), `.taxonomy`, README.md.
 * New scripts: `.agents/scripts/fonts.vendor.sh`, `.agents/scripts/web.size.sh`, `.agents/scripts/web.render.sh`, `.agents/scripts/pipeline.web.sh`, `.agents/scripts/days.seed.sh`.
-* New scenarios: `.agents/scenarios/dashboard.sections.md`, `.agents/scenarios/dashboard.empty.md`, `.agents/scenarios/dashboard.offline.md`.
+* New scenarios: `.agents/scenarios/dashboard.headline.md`, `.agents/scenarios/dashboard.sections.md`, `.agents/scenarios/dashboard.empty.md`, `.agents/scenarios/dashboard.offline.md`.
 
 ## Scope Boundaries
 
 ### In Scope
 
 * The static handler and the files built into the binary.
-* The page with all README sections, the range selector, and the empty and error states.
+* The page with the token velocity headline, the configurable site title, the subscription cost card, all README sections, the range selector, and the empty and error states.
 * The vendored Geist fonts and the vendor script.
 * The design tokens from the mockup.
 * Unit tests for the calculation modules, integration tests for the routes, and browser scenarios.
@@ -196,9 +210,11 @@ sequenceDiagram
 * GitHub collection: CR-0009 fills the PR and line fields. This CR only shows them, or the "GitHub not connected" state.
 * The end-to-end acceptance with `claude -p` and `pi -p`: CR-0010.
 * Public hosting, a CDN, and a separate deploy of the page.
-* A light theme, translations, and a page per day.
+* A light theme, translations, and a page per day (decided by the human on 2026-10-20, A18).
+* Streaks and other records of activity in a row (A18).
+* The private page of reports per proxy token and per tag: CR-0011.
 * claude.ai chats.
-* A login, an admin view, or a view of private data such as proxy tokens or accounts.
+* A login, an admin view, or a view of private data such as proxy tokens or accounts on the public page.
 
 ## Alternative Approaches Considered
 
@@ -261,7 +277,9 @@ flowchart LR
 
 | Test File | Test Name | Description | Inputs | Expected Output |
 |---|---|---|---|---|
-| `tests/web.serve.rs` | `root_serves_index_html` | Root route | `GET /` | `200`, `text/html`, body holds "Agentloupe" |
+| `tests/web.serve.rs` | `root_serves_index_html` | Root route | `GET /` | `200`, `text/html`, `<title>` is "AI agent activity", body does not hold "Agentloupe" |
+| `tests/web.serve.rs` | `site_title_is_escaped` | Title | `LOUPE_SITE_TITLE='<b>A&B</b>'` | `<title>&lt;b&gt;A&amp;B&lt;/b&gt;</title>`, ETag differs from the default |
+| `tests/web.serve.rs` | `invalid_site_title_is_actionable` | Title | empty, 81 characters | start-up stops, error names `LOUPE_SITE_TITLE` |
 | `tests/web.serve.rs` | `asset_content_types` | Types | each extension | the type of requirement 2 |
 | `tests/web.serve.rs` | `unknown_asset_is_404` | Miss | `/assets/none.js` | `404` |
 | `tests/web.serve.rs` | `traversal_rejected` | Path check | `..`, `%2f`, backslash | `404` |
@@ -277,6 +295,8 @@ flowchart LR
 | `web/test/view.build.test.js` | `range_lengths` | Ranges | `to` date | 91, 182, 365 days |
 | `web/test/view.build.test.js` | `week_buckets_iso` | PR bars | days across a year end | ISO weeks |
 | `web/test/api.days.test.js` | `request_omits_to` | Time zone | browser time zone `America/Los_Angeles`, server zone `Europe/Stockholm` | the request URL has `from` and no `to`; the view ends on the `to` of the response |
+| `web/test/view.build.test.js` | `velocity_counts_missing_days` | Headline | 3 records of 910 tokens in 91 days | velocity 30 |
+| `web/test/api.days.test.js` | `one_request_per_range` | Subscription cost | select `6M`, `3M`, `6M` | one extra request for `6M`, none for the second `6M` |
 | `web/test/view.build.test.js` | `lines_follow_range` | Lines card | seeded lines, `3M` then `1Y` | sums of the 91 and 365 last days |
 | `web/test/view.build.test.js` | `github_null_states` | States | all null, some null | `not_connected`, `partial` |
 | `web/test/stats.quartiles.test.js` | `five_levels` | Heatmap | known values | levels 0 to 4 at the quartiles |
@@ -300,6 +320,7 @@ Not applicable: no test covers removed behaviour.
 
 | Scenario | User Goal | User Surface | Success Condition | Criteria Proved | Scenario Record |
 |---|---|---|---|---|---|
+| Headline | Understand the activity in five seconds | browser | a first-time reader states the tokens per day figure and its unit within five seconds; the figure equals the seeded velocity | AC-13 | `.agents/scenarios/dashboard.headline.md` |
 | Sections | See the agent work for a range | browser | with seeded days, each section shows the seeded sums, and `6M` changes the totals and the URL fragment | AC-1, AC-3, AC-4, AC-5, AC-6 | `.agents/scenarios/dashboard.sections.md` |
 | Empty | Understand a new install | browser | with an empty `days` table, the page shows "No days published yet" and no chart | AC-7, AC-8 | `.agents/scenarios/dashboard.empty.md` |
 | Offline | Use the page with no internet | browser | with the network outside `127.0.0.1` blocked, every font and script loads and zero remote requests occur | AC-2, AC-9 | `.agents/scenarios/dashboard.offline.md` |
@@ -312,7 +333,8 @@ Not applicable: no test covers removed behaviour.
 Given the container runs with "docker compose up -d"
 When the reader runs "curl -si http://127.0.0.1:8787/"
 Then the status is 200 and the content type is "text/html; charset=utf-8"
-  And the body holds "Agentloupe"
+  And the title is "AI agent activity"
+  And the body does not hold "Agentloupe"
   And the headers hold the content-security-policy of requirement 6
   And the headers hold no "set-cookie"
 ```
@@ -332,7 +354,7 @@ Then no "web" directory exists in the image
 ```gherkin
 Given ".agents/scripts/days.seed.sh --days 400" wrote day records
 When the reader opens "http://127.0.0.1:8787/" in a browser
-Then the page shows the header, pull requests, lines changed in the range, tokens per day, cost, heatmap, daily log, and footer
+Then the page shows the header, the token velocity headline, pull requests, lines changed in the range, tokens per day, cost, heatmap, daily log, and footer
   And the footer names "Claude Code and Pi"
 ```
 
@@ -345,7 +367,8 @@ Then the URL fragment is "#range=6M"
   And the totals equal the sums of the last 182 days that "curl /v1/days" returns
   And the lines added, removed, and net equal the sums of the last 182 days
   And the heatmap does not change
-  And no new request to "/v1/days" occurs
+  And the subscription cost card equals "subscription_cost_usd" of "curl '/v1/days?from=<first day of 6M>'"
+  And one new request to "/v1/days" occurs, and none when the reader presses "6M" again
 ```
 
 ### AC-5: The cost card says it is a list price
@@ -357,6 +380,8 @@ Then the label is "Cost (API-equivalent)"
   And the text "List price of the tokens, not money paid." shows
   And the total equals the sum of cost_usd with two decimals
   And the card shows "2 calls not priced"
+  And next to it, the card "Subscription cost" shows the subscription_cost_usd of the range with two decimals
+  And no subscription name shows
 ```
 
 ### AC-6: The heatmap has five levels
@@ -413,6 +438,34 @@ Given a seeded record with summary "<img src=x onerror=alert(1)>"
 When the reader opens the page
 Then the daily log shows the literal text
   And no img element exists in the log
+```
+
+### AC-12a: The headline is token velocity
+
+```gherkin
+Given ".agents/scripts/days.seed.sh --days 400" wrote day records
+When the reader opens the page at 360 px and at 1440 px
+Then the first section below the header shows the average tokens per day of the range with the label "tokens per day"
+  And ".agents/scripts/web.render.sh --days 400" prints "headline_ratio" at least 2.0 and "headline_above_fold: true"
+  And the page shows no streak
+```
+
+### AC-13: A new reader reads the headline in five seconds
+
+```gherkin
+Given the scenario ".agents/scenarios/dashboard.headline.md"
+When a reader that has not seen the page looks at it for five seconds
+Then the reader states the tokens per day figure and its unit, and both equal the page values
+```
+
+### AC-14: The site title is configurable
+
+```gherkin
+Given "LOUPE_SITE_TITLE=Daniel's agents" in the environment
+When the reader runs "curl -s http://127.0.0.1:8787/"
+Then the title element and the header hold "Daniel&#39;s agents" or "Daniel&#x27;s agents"
+Given no LOUPE_SITE_TITLE
+Then the title is "AI agent activity"
 ```
 
 ### AC-12: The verdict and the targets pass
@@ -513,6 +566,10 @@ Chosen approach: "plain HTML, CSS, and ES modules with no build step, inline SVG
 ## Decided Questions
 
 1. **Lines card range.** Decided by the human on 2026-10-19: the lines card follows the selected range (`3M`, `6M`, `1Y`) and shows lines added, removed, and net for the range, like the other cards. No API change. Requirements 27 and 40 and AC-3 and AC-4 state it.
+3. **Headline.** Decided by the human on 2026-10-20 (A1): the audience is the general public, and token velocity is the headline, readable in five seconds. Requirement 24a, Non-Functional Requirement 9, AC-12a, and AC-13 state it. The formula (average over all days of the range) is a judgement call of the supervisor.
+4. **Site title.** Decided by the human on 2026-10-20 (A2): the product name does not show by default, and `LOUPE_SITE_TITLE` sets the title. The default "AI agent activity" is a judgement call of the supervisor. Requirement 1a and AC-14 state it.
+5. **Subscription cost.** Decided by the human on 2026-10-20 (A15): the dashboard shows the subscription cost next to the API-equivalent cost, pro-rated per day for the selected range. Requirements 21a and 29a and AC-4 and AC-5 state it.
+6. **Dashboard scope.** Decided by the human on 2026-10-20 (A18): dark only, no page per day, totals and no streaks, ranges 3M, 6M, and 1Y. Requirements 13, 22, and 29b and Non-Functional Requirement 5 state it.
 2. **End of the requested range.** Judgement call of the supervisor on 2026-10-19: the page omits `to`, so the server default of CR-0007 (today in `LOUPE_TZ`) applies. A browser west of `LOUPE_TZ` then does not miss the record of today. Requirement 21 states it.
 
 ## Open Questions
@@ -532,3 +589,5 @@ Chosen approach: "plain HTML, CSS, and ES modules with no build step, inline SVG
 Reviewed and approved by an independent reviewer agent on 2026-10-18. Revised on 2026-10-19 to record the decisions of the human; the revision needs a new review.
 
 Re-approved by an independent reviewer agent on 2026-10-19 after the human decisions were recorded.
+
+Revised on 2026-10-20 to record the decisions A1, A2, A15, and A18 of the human; the revision needs a new review.
