@@ -2,7 +2,7 @@
 name: "CR-0003 proxy tokens"
 description: "Adds many proxy tokens with name, tags, dates, and revocation, the loupe token commands, the bootstrap token from a secret, the token route segment, and the token ID on each exchange."
 id: "CR-0003"
-status: "approved"
+status: "implemented"
 date: 2026-10-19
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
