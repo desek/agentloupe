@@ -80,6 +80,7 @@ The subcommand also prints these lines:
 5. `summary_credential`, the active credential kind of the summarizer: `api_key`, `oauth_token`, or `none`.
 6. `LOUPE_TZ`, `LOUPE_PUBLISH_AT`, `LOUPE_PUBLISH_INTERVAL_SECS`, and `LOUPE_DAY_REVIEW`, each with its source.
 7. The next due publish time, in `LOUPE_TZ` and in UTC.
+8. `site_title: <value>`, the effective site title.
 
 ## Summary credential
 
@@ -88,6 +89,10 @@ The subcommand also prints these lines:
 ## Day variables
 
 `LOUPE_TZ` is an IANA time zone name, for example `Europe/Stockholm`. `LOUPE_PUBLISH_AT` has the format `HH:MM`, with an hour from 00 to 23 and a minute from 00 to 59. `LOUPE_PUBLISH_INTERVAL_SECS` is the interval of the publisher in seconds. `LOUPE_DAY_REVIEW` is `auto` or `manual`. A value that is not valid stops the start with an actionable error that names the variable and an example. `days.md` gives the full rules.
+
+## Site title
+
+`LOUPE_SITE_TITLE` sets the title of the dashboard page. The default is `AI agent activity`. The loader removes the white space at the start and the end of the value. A value that is empty after this, or that is longer than 80 characters, stops the start with an actionable error that names `LOUPE_SITE_TITLE`. `dashboard.md` gives the use of the title.
 
 ## Subscription variables
 

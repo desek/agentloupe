@@ -59,11 +59,12 @@ The pipeline entry points are in `.agents/scripts/`. Each entry point does one s
 | `pipeline.format.sh` | `cargo fmt --check` |
 | `pipeline.lint.sh` | `cargo clippy` with warnings as errors |
 | `pipeline.test.sh` | `cargo test` |
+| `pipeline.web.sh` | Checks that `node --version` equals the pin in `.tool-versions`, runs `node --test` on the calculation modules of the page, and checks the size of `web/` with `web.size.sh`. `--check-toolchain` does only the check of the pin. |
 | `pipeline.image.sh` | Builds the container image. `--dry-run` prints the build command and does not run it. |
 
 Each entry point has `--help`, a machine output by default, and `--human` for the friendly view. It writes actionable errors to stderr and returns documented exit codes. The entry points read the toolchain version from `rust-toolchain.toml` and state no version of their own.
 
-`pipeline.verdict.sh` runs the stages in the order format, lint, test, image. It only calls the stage entry points. It prints one line for each stage with `status: passed` or `status: failed`, and the time of the stage. It also prints the total time. It returns a non-zero exit code if a stage fails. The stages format, lint, and test are hermetic: they use no network after the dependencies are fetched, and no assertion reads the wall clock.
+`pipeline.verdict.sh` runs the stages in the order format, lint, test, web, image. It only calls the stage entry points. It prints one line for each stage with `status: passed` or `status: failed`, and the time of the stage. It also prints the total time. It returns a non-zero exit code if a stage fails. The entry point `pipeline.web.sh` reads the Node version from `.tool-versions`. If `node` is missing or its version differs from the pin, it stops with a non-zero exit code and an actionable error. The thin caller installs Node from `.tool-versions` and states no Node version. The stages format, lint, test, and web are hermetic: they use no network after the dependencies are fetched, and no assertion reads the wall clock.
 
 ## Measurable targets
 
@@ -93,5 +94,12 @@ Each entry point has `--help`, a machine output by default, and `--human` for th
 | Privacy of the API | `cargo test --test api_allowlist` | none; passed, 2 of 2 tests, on 2026-10-20, again on 2026-10-20 | passes |
 | Proxy time to first byte with the queue writes and the publisher, 95th percentile | `.agents/scripts/proxy.latency.sh --requests 200 --with-token` | the value before the queue writes: `p95_added_ms` 0.14 on 2026-10-20; with the queue writes and the publisher, `p95_added_ms` 0.23 on 2026-10-20, a difference of 0.09; re-measured 0.21 on 2026-10-20, a difference of 0.07 | `p95_added_ms` at most 20, and at most 2 above the baseline |
 | Verdict time after the day records and the API | total time that `pipeline.verdict.sh` prints, warm cache | 42.8 seconds after the summaries; 45.3 seconds on 2026-10-20, an increase of 2.5 seconds, because the test stage compiles and runs ten more test binaries, and the integration tests of `loupe day` wait 2.5 seconds for the publisher; re-measured 45.4 seconds, exit code 0, every stage `status: passed`, on 2026-10-20 | an increase above 10 seconds has a stated reason in this table |
+| Node pin | `.agents/scripts/pipeline.web.sh --check-toolchain; echo $?` | none, a new pin | exit code 0 when `node --version` equals the entry in `.tool-versions`, non-zero otherwise |
+| Size of the page files | `.agents/scripts/web.size.sh` prints `code_kib` and `total_kib` | none, a new measurement, added before the page | `code_kib` at most 100 (without the fonts), `total_kib` at most 400 (with the fonts) |
+| First full draw, 400 days | `.agents/scripts/web.render.sh --days 400` prints `draw_ms` | none, a new measurement, added before the sections | `draw_ms` at most 500 |
+| Headline size | `.agents/scripts/web.render.sh --days 400` prints `headline_ratio`, and `headline_above_fold` at 360 px and at 1440 px | none, a new measurement | `headline_ratio` at least 2.0, `headline_above_fold: true` at both widths |
+| Remote requests of the page | `.agents/scripts/web.render.sh --days 400` prints `remote_requests` | none | `remote_requests: 0` |
+| Proxy time to first byte with the static routes, 95th percentile | `.agents/scripts/proxy.latency.sh --requests 200 --with-token` | the value after the day records and the API: `p95_added_ms` 0.21 on 2026-10-20 | `p95_added_ms` at most 20, and at most 2 above the baseline |
+| Verdict time with the web stage | total time that `pipeline.verdict.sh` prints, warm cache, second run | 45.4 seconds after the day records and the API | at most 180 seconds, every stage `status: passed`, with the stage `web` |
 
 The time to a full verdict is the time of the local loop. The first measured value at the end of the foundation change is the baseline. A later change that makes it longer must state the reason.

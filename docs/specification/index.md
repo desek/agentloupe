@@ -13,7 +13,7 @@ This directory describes how the `loupe` binary behaves. Each file covers one pr
 | `summaries.md` | The one-line session summaries, the day paragraph, and the retention of raw bodies. |
 | `days.md` | The day records, the aggregation queue, the publisher, `loupe aggregate`, and `loupe day`. |
 | `api.md` | The public API routes under `/v1/days`, the errors, the headers, and the version policy. |
-| `dashboard.md` | The dashboard page at `GET /`. |
+| `dashboard.md` | The dashboard page at `GET /`, the static routes and their headers, the data request, the ranges, the sections and their formulas, the states, the fonts, and the design tokens. |
 | `github.md` | The GitHub worker and the GitHub token labels. |
 | `configuration.md` | The configuration loader, the variables, and `loupe config show`. |
 | `operations.md` | The subcommands, logging, storage, health, shutdown, the container, and the pipeline. |
