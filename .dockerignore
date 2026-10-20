@@ -7,3 +7,5 @@
 !migrations/
 !tests/
 !config/
+!upstreams.toml
+!examples/

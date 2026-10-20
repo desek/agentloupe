@@ -35,24 +35,33 @@ fn check(e: &Entry) -> Result<(), ConfigError> {
             "is not a host:port address",
             "an address such as 127.0.0.1:8787",
         )),
-        ("LOUPE_IDLE_SECS" | "LOUPE_RAW_RETENTION_HOURS", Some(v))
-            if v.parse::<u64>().map_or(true, |x| x == 0) =>
-        {
-            Err(bad(
-                n,
-                "is not a positive whole number",
-                "a positive whole number",
-            ))
-        }
+        (
+            "LOUPE_IDLE_SECS"
+            | "LOUPE_RAW_RETENTION_HOURS"
+            | "LOUPE_CAPTURE_MAX_BYTES"
+            | "LOUPE_CAPTURE_QUEUE"
+            | "LOUPE_UPSTREAM_CONNECT_TIMEOUT_SECS"
+            | "LOUPE_UPSTREAM_HEADERS_TIMEOUT_SECS",
+            Some(v),
+        ) if v.parse::<u64>().map_or(true, |x| x == 0) => Err(bad(
+            n,
+            "is not a positive whole number",
+            "a positive whole number",
+        )),
         ("LOUPE_PUBLISH_AT", Some(v)) if chrono::NaiveTime::parse_from_str(v, "%H:%M").is_err() => {
             Err(bad(n, "is not a time in HH:MM", "a time such as 01:00"))
         }
         ("LOUPE_DAY_REVIEW", Some(v)) if v != "auto" && v != "manual" => {
             Err(bad(n, "is not auto or manual", "auto or manual"))
         }
-        ("LOUPE_TZ" | "LOUPE_SUMMARY_MODEL" | "LOUPE_DATA_DIR" | "LOUPE_ENV", Some("")) => {
-            Err(bad(n, "is empty", "a value that is not empty"))
-        }
+        (
+            "LOUPE_TZ"
+            | "LOUPE_SUMMARY_MODEL"
+            | "LOUPE_DATA_DIR"
+            | "LOUPE_ENV"
+            | "LOUPE_UPSTREAMS_FILE",
+            Some(""),
+        ) => Err(bad(n, "is empty", "a value that is not empty")),
         _ if n.starts_with(SUBSCRIPTION_PREFIX)
             && v.and_then(|v| v.parse::<f64>().ok())
                 .is_none_or(|x| x < 0.0) =>
@@ -83,9 +92,22 @@ impl Loaded {
             check(e)?;
         }
         let get = |n: &str| self.get(n).and_then(text).unwrap_or_default().to_string();
+        let num = |n: &str| get(n).parse::<u64>().expect("checked above");
+        let key = |n: &str| parse_key(&get(n)).expect("checked above");
         Ok(Config {
             listen: get("LOUPE_LISTEN").parse().expect("checked above"),
             data_dir: get("LOUPE_DATA_DIR").into(),
+            data_key: key("LOUPE_DATA_KEY"),
+            account_key: key("LOUPE_ACCOUNT_KEY"),
+            upstreams_file: get("LOUPE_UPSTREAMS_FILE").into(),
+            capture_max_bytes: num("LOUPE_CAPTURE_MAX_BYTES") as usize,
+            capture_queue: num("LOUPE_CAPTURE_QUEUE") as usize,
+            connect_timeout: std::time::Duration::from_secs(num(
+                "LOUPE_UPSTREAM_CONNECT_TIMEOUT_SECS",
+            )),
+            headers_timeout: std::time::Duration::from_secs(num(
+                "LOUPE_UPSTREAM_HEADERS_TIMEOUT_SECS",
+            )),
         })
     }
 }

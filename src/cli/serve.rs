@@ -17,6 +17,14 @@ pub fn run(args: &ConfigArgs) -> ExitCode {
             return ExitCode::from(EXIT_CONFIG);
         }
     };
+    // The allowlist is checked before the log starts and before the port opens.
+    let upstreams = match crate::proxy::upstreams::load(&cfg.upstreams_file) {
+        Ok(u) => u,
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::from(EXIT_CONFIG);
+        }
+    };
     if let Err(e) = crate::log::init(&cfg.data_dir) {
         eprintln!(
             "error: cannot write the log file under {}: {e}. Fix: make LOUPE_DATA_DIR writable for this user, or point LOUPE_DATA_DIR at a writable directory. See docs/specification/operations.md for an old container volume. Verify: loupe serve starts and GET /healthz returns 200.",
@@ -24,7 +32,7 @@ pub fn run(args: &ConfigArgs) -> ExitCode {
         );
         return ExitCode::from(EXIT_RUNTIME);
     }
-    match crate::serve::run(&cfg) {
+    match crate::serve::run(&cfg, upstreams) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             tracing::error!(error = %e, "serve stopped with an error");

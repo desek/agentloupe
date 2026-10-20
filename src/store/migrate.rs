@@ -3,7 +3,10 @@
 use rusqlite::{Connection, params};
 
 /// Every migration, in order. The version is the number prefix of the file name.
-const MIGRATIONS: &[(i64, &str)] = &[(1, include_str!("../../migrations/0001_schema_version.sql"))];
+const MIGRATIONS: &[(i64, &str)] = &[
+    (1, include_str!("../../migrations/0001_schema_version.sql")),
+    (2, include_str!("../../migrations/0002_exchanges.sql")),
+];
 
 /// Applies each migration not yet recorded; returns how many it applied.
 pub fn migrate(conn: &mut Connection) -> rusqlite::Result<usize> {
@@ -50,5 +53,10 @@ mod tests {
             .query_row("SELECT count(*) FROM schema_version", [], |r| r.get(0))
             .unwrap();
         assert_eq!(rows as usize, super::MIGRATIONS.len());
+        assert_eq!(rows, 2);
+        let exchanges: i64 = conn
+            .query_row("SELECT count(*) FROM exchanges", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(exchanges, 0);
     }
 }

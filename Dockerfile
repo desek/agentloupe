@@ -10,6 +10,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 COPY migrations ./migrations
 COPY tests ./tests
+COPY examples ./examples
 RUN cargo build --release --locked --bin loupe
 
 # debian slim has bash, so the HEALTHCHECK can use /dev/tcp and the image needs no curl.
@@ -22,6 +23,7 @@ RUN groupadd --gid "$GID" loupe \
 WORKDIR /app
 COPY --from=build /src/target/release/loupe /usr/local/bin/loupe
 COPY config ./config
+COPY upstreams.toml ./
 ENV LOUPE_ENV=container
 USER loupe
 EXPOSE 8787

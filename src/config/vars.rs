@@ -34,6 +34,11 @@ pub const VARS: &[Var] = &[
     var("LOUPE_PUBLIC_PROJECTS", Some(""), false),
     var("LOUPE_DAY_REVIEW", Some("auto"), false),
     var("LOUPE_ADMIN_TOKEN", None, true),
+    var("LOUPE_UPSTREAMS_FILE", Some("upstreams.toml"), false),
+    var("LOUPE_CAPTURE_MAX_BYTES", Some("33554432"), false),
+    var("LOUPE_CAPTURE_QUEUE", Some("256"), false),
+    var("LOUPE_UPSTREAM_CONNECT_TIMEOUT_SECS", Some("10"), false),
+    var("LOUPE_UPSTREAM_HEADERS_TIMEOUT_SECS", Some("120"), false),
 ];
 
 /// Prefix of the GitHub token variables; the rest of the name is the label. Secret, env only.
