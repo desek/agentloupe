@@ -3,7 +3,7 @@ date: 2026-10-20
 source: cr (CR-0007)
 surface: cli and http, with a real agent
 outcome: reproduced
-runs: "1 of 1 passed, last run 2026-10-20"
+runs: "2 of 2 passed, last run 2026-10-20"
 ---
 
 ## Scenario: a session of today is visible in the public API after loupe aggregate
@@ -37,3 +37,5 @@ The operator sees the record of today in the public API after one real Claude Co
 ### Run log
 
 2026-10-20: step 4 returned 404. `loupe aggregate --date today` printed `calls: 1`, `sessions: 1`, `cost_usd: 0.0086`, `summary: absent`, `revision: 1`, `written: true`. Step 7 returned the record of 2026-10-20 with `calls` 1 and `by_agent` keys `["claude-code"]`.
+
+2026-10-20, in the container (`docker compose up` with a separate project name and a new volume): step 4 returned 404. After one `claude -p` through the proxy, `loupe parse --once`, and `loupe aggregate --date today`, stdout had `calls: 1` and `written: true`. `curl -s http://127.0.0.1:8787/v1/days/2026-10-20` returned 200 with `calls` 1 and `detail.by_agent` keys `["claude-code"]`. The container and its volume were removed after the run.
