@@ -33,6 +33,8 @@ On SIGTERM or SIGINT, `loupe serve` stops new connections. It lets open requests
 
 The `Dockerfile` has two stages. The build stage compiles a release binary with the toolchain that `rust-toolchain.toml` pins. The runtime stage holds only the binary and its runtime files. It runs as a user that is not root. Its `HEALTHCHECK` calls `GET /healthz`.
 
+The runtime image is `debian:bookworm-slim`. It has the same C library as the build stage, and it has `bash`. The `HEALTHCHECK` uses the `/dev/tcp` feature of `bash`, so the image needs no `curl`. A smaller distroless image has no shell, so it cannot run a `HEALTHCHECK` without an extra program. The runtime user is `loupe` with UID and GID `10001`.
+
 `compose.yaml` has one service. It binds the port as `127.0.0.1:8787:8787`. It mounts a named volume at `/data`, reads the secrets from `.env`, and sets `LOUPE_ENV`. `.env.example` lists each variable name that `compose.yaml` passes, with no value.
 
 ### An old volume that the runtime user cannot write
@@ -66,7 +68,7 @@ Each entry point has `--help`, a machine output by default, and `--human` for th
 | Metric | Method | Baseline | Threshold |
 |---|---|---|---|
 | Verdict result | `.agents/scripts/pipeline.verdict.sh; echo $?` | none | exit code 0, every stage `status: passed` |
-| Time to a full verdict, warm cache | total time that `pipeline.verdict.sh` prints, second run | baseline: to be measured | at most 180 seconds |
+| Time to a full verdict, warm cache | total time that `pipeline.verdict.sh` prints, second run | 1.9 seconds, measured on 2026-10-20 on Apple silicon | at most 180 seconds |
 | Time from container start to healthy | `docker compose up -d && time sh -c 'until curl -sf http://127.0.0.1:8787/healthz; do sleep 0.2; done'` | none | at most 5 seconds |
 
 The time to a full verdict is the time of the local loop. The first measured value at the end of the foundation change is the baseline. A later change that makes it longer must state the reason.
