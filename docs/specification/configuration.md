@@ -41,6 +41,11 @@ The flag `--env` or the variable `LOUPE_ENV` gives the name of the environment. 
 | `LOUPE_DAY_REVIEW` | no | no | `auto` |
 | `LOUPE_SUBSCRIPTION_<NAME>` | no | no | none |
 | `LOUPE_ADMIN_TOKEN` | no | yes | none |
+| `LOUPE_UPSTREAMS_FILE` | no | no | `upstreams.toml` in the working directory |
+| `LOUPE_CAPTURE_MAX_BYTES` | no | no | `33554432` |
+| `LOUPE_CAPTURE_QUEUE` | no | no | `256` |
+| `LOUPE_UPSTREAM_CONNECT_TIMEOUT_SECS` | no | no | `10` |
+| `LOUPE_UPSTREAM_HEADERS_TIMEOUT_SECS` | no | no | `120` |
 
 The loader parses and validates every value. A value that only a later product area uses does not change the behaviour of the binary until that area exists.
 

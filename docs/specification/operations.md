@@ -19,6 +19,8 @@ The binary writes each log event as one line to stderr and to `<LOUPE_DATA_DIR>/
 
 The binary stores its data in the SQLite file `<LOUPE_DATA_DIR>/loupe.db`. The journal mode is WAL.
 
+If the capture queue is full, the binary writes each sealed exchange record as one file in `<LOUPE_DATA_DIR>/spill/`. See `proxy.md`.
+
 At start, the binary applies the versioned migrations from `migrations/` in order. It records each applied version in a version table in the database. A second start applies no migration again.
 
 ## Health
@@ -70,5 +72,6 @@ Each entry point has `--help`, a machine output by default, and `--human` for th
 | Verdict result | `.agents/scripts/pipeline.verdict.sh; echo $?` | exit code 0, every stage `status: passed`, measured on 2026-10-20 | exit code 0, every stage `status: passed` |
 | Time to a full verdict, warm cache | total time that `pipeline.verdict.sh` prints, second run | 1.9 seconds, measured on 2026-10-20 on Apple silicon | at most 180 seconds |
 | Time from container start to healthy | `docker compose up -d && time sh -c 'until curl -sf http://127.0.0.1:8787/healthz; do sleep 0.2; done'` | 0.02 seconds to the first 200 from `/healthz`, and 1.3 seconds to the `healthy` status of Docker, measured on 2026-10-20 on Apple silicon | at most 5 seconds |
+| Added time to the first byte through the proxy, 95th percentile | `.agents/scripts/proxy.latency.sh --requests 200`, which starts the fake upstream, sends 200 server-sent events requests direct and through the proxy, and prints `p95_added_ms` | to be measured | `p95_added_ms` at most 20 |
 
 The time to a full verdict is the time of the local loop. The first measured value at the end of the foundation change is the baseline. A later change that makes it longer must state the reason.
