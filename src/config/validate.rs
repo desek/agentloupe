@@ -48,6 +48,16 @@ fn check(e: &Entry) -> Result<(), ConfigError> {
             "is not a positive whole number",
             "a positive whole number",
         )),
+        ("LOUPE_BOOTSTRAP_TOKEN", Some(v)) => crate::token::format::parse(v).map_err(|why| {
+            ConfigError::new(
+                n,
+                format!("is not a valid proxy token: it {why}"),
+                vec![
+                    format!("run `loupe token generate` and put the value in .env as {n}=<value>"),
+                    format!("unset {n} to revoke the bootstrap token at the next start"),
+                ],
+            )
+        }),
         ("LOUPE_PUBLISH_AT", Some(v)) if chrono::NaiveTime::parse_from_str(v, "%H:%M").is_err() => {
             Err(bad(n, "is not a time in HH:MM", "a time such as 01:00"))
         }
@@ -108,6 +118,10 @@ impl Loaded {
             headers_timeout: std::time::Duration::from_secs(num(
                 "LOUPE_UPSTREAM_HEADERS_TIMEOUT_SECS",
             )),
+            bootstrap_token: self
+                .get("LOUPE_BOOTSTRAP_TOKEN")
+                .and_then(text)
+                .map(|v| super::secret::Secret::new(v.to_string())),
         })
     }
 }

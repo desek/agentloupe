@@ -26,4 +26,6 @@ pub struct Config {
     pub connect_timeout: std::time::Duration,
     /// From the end of the request send to the response headers.
     pub headers_timeout: std::time::Duration,
+    /// The raw bootstrap token, already checked against the token format.
+    pub bootstrap_token: Option<secret::Secret>,
 }

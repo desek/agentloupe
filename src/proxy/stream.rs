@@ -16,6 +16,8 @@ pub struct Pending {
     pub record: ExchangeRecord,
     pub request_tap: Arc<Mutex<Tap>>,
     pub capture: Capture,
+    /// The name of the proxy token for the log line, or `none`; never the raw token or its hash.
+    pub token_name: String,
 }
 
 impl Pending {
@@ -36,7 +38,7 @@ impl Pending {
             id = %r.id, agent = %r.agent, upstream = %r.upstream, method = %r.method, path = %r.path,
             status = r.status, request_size = r.request_size, response_size = r.response_size,
             ttfb_ms = r.ttfb_ms, duration_ms = r.ended_ms - r.started_ms, outcome = %r.outcome,
-            "exchange"
+            token = %self.token_name, "exchange"
         );
         self.capture.submit(self.record);
     }

@@ -6,6 +6,11 @@ use rusqlite::{Connection, params};
 const MIGRATIONS: &[(i64, &str)] = &[
     (1, include_str!("../../migrations/0001_schema_version.sql")),
     (2, include_str!("../../migrations/0002_exchanges.sql")),
+    (3, include_str!("../../migrations/0003_proxy_tokens.sql")),
+    (
+        4,
+        include_str!("../../migrations/0004_exchanges_proxy_token_id.sql"),
+    ),
 ];
 
 /// Applies each migration not yet recorded; returns how many it applied.
@@ -53,7 +58,19 @@ mod tests {
             .query_row("SELECT count(*) FROM schema_version", [], |r| r.get(0))
             .unwrap();
         assert_eq!(rows as usize, super::MIGRATIONS.len());
-        assert_eq!(rows, 2);
+        assert_eq!(rows, 4);
+        let tokens: i64 = conn
+            .query_row("SELECT count(*) FROM proxy_tokens", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(tokens, 0);
+        let col: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM pragma_table_info('exchanges') WHERE name = 'proxy_token_id'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(col, 1);
         let exchanges: i64 = conn
             .query_row("SELECT count(*) FROM exchanges", [], |r| r.get(0))
             .unwrap();

@@ -5,6 +5,7 @@ use super::{ProxyState, error, headers, route::Route};
 use crate::capture::record::{ExchangeRecord, new_id};
 use crate::capture::tap::Tap;
 use crate::capture::{credential, redact};
+use crate::token::gate::Accepted;
 use axum::body::Body;
 use axum::http::{HeaderValue, Request, StatusCode, header};
 use axum::response::Response;
@@ -42,6 +43,7 @@ pub async fn forward(
     state: Arc<ProxyState>,
     route: Route,
     base: String,
+    token: Option<Accepted>,
     req: Request<Body>,
 ) -> Response {
     let t0 = Instant::now();
@@ -89,7 +91,9 @@ pub async fn forward(
         account_id_source: acct.map(|c| c.1),
         outcome: String::new(),
         error: None,
+        proxy_token_id: token.as_ref().map(|t| t.id),
     };
+    let token_name = token.map_or_else(|| "none".to_string(), |t| t.name);
     let mut builder = state.client.request(parts.method, &url).headers(h);
     if with_body {
         let tap = request_tap.clone();
@@ -120,6 +124,7 @@ pub async fn forward(
                 record,
                 request_tap,
                 capture: state.capture.clone(),
+                token_name,
             };
             pending.finish(Tap::new(0), "upstream_unreachable", Some(why.clone()));
             return error::json(
@@ -148,6 +153,7 @@ pub async fn forward(
         record,
         request_tap,
         capture: state.capture.clone(),
+        token_name,
     };
     let stream = CaptureStream::new(
         Box::pin(resp.bytes_stream()),

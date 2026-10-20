@@ -5,6 +5,8 @@ use std::path::Path;
 
 pub fn open(data_dir: &Path) -> rusqlite::Result<Connection> {
     let conn = Connection::open(data_dir.join("loupe.db"))?;
+    // The token subcommands write from another process while serve runs; wait for the lock.
+    conn.busy_timeout(std::time::Duration::from_secs(5))?;
     let mode: String = conn.query_row("PRAGMA journal_mode = WAL", [], |r| r.get(0))?;
     debug_assert_eq!(mode, "wal");
     Ok(conn)

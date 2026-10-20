@@ -92,6 +92,7 @@ pub mod tests {
             account_id_source: None,
             outcome: "complete".into(),
             error: None,
+            proxy_token_id: None,
         }
     }
 

@@ -1,4 +1,4 @@
-//! @agents-index The pass-through proxy: route parse, allowlist check, then the streamed forward with capture.
+//! @agents-index The pass-through proxy: route parse, token gate, allowlist check, then the streamed forward with capture.
 
 pub mod error;
 pub mod forward;
@@ -8,6 +8,7 @@ pub mod stream;
 pub mod upstreams;
 
 use crate::capture::writer::Capture;
+use crate::token::gate::Decision;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use axum::response::Response;
@@ -24,6 +25,7 @@ pub struct ProxyState {
     pub account_key: [u8; 32],
     pub capture_max_bytes: usize,
     pub headers_timeout: Duration,
+    pub gate: crate::token::gate::Gate,
 }
 
 /// Makes the upstream client: no redirects followed, no decompression, the connect timeout covers TLS.
@@ -45,6 +47,10 @@ pub async fn handle(state: Arc<ProxyState>, req: Request<Body>) -> Response {
             );
         }
     };
+    let token = match state.gate.check(route.token.as_ref().map(|t| t.0.as_str())) {
+        Decision::Accept(t) => t,
+        Decision::Refuse(code) => return error::token(code),
+    };
     let Some(base) = state.upstreams.get(&route.upstream).cloned() else {
         let known: Vec<&String> = state.upstreams.keys().collect();
         return error::json(
@@ -58,5 +64,5 @@ pub async fn handle(state: Arc<ProxyState>, req: Request<Body>) -> Response {
             }),
         );
     };
-    forward::forward(state, route, base, req).await
+    forward::forward(state, route, base, token, req).await
 }

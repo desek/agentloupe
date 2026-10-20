@@ -3,6 +3,7 @@
 mod config_show;
 mod gen_key;
 mod serve;
+mod token;
 
 use clap::{Args, Parser, Subcommand};
 use std::process::ExitCode;
@@ -21,6 +22,13 @@ enum Command {
     Serve(ConfigArgs),
     /// Print one new random 32-byte key in standard base64 with padding. Stores nothing.
     GenKey,
+    /// Manage the proxy tokens that clients put first in the proxy base URL.
+    ///
+    /// Exit codes: 0 done, 1 the store refused (a name exists, an unknown name, a database error), 2 bad input.
+    Token {
+        #[command(subcommand)]
+        command: TokenCommand,
+    },
     /// Inspect the configuration.
     Config {
         #[command(subcommand)]
@@ -37,6 +45,50 @@ enum ConfigCommand {
         /// Print a table instead of one JSON object per line.
         #[arg(long)]
         human: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum TokenCommand {
+    /// Print one new raw token on stdout. Opens no database and stores nothing; use it for LOUPE_BOOTSTRAP_TOKEN.
+    Generate,
+    /// Make an active token, store only its SHA-256 hash, and print the raw token one time.
+    Create {
+        /// The token name; matches ^[a-z0-9][a-z0-9-]{0,31}$, never bootstrap, never a name that exists.
+        #[arg(long)]
+        name: String,
+        /// A tag KEY=VALUE; repeat for more, at most 16.
+        #[arg(long = "tag", value_name = "KEY=VALUE")]
+        tags: Vec<String>,
+        /// Validate and print what would happen; write nothing.
+        #[arg(long)]
+        dry_run: bool,
+        /// Print a sentence instead of one JSON object.
+        #[arg(long)]
+        human: bool,
+        #[command(flatten)]
+        args: ConfigArgs,
+    },
+    /// Show each token with its name, tags, dates, and status; never the raw token or the hash.
+    List {
+        /// Print a table instead of one JSON object per line.
+        #[arg(long)]
+        human: bool,
+        #[command(flatten)]
+        args: ConfigArgs,
+    },
+    /// Set revoked_at on the token NAME; a second revoke keeps the first time.
+    Revoke {
+        /// The name of the token to revoke.
+        name: String,
+        /// Validate and print what would happen; write nothing.
+        #[arg(long)]
+        dry_run: bool,
+        /// Print a sentence instead of one JSON object.
+        #[arg(long)]
+        human: bool,
+        #[command(flatten)]
+        args: ConfigArgs,
     },
 }
 
@@ -80,5 +132,22 @@ pub fn run() -> ExitCode {
         Command::Config {
             command: ConfigCommand::Show { args, human },
         } => config_show::run(&args, human),
+        Command::Token { command } => match command {
+            TokenCommand::Generate => token::generate(),
+            TokenCommand::Create {
+                name,
+                tags,
+                dry_run,
+                human,
+                args,
+            } => token::create(&args, &name, &tags, dry_run, human),
+            TokenCommand::List { human, args } => token::list(&args, human),
+            TokenCommand::Revoke {
+                name,
+                dry_run,
+                human,
+                args,
+            } => token::revoke(&args, &name, dry_run, human),
+        },
     }
 }

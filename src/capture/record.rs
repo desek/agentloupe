@@ -33,6 +33,9 @@ pub struct ExchangeRecord {
     pub account_id_source: Option<String>,
     pub outcome: String,
     pub error: Option<String>,
+    /// The ID of the proxy token that passed the gate; None in no-token mode. Default for old spill files.
+    #[serde(default)]
+    pub proxy_token_id: Option<i64>,
 }
 
 /// A new random exchange id.

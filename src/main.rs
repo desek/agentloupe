@@ -7,6 +7,7 @@ mod log;
 mod proxy;
 mod serve;
 mod store;
+mod token;
 
 fn main() -> std::process::ExitCode {
     cli::run()
