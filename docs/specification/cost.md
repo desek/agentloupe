@@ -110,7 +110,7 @@ A test fails if a price field that the function reads is not a property of the s
 
 The pinned price file must hold the model `claude-haiku-5-5` with the provider `anthropic`. The entry must hold these fields: `input_cost_per_token`, `output_cost_per_token`, `cache_read_input_token_cost`, `cache_creation_input_token_cost`, and `cache_creation_input_token_cost_above_1hr`. A tier field is required only if the upstream entry has it.
 
-A test fails with an actionable error if the embedded file does not meet this rule. The error names the model, the missing field, and the fix: `.agents/scripts/prices.vendor.sh --ref <commit>` with a commit that holds the entry. `prices.vendor.sh` does the same check after the schema validation. If the check fails, the script writes nothing, prints an actionable error on stderr, and exits with code 4.
+A test fails with an actionable error if the embedded file does not meet this rule. The error names the model, the missing field, and the fix: `.agents/scripts/prices.vendor.sh --ref <commit>` with a commit that holds the entry. `prices.vendor.sh` does the same check after the schema validation. If the check fails, the script writes nothing, prints an actionable error on stderr, and exits with code 4. For a test, the variable `PRICES_VENDOR_SOURCE_DIR` points the script at a local directory with the three files, so the test runs with no network.
 
 ## Refresh path
 

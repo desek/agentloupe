@@ -2,7 +2,7 @@
 name: "CR-0005 API-equivalent cost from the vendored LiteLLM prices"
 description: "Builds the vendored LiteLLM price file into the loupe binary, validates it against the vendored schema in a test, and prices each call with the six rules of the README section Cost, with null cost for an unpriced call and the price-file commit stored on each call, and adds the subscription cost configuration that the day records and the dashboard show next to the API-equivalent cost."
 id: "CR-0005"
-status: "approved"
+status: "implemented"
 date: 2026-10-20
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
