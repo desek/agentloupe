@@ -66,7 +66,8 @@ The change adds five parts:
 
 ```mermaid
 flowchart LR
-    C[calls] & S[sessions] & DL[day_summaries] --> B[day builder]
+    C[calls] & S[sessions] & DL[day_summaries] & OV[day_overrides] --> B[day builder]
+    DAY["loupe day commands"] --> OV & D
     P[parser and idle step] -->|day changed| Q[agg_queue]
     SW[summary worker] -->|day changed| Q
     Q --> PUB[publisher worker]
@@ -113,7 +114,7 @@ sequenceDiagram
 7. `calls` **MUST** be the number of call rows of the day. `sessions` **MUST** be the number of distinct segments that have one or more calls on the day (requirement 4).
 8. `cost_usd` **MUST** be the exact decimal sum of `cost_usd` of the priced calls of the day, rounded half to even to 4 fraction digits, and written as a JSON number. `unpriced_calls` **MUST** be the number of calls of the day with a null `cost_usd`. A day with no priced call **MUST** have `cost_usd` `0`.
 8a. `subscription_cost_usd` **MUST** be the result of `subscription_cost_for_day(day, subscriptions)` of CR-0005 requirement 27, rounded half to even to 4 fraction digits, and written as a JSON number. It **MUST** be `0` when no subscription is configured. It **MUST NOT** hold a subscription name. A subscription cost alone **MUST NOT** give a day activity (requirement 15). Decided by the human on 2026-10-20.
-8b. The builder **MUST** take the subscriptions as an input, so it stays a pure function (Non-Functional Requirement 4). A change of `LOUPE_SUBSCRIPTION_<NAME>` changes only the records that are built after the change; see Risks.
+8b. The builder **MUST** take the subscriptions as an input, so it stays a pure function (Non-Functional Requirement 4). A change of `LOUPE_SUBSCRIPTION_<NAME>` changes only the records that are built after the change. The envelope sum of requirement 38 uses the current configuration, so the stored per-day values can differ from it until `loupe aggregate --date D` builds each day again; see Risk 6.
 9. `prs_opened`, `prs_merged`, `lines_added`, and `lines_removed` **MUST** be JSON `null` in this CR. CR-0009 sets them. The record **MUST** keep the keys, so the shape does not change when CR-0009 lands.
 10. `summary` **MUST** be the `summary` of the `day_overrides` row of the day when one exists. Else it **MUST** be the `line` of the `day_summaries` row of the day when its status is `done` or `fallback`, and `null` in all other cases.
 11. Before the builder reads `day_summaries`, it **MUST** call `build_day_line(day)` of CR-0006. A result `not_ready` **MUST NOT** stop the build. The builder **MUST** write the record with the current summary state and **MUST** put the day in `agg_queue` with reason `summary_not_ready`.
@@ -166,7 +167,7 @@ sequenceDiagram
 **Day review and the commands `loupe day`**
 
 37a. `LOUPE_DAY_REVIEW` **MUST** accept `auto` (default) or `manual`. Any other value **MUST** stop start with an actionable error, as in requirement 3. In `manual`, a new day stays `pending_review` and is not public until the operator approves it. Decided by the human on 2026-10-20.
-37b. `loupe day approve --date D` **MUST** set the state of a `pending_review` day to `published` and set `published_at`. On a `published` day it **MUST** change nothing and exit 0. On a `deleted` day it **MUST** change nothing and exit with code 2 and an actionable error that names `loupe day restore --date D`.
+37b. `loupe day approve --date D` **MUST** set the state of a `pending_review` day to `published` and set `published_at`. On a `published` day it **MUST** change nothing and exit 0. On a `deleted` day it **MUST** change nothing and exit with code 2 and an actionable error that names `loupe day restore --date D`. On a day with no `days` row (a day that is not due, or a day with no build), it **MUST** change nothing and exit with code 2 and an actionable error that names `loupe aggregate --date D`.
 37c. `loupe day edit --date D --summary TEXT` **MUST** write `TEXT` to `day_overrides.summary`, build the day again, and write the record. The edit **MUST** survive each later rebuild (requirement 10). An empty `TEXT` **MUST** exit with code 2. On a day with no `days` row, the command **MUST** write the override only, and the next build of the day uses it.
 37d. `loupe day delete --date D` **MUST** set `day_overrides.deleted_at` and the `days` state `deleted`. The row of `days` stays as a tombstone, so the publisher (requirement 27) and the catch-up never create the day again. A day with no `days` row **MUST** get a tombstone row too. That row **MUST** hold `record` null, `content_hash` null, and `revision` 0.
 37e. `loupe day restore --date D` **MUST** clear `day_overrides.deleted_at` and set the state to `published`, or to `pending_review` when `LOUPE_DAY_REVIEW` is `manual` and the day was never approved. Before it sets the state, the command **MUST** build the day with `build_day(day)` and write the record with requirement 19. When the day has no activity (requirement 15), the command **MUST** exit with code 2 and an actionable error, and the tombstone stays.
@@ -624,7 +625,7 @@ cargo test --test api.allowlist
 
 **Likelihood:** medium
 **Impact:** low
-**Mitigation:** `docs/specification/days.md` states that the operator runs `loupe aggregate --date <day>` to build a day again with the new price.
+**Mitigation:** The envelope of `GET /v1/days` uses the current configuration, but each stored record keeps the value of its last build, so the two can differ after a price change. `docs/specification/days.md` states this and states that the operator runs `loupe aggregate --date <day>` to build a day again with the new price.
 
 ## Dependencies
 
