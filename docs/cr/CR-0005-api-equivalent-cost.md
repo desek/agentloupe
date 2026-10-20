@@ -1,9 +1,9 @@
 ---
 name: "CR-0005 API-equivalent cost from the vendored LiteLLM prices"
-description: "Builds the vendored LiteLLM price file into the loupe binary, validates it against the vendored schema in a test, and prices each call with the six rules of the README section Cost, with null cost for an unpriced call and the price-file commit stored on each call."
+description: "Builds the vendored LiteLLM price file into the loupe binary, validates it against the vendored schema in a test, and prices each call with the six rules of the README section Cost, with null cost for an unpriced call and the price-file commit stored on each call, and adds the subscription cost configuration that the day records and the dashboard show next to the API-equivalent cost."
 id: "CR-0005"
-status: "approved"
-date: 2026-10-18
+status: "proposed"
+date: 2026-10-20
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
@@ -16,7 +16,7 @@ source-commit: fc7439e
 
 ## Change Summary
 
-After CR-0004, the parser writes one row in `calls` for each model call, with the model, the service tier, and five token columns, but no call has a cost. This CR builds the vendored LiteLLM price file into the binary at compile time, adds a test that validates the file against the vendored schema, and prices each call with the six rules of the README section "Cost". Each call then stores its API-equivalent cost in US dollars, or `null` as an unpriced call, together with the commit of the price file.
+After CR-0004, the parser writes one row in `calls` for each model call, with the model, the service tier, and five token columns, but no call has a cost. This CR builds the vendored LiteLLM price file into the binary at compile time, adds a test that validates the file against the vendored schema, and prices each call with the six rules of the README section "Cost". Each call then stores its API-equivalent cost in US dollars, or `null` as an unpriced call, together with the commit of the price file. The CR also adds the subscription cost: the configuration `LOUPE_SUBSCRIPTION_<NAME>` gives the real monthly price of each subscription, and one pure function pro-rates it to one calendar day. CR-0007 and CR-0008 consume that function.
 
 ## Motivation and Background
 
@@ -26,6 +26,7 @@ The README section "Cost" states that Agentloupe shows what each call costs at t
 
 * The README section "Cost" defines six pricing rules and a refresh path that no code implements yet.
 * CR-0007 needs a stored cost per call and a count of unpriced calls to build `cost` and `unpriced_calls` for a day.
+* The human decided on 2026-10-20 (A15) that the dashboard also shows the real subscription cost next to the API-equivalent cost. CR-0007 and CR-0008 need one definition of that figure.
 * The schema uses Python regex syntax such as `(?i)`, which the default ECMA-262 dialect of JSON Schema rejects. The test must use a dialect that accepts it.
 
 ## Current State
@@ -54,6 +55,7 @@ flowchart LR
 6. Add the columns `cost_usd`, `price_commit`, and `unpriced_reason` to `calls`.
 7. Add a command `loupe price backfill` that prices the calls that CR-0004 wrote before this CR.
 8. Add a test that validates the embedded file against the embedded schema with a regex dialect that accepts `(?i)`.
+9. Add the subscription cost configuration `LOUPE_SUBSCRIPTION_<NAME>` and a pure function that pro-rates it to one day.
 
 ### Proposed State Diagram
 
@@ -108,6 +110,11 @@ flowchart TD
 20. A test **MUST** validate the embedded price file against the embedded schema. The test **MUST** use a JSON Schema validator whose regex dialect accepts the Python inline flag `(?i)`. The chosen approach is the `jsonschema` crate as a dev-dependency with its Rust regex engine, because the Rust `regex` syntax accepts inline flags such as `(?i)`. The implementer **MUST** confirm at tier 1 (the installed crate source) that the pinned version compiles every `pattern` of the schema. If one pattern does not compile, the test **MUST** fail with an actionable error that names the pattern; the test **MUST NOT** skip or rewrite it.
 21. The refresh path **MUST** stay: run `.agents/scripts/prices.vendor.sh`, rebuild, run the verdict. This CR **MUST NOT** change the files in `vendor/litellm/` by hand. The only change to `prices.vendor.sh` is the check of requirement 23.
 23. **The required model.** The pinned LiteLLM commit **MUST** hold an entry `claude-haiku-5-5` with `litellm_provider` `anthropic` and with each price field of rules 2 to 4 that a Haiku call reads: `input_cost_per_token`, `output_cost_per_token`, `cache_read_input_token_cost`, `cache_creation_input_token_cost`, and `cache_creation_input_token_cost_above_1hr`. The tier fields of rules 3 and 4 are required only if the upstream entry of that commit has them. A build test **MUST** fail with an actionable error if the embedded file does not meet this rule; the error **MUST** name the model, the missing field, and the fix (`.agents/scripts/prices.vendor.sh --ref <commit>` with a commit that holds the entry). `prices.vendor.sh` **MUST** check the same rule after the schema validation and before it writes. If the rule fails, it **MUST** write nothing, print an actionable error on stderr, and exit with the code for a failed validation (4). The default commit selection **MUST** stay; a commit that fails the rule is rejected, not replaced by a guess. The vendored file at the date of this CR holds the entry, so no refresh is necessary now. The list of required models **MUST** be one constant in each of the two places (the test and the script), so the definition of done of CR-0010 (`cost_usd` above 0 and `unpriced_calls` 0 for `claude-haiku-5-5`) cannot fail because of the pin.
+24. **The chatgpt upstream uses OpenAI prices.** The human decided on 2026-10-20 (A15) that calls through `chatgpt` get the API-equivalent cost of the OpenAI API, as requirement 5 sets with `litellm_provider = "openai"`. A test **MUST** check that the shipped `upstreams.toml` maps `chatgpt` to `openai`.
+25. **Old calls keep their price.** The human decided on 2026-10-20 (A15) that a refresh of the price file does not reprice old calls. Requirements 14 and 15 implement this. No command **MUST** reprice a call that has a `price_commit`.
+26. **Subscription cost configuration.** The human decided on 2026-10-20 (A15) that the dashboard also shows the real subscription cost. Each environment variable `LOUPE_SUBSCRIPTION_<NAME>=<USD per month>` **MUST** declare one subscription. `<NAME>` **MUST** match `[A-Z0-9_]+` and is the subscription name in lowercase (for example `LOUPE_SUBSCRIPTION_CLAUDE_MAX=200` declares `claude_max` at 200 USD per month). The value **MUST** be a non-negative decimal with at most 2 fraction digits. The configuration loader **MUST** reject an invalid name or value before the port opens, with an actionable error that names the variable, the expected shape, and the check (`loupe config show`). No variable means no subscription and a subscription cost of 0. The configuration **MUST** follow the order of precedence of CR-0001 (flag, environment variable, file, default), with no default subscription.
+27. **Pro-rating rule.** A pure function `subscription_cost_for_day(date, subscriptions)` **MUST** return, in exact decimal arithmetic, the sum over all subscriptions of the monthly price divided by the number of days of the calendar month of that date, as decimal text with at most 12 fraction digits. The date is a calendar day in `LOUPE_TZ`. The subscription cost of a range **MUST** be the sum of this function over each day of the range. The function **MUST** use the current configuration for every day, past or future, because the configuration holds no history of prices. It **MUST** return the cost for a day with no calls too. CR-0007 **MUST** use this function for the subscription cost of a day record, and CR-0008 **MUST** show its sum for the selected range next to the API-equivalent cost. This CR **MUST NOT** add the figure to a day record or to the dashboard.
+28. `loupe config show` **MUST** print each subscription as `subscription.<name>: <USD per month>` and the line `subscription_total_per_month: <sum>`.
 22. The Layer 2 document `docs/specification/cost.md` **MUST** describe the embedding, the provider match, the six rules, the order of tiers, the unpriced reasons, and the refresh path before the code lands. `docs/specification/parser.md` **MUST** link to it.
 
 ### Non-Functional Requirements
@@ -117,7 +124,8 @@ flowchart TD
 3. Source files **MUST** follow the small-file rule with hierarchical names, for example `build.rs`, `src/price/embed.rs`, `src/price/index.rs`, `src/price/lookup.rs`, `src/price/tier.rs`, `src/price/compute.rs`, `src/price/unpriced.rs`, `src/cli/price.rs`. Each file **MUST** carry one `@agents-index` line.
 4. Governance identifiers **MUST NOT** appear in source code, comments, test names, or user-facing docs.
 5. Logs **MUST** follow the `logging_standard` (one JSON line with `file:line`). Errors **MUST** follow `actionable_errors`.
-6. The `.taxonomy` rows for API-equivalent cost and unpriced call **MUST** name `src/price/` and `docs/specification/cost.md` in `Lives in`. A new row **MUST** be added for price commit.
+6. The `.taxonomy` rows for API-equivalent cost and unpriced call **MUST** name `src/price/` and `docs/specification/cost.md` in `Lives in`. New rows **MUST** be added for price commit and for subscription cost.
+7. The subscription cost code **MUST** live in small files, for example `src/subscription/config.rs` and `src/subscription/prorate.rs`, and `docs/specification/cost.md` **MUST** describe the configuration and the pro-rating rule before the code lands.
 
 ## Measurable Targets
 
@@ -133,6 +141,7 @@ flowchart TD
 
 * New: `build.rs`, `src/price/`, `src/cli/price.rs`, a migration for the three `calls` columns, `docs/specification/cost.md`, `tests/price.*.rs`, fixtures under `tests/fixtures/price/`, `.agents/scripts/cost.bench.sh`, `.agents/scenarios/cost.call.md`.
 * Changed: the parser worker (one call to the pricing function), `upstreams.toml` and its loader (entry shape changes from a string to a table with `base_url` and `litellm_provider`), `docs/specification/proxy.md` (the entry shape), the test fixtures that write `upstreams.toml`, `loupe config show`, `Cargo.toml` (`rust_decimal`, `serde_json`, dev-dependency `jsonschema`), `.taxonomy`, `docs/specification/parser.md`, `docs/specification/operations.md`.
+* New: `src/subscription/`, `tests/subscription.*.rs`.
 * Changed: `.agents/scripts/prices.vendor.sh` (the required-model check of requirement 23 only).
 * Not changed: `vendor/litellm/`, `README.md`.
 
@@ -147,10 +156,13 @@ flowchart TD
 * Null cost and `unpriced_reason` for an unpriced call.
 * The three new `calls` columns, `loupe price backfill`, and `loupe price show`.
 * The refresh path through `.agents/scripts/prices.vendor.sh`, documented in `docs/specification/cost.md`.
+* The subscription cost configuration `LOUPE_SUBSCRIPTION_<NAME>` and the pure pro-rating function per day.
 
 ### Out of Scope ("Here, But Not Further")
 
-* Day totals, `cost`, and `unpriced_calls` of a day record: CR-0007.
+* Day totals, `cost`, `unpriced_calls`, and the subscription cost of a day record: CR-0007.
+* The subscription cost on the dashboard: CR-0008.
+* A history of subscription prices.
 * The cost on the dashboard and the label "API-equivalent": CR-0008.
 * Session summaries: CR-0006.
 * A change to the token columns or the session rules: CR-0004 owns them.
@@ -235,6 +247,12 @@ flowchart LR
 | `tests/upstreams.rs` | `string_entry_is_actionable` | Config error | entry in the old string shape | error names upstream and the table shape |
 | `tests/upstreams.rs` | `inline_table_entry_loads` | Format | inline table entry | loads with both keys |
 | `tests/upstreams.rs` | `unknown_key_is_actionable` | Config error | entry with an extra key | error names upstream and key |
+| `tests/upstreams.rs` | `chatgpt_uses_openai_prices` | Requirement 24 | shipped `upstreams.toml` | `chatgpt` has `litellm_provider = "openai"` |
+| `src/subscription/config.rs` (unit) | `subscription_vars_parse` | Requirement 26 | `LOUPE_SUBSCRIPTION_CLAUDE_MAX=200`, `LOUPE_SUBSCRIPTION_CHATGPT_PRO=20` | two subscriptions, names `claude_max` and `chatgpt_pro` |
+| `src/subscription/config.rs` (unit) | `invalid_subscription_is_actionable` | Requirement 26 | value `-1`, value `abc`, value `1.234` | an actionable error that names the variable |
+| `src/subscription/prorate.rs` (unit) | `prorate_by_days_in_month` | Requirement 27 | 200 USD per month, dates 2026-02-10 and 2026-10-10 | `7.142857142857` and `6.451612903226` |
+| `src/subscription/prorate.rs` (unit) | `range_sum_of_full_month_is_monthly_price` | Requirement 27 | 200 USD per month, each day of 2026-10 | sum equal to 200 within 1e-9 |
+| `src/subscription/prorate.rs` (unit) | `no_subscription_is_zero` | Requirement 26 | no variables | `0` |
 
 ### Tests to Modify
 
@@ -330,6 +348,30 @@ When the operator runs ".agents/scripts/prices.vendor.sh --dry-run" against a co
 Then the exit code is 4, nothing is written, and stderr names claude-haiku-5-5 and the fix
 ```
 
+### AC-10: The chatgpt upstream uses OpenAI prices and old calls keep their price
+
+```gherkin
+Given the shipped upstreams.toml
+When the operator runs "cargo test chatgpt_uses_openai_prices"
+Then the test passes
+Given a call with price_commit C and a refreshed price file with a different commit
+When the operator rebuilds and runs "loupe price backfill"
+Then cost_usd and price_commit of the call stay unchanged
+```
+
+### AC-11: The subscription cost is configured and pro-rated per day
+
+```gherkin
+Given "LOUPE_SUBSCRIPTION_CLAUDE_MAX=200" in the environment
+When the operator runs "loupe config show"
+Then the output has the lines "subscription.claude_max: 200" and "subscription_total_per_month: 200"
+When the operator runs "cargo test subscription"
+Then prorate_by_days_in_month and range_sum_of_full_month_is_monthly_price pass
+Given "LOUPE_SUBSCRIPTION_CLAUDE_MAX=abc" in the environment
+When the operator runs "loupe serve"
+Then it exits before the port opens with an error that names LOUPE_SUBSCRIPTION_CLAUDE_MAX and the expected shape
+```
+
 ### AC-8: The verdict passes
 
 ```gherkin
@@ -418,12 +460,17 @@ Chosen approach: "embed the vendored file, match by model and the provider in `u
 
 ## Open Questions
 
-1. **Provider for the upstream `chatgpt` (https://chatgpt.com).** The README lists it as an OpenAI upstream that a subscription uses. Provisional default: `litellm_provider = "openai"`, so the call gets the API-equivalent cost of the OpenAI API.
-2. **Unit and precision of `cost_usd`.** Provisional default: US dollars as decimal text with at most 12 fraction digits (requirement 12).
+1. **Unit and precision of `cost_usd`.** Provisional default: US dollars as decimal text with at most 12 fraction digits (requirement 12).
+
+## Decided Questions
+
+* **Provider for the upstream `chatgpt`.** Decided by the human on 2026-10-20 (A15): OpenAI API prices (requirement 24).
+* **Price of old calls after a refresh.** Decided by the human on 2026-10-20 (A15): old calls keep their price (requirement 25).
+* **Real subscription cost.** Decided by the human on 2026-10-20 (A15): the dashboard shows it next to the API-equivalent cost, from `LOUPE_SUBSCRIPTION_<NAME>`, pro-rated per day (requirements 26 to 28).
 
 ## Related Items
 
-* CR-0004 (calls), CR-0007 (day totals), CR-0008 (dashboard).
+* CR-0004 (calls), CR-0007 (day totals and the subscription cost of a day), CR-0008 (dashboard and the subscription cost of a range).
 * README sections "Cost" and "How it works" step 4.
 * `vendor/litellm/SOURCE.md`, `.agents/scripts/prices.vendor.sh`.
 
