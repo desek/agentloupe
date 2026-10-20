@@ -1,0 +1,3 @@
+# @agents-index Values that are not secret for a run on the host; secrets come from .env or the environment.
+LOUPE_LISTEN = "127.0.0.1:8787"
+LOUPE_DATA_DIR = "./data"

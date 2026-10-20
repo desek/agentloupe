@@ -1,0 +1,38 @@
+# @agents-index Cargo manifest of the agent-loupe crate, which builds the single loupe binary.
+[package]
+name = "agent-loupe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "loupe"
+path = "src/main.rs"
+
+[[test]]
+name = "serve_health"
+path = "tests/serve.health.rs"
+
+[[test]]
+name = "serve_shutdown"
+path = "tests/serve.shutdown.rs"
+
+[[test]]
+name = "serve_config"
+path = "tests/serve.config.rs"
+
+[dependencies]
+axum = "0.8"
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+clap = { version = "4", features = ["derive"] }
+getrandom = "0.3"
+rusqlite = { version = "0.37", features = ["bundled"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time"] }
+toml = "0.9"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "registry"] }
+
+[dev-dependencies]
+tempfile = "3"

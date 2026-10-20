@@ -1,0 +1,34 @@
+//! @agents-index The serve subcommand: validates the configuration, starts logging, then runs the server until a signal.
+
+use super::ConfigArgs;
+use crate::config::loader;
+use std::process::ExitCode;
+
+/// Exit code for a configuration that is missing or not valid; the port is never opened.
+const EXIT_CONFIG: u8 = 2;
+/// Exit code for a runtime failure after the configuration passed.
+const EXIT_RUNTIME: u8 = 1;
+
+pub fn run(args: &ConfigArgs) -> ExitCode {
+    let cfg = match loader::load_from_process(&args.as_flags()).and_then(|c| c.validate()) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::from(EXIT_CONFIG);
+        }
+    };
+    if let Err(e) = crate::log::init(&cfg.data_dir) {
+        eprintln!(
+            "error: cannot write the log file under {}: {e}. Fix: make LOUPE_DATA_DIR writable for this user, or point LOUPE_DATA_DIR at a writable directory. See docs/specification/operations.md for an old container volume. Verify: loupe serve starts and GET /healthz returns 200.",
+            cfg.data_dir.display()
+        );
+        return ExitCode::from(EXIT_RUNTIME);
+    }
+    match crate::serve::run(&cfg) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            tracing::error!(error = %e, "serve stopped with an error");
+            ExitCode::from(EXIT_RUNTIME)
+        }
+    }
+}

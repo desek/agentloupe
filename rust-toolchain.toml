@@ -1,0 +1,4 @@
+# @agents-index Pins the one Rust toolchain that local builds, the pipeline entry points, and the Dockerfile use.
+[toolchain]
+channel = "1.97.1"
+components = ["rustfmt", "clippy"]
