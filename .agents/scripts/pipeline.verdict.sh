@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# @agents-index Runs the pipeline stage entry points in the order format, lint, test, image, and prints the verdict.
+# @agents-index Runs the pipeline stage entry points in the order format, lint, test, web, image, and prints the verdict.
 #
 # Usage: pipeline.verdict.sh [--human]
 #   --human    Print a friendly view for a person. Also the default when stdout is a terminal.
@@ -11,7 +11,7 @@
 set -uo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
-STAGES=(format lint test image)
+STAGES=(format lint test web image)
 human=0
 [[ -t 1 ]] && human=1
 

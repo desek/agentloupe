@@ -1,0 +1,51 @@
+/* @agents-index Design tokens of the dashboard from the mockup: colors, fonts, sizes, radii, and the font faces. */
+@font-face {
+  font-family: 'Geist';
+  src: url('/assets/fonts/Geist-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/assets/fonts/GeistMono-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+:root {
+  color-scheme: dark;
+  --color-bg: #0F1012;
+  --color-ink-inverse: #111214;
+  --color-surface: #15161A;
+  --color-border: #24262B;
+  --color-rule: #2A2C31;
+  --color-text: #ECEAE4;
+  --color-text-body: #B5B4AE;
+  --color-text-muted: #9A9AA0;
+  --color-text-faint: #85868C;
+  --color-input: #5E86E0;
+  --color-output: #BB7F35;
+  --color-positive: #3FA864;
+  --color-highlight: #D9C27A;
+  --color-link: #9DB6EE;
+  --color-link-hover: #C9D7F6;
+  --heat-0: #1D1F23;
+  --heat-1: #1B4A2F;
+  --heat-2: #21703E;
+  --heat-3: #2E9A55;
+  --heat-4: #4FCB74;
+  --font-sans: 'Geist', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --size-headline: 72px;
+  --size-figure: 34px;
+  --size-figure-small: 30px;
+  --size-title: 40px;
+  --size-body: 15px;
+  --size-text: 13px;
+  --size-label: 12px;
+  --size-axis: 11px;
+  --radius-card: 12px;
+  --radius-bar: 3px;
+  --max-width: 1200px;
+  --radius-cell: 2px;
+  --radius-pill: 999px;
+}

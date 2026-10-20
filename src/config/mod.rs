@@ -32,6 +32,8 @@ pub struct Config {
     pub idle_secs: u64,
     /// The time between two passes of the parser worker.
     pub parse_interval: std::time::Duration,
+    /// The trimmed site title of the dashboard, 1 to 80 characters.
+    pub site_title: String,
     pub summary: SummaryConfig,
     pub days: DayConfig,
 }

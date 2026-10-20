@@ -52,6 +52,14 @@ fn derived(cfg: &Loaded) -> Vec<(String, String, &'static str)> {
         ),
     };
     out.push(("publish_next_due_local".into(), local, "derived"));
+    out.push((
+        "site_title".into(),
+        get("LOUPE_SITE_TITLE")
+            .unwrap_or_default()
+            .trim()
+            .to_string(),
+        "derived",
+    ));
     out.push(("publish_next_due_utc".into(), utc, "derived"));
     out.push((
         "summary_credential".into(),
@@ -180,6 +188,7 @@ mod tests {
         assert_eq!(value("LOUPE_PUBLISH_AT"), "01:00");
         assert_eq!(value("LOUPE_PUBLISH_INTERVAL_SECS"), "60");
         assert_eq!(value("LOUPE_DAY_REVIEW"), "auto");
+        assert_eq!(value("site_title"), "AI agent activity");
         assert!(value("publish_next_due_local").contains("T01:00:00+0"));
         assert!(value("publish_next_due_utc").ends_with("+00:00"));
         assert!(

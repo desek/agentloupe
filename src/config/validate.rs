@@ -87,6 +87,13 @@ fn check(e: &Entry) -> Result<(), ConfigError> {
         ("LOUPE_PUBLISH_AT", Some(v)) if super::publish_at(v).is_none() => {
             Err(bad(n, "is not a time in HH:MM", "a time such as 01:00"))
         }
+        ("LOUPE_SITE_TITLE", Some(v)) if v.trim().is_empty() || v.trim().chars().count() > 80 => {
+            Err(bad(
+                n,
+                "is empty after trim or longer than 80 characters",
+                "a title of 1 to 80 characters such as AI agent activity",
+            ))
+        }
         ("LOUPE_DAY_REVIEW", Some(v)) if v != "auto" && v != "manual" => {
             Err(bad(n, "is not auto or manual", "auto or manual"))
         }
@@ -149,6 +156,7 @@ impl Loaded {
                 .and_then(text)
                 .map(|v| super::secret::Secret::new(v.to_string())),
             idle_secs: num("LOUPE_IDLE_SECS"),
+            site_title: get("LOUPE_SITE_TITLE").trim().to_string(),
             parse_interval: std::time::Duration::from_secs(num("LOUPE_PARSE_INTERVAL_SECS")),
             days: super::DayConfig {
                 publish_at: super::publish_at(&get("LOUPE_PUBLISH_AT")).expect("checked above"),

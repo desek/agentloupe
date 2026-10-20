@@ -18,3 +18,4 @@ pub mod store;
 pub mod subscription;
 pub mod summary;
 pub mod token;
+pub mod web;

@@ -93,11 +93,13 @@ pub fn run(cfg: &Config, upstreams: Upstreams) -> Result<(), Box<dyn Error>> {
         tz: cfg.summary.tz,
         subscriptions: cfg.days.subscriptions.clone(),
     });
+    // The title goes into index.html once here, so each request serves the same bytes and ETag.
+    let site = Arc::new(crate::web::Site::new(&cfg.site_title));
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(async {
         let listener = tokio::net::TcpListener::bind(cfg.listen).await?;
         tracing::info!(listen = %cfg.listen, "listening");
-        shutdown::serve_until_signal(listener, router::router(state, api)).await
+        shutdown::serve_until_signal(listener, router::router(state, api, site)).await
     })?;
     // The runtime drop ends every open stream, which drops the last capture handle; the writer
     // then drains the queue and stops.

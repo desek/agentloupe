@@ -1,4 +1,4 @@
-//! @agents-index The HTTP router: health and the public API first, reserved paths 404, the rest falls back to the proxy; CORS on public paths.
+//! @agents-index The HTTP router: health, the public API, and the dashboard files first; other reserved paths 404; the rest goes to the proxy.
 
 use crate::proxy::ProxyState;
 use axum::Router;
@@ -7,23 +7,36 @@ use axum::http::{Request, StatusCode};
 use axum::response::Response;
 use std::sync::Arc;
 
-/// The reserved first path segments; the only list, so the route parser rejects these names too.
+/// The reserved first path segments: the names that the public API and the static handler serve.
+/// The only list, so the route parser rejects these names too.
 pub const RESERVED: &[&str] = &["healthz", "v1", "assets", "favicon.ico"];
 
-/// Builds the app: `/healthz` and the public API, then a fallback that answers reserved paths with
-/// 404 and proxies the rest. The CORS layer covers every route, and adds its header only to
+/// Builds the app: `/healthz` and the public API, then a fallback that serves the dashboard files,
+/// answers other reserved paths with 404, and proxies the rest. The CORS layer covers every route, and adds its header only to
 /// `/healthz` and the paths under `/v1/`.
-pub fn router(state: Arc<ProxyState>, api: Arc<crate::api::ApiState>) -> Router {
+pub fn router(
+    state: Arc<ProxyState>,
+    api: Arc<crate::api::ApiState>,
+    site: Arc<crate::web::Site>,
+) -> Router {
     super::health::router()
         .merge(crate::api::router(api))
         .fallback(move |req: Request<Body>| {
             let state = state.clone();
-            async move { dispatch(state, req).await }
+            let site = site.clone();
+            async move { dispatch(state, site, req).await }
         })
         .layer(axum::middleware::from_fn(crate::api::cors::layer))
 }
 
-async fn dispatch(state: Arc<ProxyState>, req: Request<Body>) -> Response {
+async fn dispatch(
+    state: Arc<ProxyState>,
+    site: Arc<crate::web::Site>,
+    req: Request<Body>,
+) -> Response {
+    if crate::web::path::is_static(req.uri().path()) {
+        return crate::web::serve::handle(&site, &req);
+    }
     let first = req
         .uri()
         .path()
@@ -32,7 +45,7 @@ async fn dispatch(state: Arc<ProxyState>, req: Request<Body>) -> Response {
         .next()
         .unwrap_or("");
     if first.is_empty() || RESERVED.contains(&first) {
-        // The dashboard and the API own these paths; until they exist, they are not found.
+        // A reserved name that no route serves, for example /v1/other, is not found.
         return crate::proxy::error::json(
             StatusCode::NOT_FOUND,
             serde_json::json!({"error": "not_found", "path": req.uri().path()}),

@@ -1,4 +1,4 @@
-//! @agents-index Integration test: reserved routes take precedence over the proxy and never reach an upstream.
+//! @agents-index Integration test: reserved routes, the dashboard files included, take precedence over the proxy and never reach an upstream.
 
 #[path = "common/fake_upstream.rs"]
 mod fake;
@@ -22,7 +22,15 @@ async fn reserved_routes_take_precedence() {
 async fn check_reserved(l: &Loupe) {
     assert_eq!(reqwest::get(l.url("/healthz")).await.unwrap().status(), 200);
     assert_eq!(reqwest::get(l.url("/v1/days")).await.unwrap().status(), 200);
-    for path in ["/v1/other", "/", "/assets/app.js", "/favicon.ico"] {
+    // The static handler serves the page and its files without a token.
+    for path in ["/", "/favicon.ico", "/assets/js/app.js"] {
+        assert_eq!(
+            reqwest::get(l.url(path)).await.unwrap().status(),
+            200,
+            "{path}"
+        );
+    }
+    for path in ["/v1/other", "/assets/app.js"] {
         assert_eq!(
             reqwest::get(l.url(path)).await.unwrap().status(),
             404,

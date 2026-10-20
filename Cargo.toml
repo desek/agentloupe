@@ -194,3 +194,11 @@ tracing-subscriber = { version = "0.3", features = ["fmt", "registry"] }
 [dev-dependencies]
 jsonschema = { version = "0.59.0", default-features = false }
 tempfile = "3"
+
+[[test]]
+name = "web_serve"
+path = "tests/web.serve.rs"
+
+[[test]]
+name = "web_embed"
+path = "tests/web.embed.rs"
