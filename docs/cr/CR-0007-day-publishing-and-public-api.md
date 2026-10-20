@@ -54,7 +54,7 @@ flowchart LR
 
 ## Proposed Change
 
-The change adds four parts:
+The change adds five parts:
 
 1. A day builder. It is a function that reads `calls`, `sessions`, and `day_summaries` for one day in `LOUPE_TZ` and returns one day record.
 2. The queue `agg_queue`. The parser, the idle step, and the summary worker put a day into the queue when a change affects that day.
@@ -127,7 +127,7 @@ sequenceDiagram
 **Privacy of the record**
 
 16. Model names, agent labels, and exact token counts per day are public. Decided by the human on 2026-10-20. The record **MUST NOT** hold a count of provider accounts, a proxy token ID, a proxy token name or tag, an account ID or hash, a session ID, a session key hash, an upstream base URL, a credential, a price commit, an unpriced reason, or a body.
-17. One source file **MUST** hold the allowlist of the field names of the record, at every level except the keys of `by_agent` and `by_model`. A test **MUST** fail if a built record holds a field name outside the allowlist.
+17. One source file **MUST** hold the allowlist of the field names of the record, at every level except the keys of `by_agent` and `by_model`. The allowlist **MUST** also name the fields of the envelope of requirement 38, `subscription_cost_usd` included. A test **MUST** fail if a built record holds a field name outside the allowlist.
 
 **Storage**
 
@@ -166,15 +166,15 @@ sequenceDiagram
 **Day review and the commands `loupe day`**
 
 37a. `LOUPE_DAY_REVIEW` **MUST** accept `auto` (default) or `manual`. Any other value **MUST** stop start with an actionable error, as in requirement 3. In `manual`, a new day stays `pending_review` and is not public until the operator approves it. Decided by the human on 2026-10-20.
-37b. `loupe day approve --date D` **MUST** set the state of a `pending_review` day to `published` and set `published_at`. On a `published` day it **MUST** change nothing and exit 0.
-37c. `loupe day edit --date D --summary TEXT` **MUST** write `TEXT` to `day_overrides.summary`, build the day again, and write the record. The edit **MUST** survive each later rebuild (requirement 10). An empty `TEXT` **MUST** exit with code 2.
-37d. `loupe day delete --date D` **MUST** set `day_overrides.deleted_at` and the `days` state `deleted`. The row of `days` stays as a tombstone, so the publisher (requirement 27) and the catch-up never create the day again. A day with no `days` row **MUST** get a tombstone row too.
-37e. `loupe day restore --date D` **MUST** clear `day_overrides.deleted_at` and set the state to `published`, or to `pending_review` when `LOUPE_DAY_REVIEW` is `manual` and the day was never approved.
+37b. `loupe day approve --date D` **MUST** set the state of a `pending_review` day to `published` and set `published_at`. On a `published` day it **MUST** change nothing and exit 0. On a `deleted` day it **MUST** change nothing and exit with code 2 and an actionable error that names `loupe day restore --date D`.
+37c. `loupe day edit --date D --summary TEXT` **MUST** write `TEXT` to `day_overrides.summary`, build the day again, and write the record. The edit **MUST** survive each later rebuild (requirement 10). An empty `TEXT` **MUST** exit with code 2. On a day with no `days` row, the command **MUST** write the override only, and the next build of the day uses it.
+37d. `loupe day delete --date D` **MUST** set `day_overrides.deleted_at` and the `days` state `deleted`. The row of `days` stays as a tombstone, so the publisher (requirement 27) and the catch-up never create the day again. A day with no `days` row **MUST** get a tombstone row too. That row **MUST** hold `record` null, `content_hash` null, and `revision` 0.
+37e. `loupe day restore --date D` **MUST** clear `day_overrides.deleted_at` and set the state to `published`, or to `pending_review` when `LOUPE_DAY_REVIEW` is `manual` and the day was never approved. Before it sets the state, the command **MUST** build the day with `build_day(day)` and write the record with requirement 19. When the day has no activity (requirement 15), the command **MUST** exit with code 2 and an actionable error, and the tombstone stays.
 37f. Each `loupe day` command **MUST** support `--dry-run`, print `key: value` lines (`day`, `state`, `summary` as `present` or `absent`, `written`), never print the summary text, and use the exit codes of requirement 37. A bad `--date` **MUST** exit 2 with an actionable error, as in requirement 36. A re-run of a command **MUST** give the same end state.
 
 **Public API**
 
-38. `GET /v1/days?from=YYYY-MM-DD&to=YYYY-MM-DD` **MUST** return `200` with `content-type: application/json` and the body `{"from": ..., "to": ..., "updated_at": ..., "days": [...]}`. `days` **MUST** hold the records of the `published` rows of `days` in the range, both ends included, sorted by `day` ascending. `updated_at` **MUST** be the latest `built_at` of the `published` rows of `days` as RFC 3339 in UTC, or `null` when the table is empty.
+38. `GET /v1/days?from=YYYY-MM-DD&to=YYYY-MM-DD` **MUST** return `200` with `content-type: application/json` and the body `{"from": ..., "to": ..., "updated_at": ..., "subscription_cost_usd": ..., "days": [...]}`. `subscription_cost_usd` **MUST** be the sum of `subscription_cost_for_day` of CR-0005 requirement 27 over each day from `from` to `to`, both ends included, days with no record included, rounded half to even to 4 fraction digits and written as a JSON number. Decided by the human on 2026-10-20 (A15). `days` **MUST** hold the records of the `published` rows of `days` in the range, both ends included, sorted by `day` ascending. `updated_at` **MUST** be the latest `built_at` of the `published` rows of `days` as RFC 3339 in UTC, or `null` when the table is empty.
 39. Without `to`, `to` **MUST** be the current day in `LOUPE_TZ`. Without `from`, `from` **MUST** be `to` minus 365 days.
 40. A value of `from` or `to` that is not a valid `YYYY-MM-DD` date, a `from` after `to`, a range of more than 400 days, or an unknown query parameter **MUST** return `400` with the body `{"error": {"code": ..., "message": ..., "fix": ...}}`, where `fix` names a valid example query. The codes **MUST** be `invalid_date`, `inverted_range`, `range_too_long`, and `unknown_parameter`.
 41. `GET /v1/days/{day}` **MUST** return `200` with the record alone when a `published` row exists, `404` with `{"error": {"code": "not_found", ...}}` when it does not, and `400` with `invalid_date` when `{day}` is not a valid date.
@@ -191,7 +191,7 @@ sequenceDiagram
 48. `loupe config show` **MUST** print `LOUPE_TZ`, `LOUPE_PUBLISH_AT`, `LOUPE_PUBLISH_INTERVAL_SECS`, and `LOUPE_DAY_REVIEW` with their sources, and the next due publish time in `LOUPE_TZ` and in UTC.
 49. The implementation **MUST** update README.md in the same change: the configuration table gains rows for `LOUPE_PUBLISH_INTERVAL_SECS` and `LOUPE_DAY_REVIEW`, the command list gains `loupe day approve`, `edit`, `delete`, and `restore`, the example day record shows `subscription_cost_usd` and `null` for the PR and line fields until GitHub counts land, and the public API line states the response envelope and the error codes. This CR document does not edit README.md.
 50. The Layer 2 document `docs/specification/days.md` **MUST** describe the day boundaries, the record fields and sums, the queue reasons, the due rule, the catch-up, the late update, the day review, the states, the overrides, the tombstone, `loupe aggregate`, and `loupe day` before the code lands.
-51. The Layer 2 document `docs/specification/api.md` **MUST** describe the routes, the parameters, the envelope, the error codes, the CORS and cache headers, and the field allowlist before the code lands.
+51. The Layer 2 document `docs/specification/api.md` **MUST** describe the routes, the parameters, the envelope with its `subscription_cost_usd` range field, the error codes, the CORS and cache headers, and the field allowlist before the code lands.
 52. `.taxonomy` **MUST** update the rows for day record and public API, and **MUST** add rows for aggregation queue, publisher, due day, revision, day review, day override, and tombstone.
 
 ### Non-Functional Requirements
@@ -480,6 +480,17 @@ Then the container exits non-zero
   And its log names "LOUPE_TZ", the example "Europe/Stockholm", and "loupe config show"
 ```
 
+### AC-13: Only a day with activity gets a record
+
+```gherkin
+Given day D1 has no call and no GitHub activity
+  And day D2 has no call and a test activity source reports activity for D2
+  And D1 and D2 are due
+When the publisher worker wakes
+Then "GET /v1/days/D1" returns 404
+  And "GET /v1/days/D2" returns 200 with "calls" 0
+```
+
 ### AC-14: Manual review holds a day until approval
 
 ```gherkin
@@ -526,15 +537,13 @@ When the reader runs "loupe aggregate --date 2026-10-15"
 Then "/v1/days/2026-10-15" has "subscription_cost_usd" 6.4516
 ```
 
-### AC-13: Only a day with activity gets a record
+### AC-19: The range holds the subscription cost of every day
 
 ```gherkin
-Given day D1 has no call and no GitHub activity
-  And day D2 has no call and a test activity source reports activity for D2
-  And D1 and D2 are due
-When the publisher worker wakes
-Then "GET /v1/days/D1" returns 404
-  And "GET /v1/days/D2" returns 200 with "calls" 0
+Given LOUPE_SUBSCRIPTION_CLAUDE_MAX=200 and calls on 2026-10-15 only
+When the reader requests "/v1/days?from=2026-10-01&to=2026-10-31"
+Then the body has "subscription_cost_usd" 200
+  And "days" holds one record
 ```
 
 ## Quality Standards Compliance
@@ -605,17 +614,17 @@ cargo test --test api.allowlist
 **Impact:** low
 **Mitigation:** The queue holds one row per day. A day stays only while a segment is open or a summary is pending, and CR-0006 gives each summary a final status after its retries.
 
-### Risk 6: A change of a subscription price changes later builds only
-
-**Likelihood:** medium
-**Impact:** low
-**Mitigation:** `docs/specification/days.md` states that the operator runs `loupe aggregate --date <day>` to build a day again with the new price.
-
 ### Risk 5: A today record looks final in the API
 
 **Likelihood:** medium
 **Impact:** low
 **Mitigation:** The parser queues today for each later call, and the publisher builds the day again when it is due. The dashboard of CR-0008 can mark today as partial.
+
+### Risk 6: A change of a subscription price changes later builds only
+
+**Likelihood:** medium
+**Impact:** low
+**Mitigation:** `docs/specification/days.md` states that the operator runs `loupe aggregate --date <day>` to build a day again with the new price.
 
 ## Dependencies
 
@@ -650,7 +659,7 @@ Chosen approach: "store a deterministic day record in `days`, written by a due-r
 * **Day review.** Decided by the human on 2026-10-20 (A5): `LOUPE_DAY_REVIEW=auto|manual`, default `auto`, and `loupe day approve`. Requirements 27 and 37a to 37b.
 * **Edit, delete, and restore.** Decided by the human on 2026-10-20 (A6): `loupe day edit`, `delete` with a tombstone, and `restore`. Edits survive rebuilds. Requirements 10, 20a, and 37c to 37f.
 * **Session count.** Decided by the human on 2026-10-20 (A9): a segment counts on each day that has a call. Requirements 4 and 7.
-* **Subscription cost.** Decided by the human on 2026-10-20 (A15): each record holds `subscription_cost_usd`. Requirements 5, 8a, and 8b.
+* **Subscription cost.** Decided by the human on 2026-10-20 (A15): each record holds `subscription_cost_usd`, and the envelope of `GET /v1/days` holds the sum over each day of the range, days with no record included, so it agrees with CR-0005 requirement 27. Requirements 5, 8a, 8b, 17, 38, and 51.
 * **Time.** Decided by the human on 2026-10-20 (A17): the defaults of `LOUPE_TZ` and `LOUPE_PUBLISH_AT` stay, and a late update is silent. Requirement 30a.
 * **API version.** Decided by the human on 2026-10-20 (A19): the `/v1/` prefix policy, and no schema file. Requirement 47a.
 * **Public detail.** Decided by the human on 2026-10-20 (A3): model names, agent labels, and exact token counts are public; the count of provider accounts is private. Requirement 16.
