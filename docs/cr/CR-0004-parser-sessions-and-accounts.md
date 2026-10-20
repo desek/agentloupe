@@ -138,7 +138,8 @@ stateDiagram-v2
 20. The close of a segment **MUST** be the only event that a later CR (CR-0006 summaries) reads to start its work. This CR **MUST** add a column `sessions.closed_at` and an index on (state, closed_at), and **MUST NOT** add the summary step.
 
 35. A subagent is a session. The calls of a subagent inside one agent run **MUST** form their own session, separate from the session of the main agent. The session key rule **MUST** give a subagent a key that differs from the key of its parent. The verification of requirement 30 **MUST** find and record in `docs/specification/parser.md` which request field or header separates subagent calls from main calls (for example the session hint, `metadata.user_id`, or the opening hash), and **MUST** correct requirement 13 if the listed sources join them.
-36. The default of `LOUPE_IDLE_SECS` **MUST** be `3600` (60 minutes).
+36. The default of `LOUPE_IDLE_SECS` **MUST** be `3600` (60 minutes). This change **MUST** update the row for `LOUPE_IDLE_SECS` in the configuration table of the README to `3600`, and **MUST** change the CR-0001 unit test `default_when_unset` to expect `3600`.
+38. The day count rule for a session that spans midnight is in CR-0007: the session counts on each day that has a call. Each call row keeps its own `started_at`, so CR-0007 can read the days of the calls of a session.
 
 **Provider accounts**
 
@@ -165,7 +166,7 @@ stateDiagram-v2
 31. The verification **MUST** read the header names (never the values) and the field paths of the request body, and **MUST** record in `docs/specification/parser.md`, per agent and version: which session header is present, the shape of `metadata.user_id`, whether `prompt_cache_key` is present, and which account source applies.
 32. If a listed source does not exist in the capture, or a new stable source exists, the implementer **MUST** correct the lists of requirements 1, 13, and 21 in code and in the Layer 2 document. The credential hash **MUST** stay the last fallback.
 33. The verification **MUST NOT** write a header value, a body, or a credential to the repository, a log file, or the report. It **MUST** write only names, paths, and booleans.
-34. After the verification of requirement 31, the implementer **MUST** update the README section "Accounts" to state the verified account and session sources per agent version. This CR **MUST NOT** edit other README sections.
+34. After the verification of requirement 31, the implementer **MUST** update the README section "Accounts" to state the verified account and session sources per agent version. This CR **MUST NOT** edit other README sections, except the row for `LOUPE_IDLE_SECS` in the configuration table (requirement 36).
 
 ### Non-Functional Requirements
 
@@ -189,7 +190,8 @@ stateDiagram-v2
 
 * New: migrations for `calls`, `sessions`, `accounts`, `worker_cursors`, and the new `exchanges` columns; `src/parse/`, `src/session/`, `src/account/`, `src/capture/session_hint.rs`, `src/cli/parse.rs`; `docs/specification/parser.md`; `tests/parse.*.rs`; `.agents/scripts/parser.bench.sh`; `.agents/scenarios/parser.*.md`; fixtures under `tests/fixtures/parse/`.
 * Changed: the capture writer (session hint), `loupe serve` (start the worker), the configuration loader (two variables), `.env.example` (comments only), `.taxonomy`, `docs/specification/proxy.md` (link to the session hint).
-* Changed after the verification: README.md, section "Accounts" only (requirement 34).
+* Changed after the verification: README.md, section "Accounts" (requirement 34).
+* Changed: README.md, the row for `LOUPE_IDLE_SECS` in the configuration table, and the CR-0001 unit test `default_when_unset` (requirement 36).
 * Not changed: other README sections, `vendor/litellm/`, the public API, the dashboard.
 
 ## Scope Boundaries
@@ -212,7 +214,7 @@ stateDiagram-v2
 * The dashboard: CR-0008. GitHub: CR-0009.
 * The full end-to-end acceptance on macOS with the dashboard: CR-0010. This CR uses real agents only for the verification of requirement 30.
 * Codex. The `chatgpt-account-id` header stays in the list from CR-0002, but this CR verifies only Claude Code and Pi.
-* An edit of a README section other than "Accounts".
+* An edit of a README section other than "Accounts", except the row for `LOUPE_IDLE_SECS` in the configuration table (requirement 36).
 * A delete of call or session rows by age.
 
 ## Alternative Approaches Considered
@@ -488,7 +490,7 @@ Chosen approach: "a separate parser worker with a transactional cursor, HMAC ses
 
 ### Decided
 
-* **Idle time** (Q15). Decided by the human on 2026-10-20: `LOUPE_IDLE_SECS` default is `3600` (60 minutes). Requirements 26 and 36.
+* **Idle time** (Q15). Decided by the human on 2026-10-20: `LOUPE_IDLE_SECS` default is `3600` (60 minutes). Requirements 26 and 36. The README configuration row and the CR-0001 test `default_when_unset` change to `3600`. A session that spans midnight counts on each day that has a call; CR-0007 owns that rule (requirement 38).
 * **Subagent calls** (Q17). Decided by the human on 2026-10-20: a subagent is a session. The detection rule is verified at capture time. Requirement 35, AC-9.
 * **Provider account count** (Q18). Decided by the human on 2026-10-20: the count stays private. Requirement 25.
 * **README change** (Q19, former open question 3). Decided by the human on 2026-10-20: the README section "Accounts" can change after the verification. Requirement 34.
