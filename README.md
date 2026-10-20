@@ -109,6 +109,7 @@ Configuration:
 | `LOUPE_ACCOUNT_KEY` | yes | Secret for the HMAC hashes of accounts and pull requests. |
 | `LOUPE_BOOTSTRAP_TOKEN` | no | A proxy token from a secret (see "Proxy tokens"). |
 | `LOUPE_GITHUB_TOKEN_<LABEL>` | no | One or more GitHub tokens (see "GitHub"). |
+| `LOUPE_GITHUB_API_URL` | no | Base URL of the GitHub API. Default `https://api.github.com`. Must use `https`, except for `127.0.0.1` or `localhost`. |
 | `LOUPE_SUMMARY_API_KEY` | no | Console API key for the one-line summaries. Either this key or `LOUPE_SUMMARY_OAUTH_TOKEN` enables the summaries; if both are set, the key is used. Without one, no summaries. |
 | `LOUPE_SUMMARY_OAUTH_TOKEN` | no | Claude subscription token from `claude setup-token`, sent as `Authorization: Bearer`. Works with `claude-haiku-5-5` only. |
 | `LOUPE_SUMMARY_MODEL` | no | Model for the summaries. Default `claude-haiku-5-5`. A model other than `claude-haiku-5-5` needs `LOUPE_SUMMARY_API_KEY`, because a subscription token works only with Haiku. |
@@ -127,7 +128,8 @@ A day has a record when it has agent calls or GitHub activity. A day with neithe
 and the dashboard shows it as zero. The day line is published with no manual review. To change a
 day later, run `loupe aggregate --date` again.
 
-Example day record. The pull request and line fields are `null` until the GitHub counts land:
+Example day record. The pull request and line fields are `null` when no GitHub token is set.
+`detail.github.failed_tokens` is the number of GitHub tokens whose fetch of the day failed:
 
 ```json
 {
@@ -135,9 +137,9 @@ Example day record. The pull request and line fields are `null` until the GitHub
   "input_total": 1283200, "input": 21000, "cache_read": 1250000, "cache_write": 12200,
   "output": 103969, "calls": 212, "sessions": 4,
   "cost_usd": 2.4744, "unpriced_calls": 0, "subscription_cost_usd": 6.4516,
-  "prs_opened": null, "prs_merged": null, "lines_added": null, "lines_removed": null,
+  "prs_opened": 3, "prs_merged": 2, "lines_added": 412, "lines_removed": 97,
   "summary": "shipped UI fixes to match brand identity",
-  "detail": { "by_agent": { "claude-code": {}, "pi": {} }, "by_model": {} }
+  "detail": { "by_agent": { "claude-code": {}, "pi": {} }, "by_model": {}, "github": { "failed_tokens": 0 } }
 }
 ```
 
@@ -305,8 +307,13 @@ as the day is published. It catches up missed days in the same way as the rest o
 - **Day fields.** `prs_opened`, `prs_merged`, `lines_added`, and `lines_removed`. The lines
   count on the day of the merge.
 - **Failures.** If a token fails (expired, revoked, not approved), the worker logs the label and
-  the cause. The public day record shows only the number of failed tokens. The label names stay
-  in the private database and in the logs.
+  the cause. The day records the number of failed tokens in `detail.github.failed_tokens`. The
+  label names stay in the private database and in the logs. If a search finds more than 1000
+  pull requests, the fetch fails with the cause `search_limit`, because the search API returns
+  at most 1000 results and a part count is wrong.
+- **Retry.** On each wake, the worker fetches again each published day of the last 7 days that
+  has a failed token. A day that changes gets a new revision. After you fix a token, you can
+  also run `loupe aggregate --date <day>`.
 
 Required permissions for a fine-grained personal access token (recommended):
 
