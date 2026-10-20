@@ -2,7 +2,7 @@
 name: "CR-0012 backfill of calls and sessions from the agent session logs"
 description: "Adds the command loupe backfill, which reads the Claude Code and Pi session logs on disk and writes calls and sessions for the time before the proxy captured them, with the same token columns, segment rule, and prices as a proxied call, a rule that skips a log session that the proxy already captured, an idempotent key per log entry, and a summary line per backfilled segment from the log content."
 id: "CR-0012"
-status: "draft"
+status: "approved"
 date: 2026-10-20
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
@@ -134,7 +134,7 @@ sequenceDiagram
 
 **Double count**
 
-22. Decided by the human on 2026-10-20 (Decision 1): the session ID of a log session is unique, and the backfill **MUST** track the processed session IDs. Before it adds a call, the backfill **MUST** compute the session key of requirement 20 and **MUST** look for a row of `sessions` with that `key_hash` and a `key_source` other than `log` (a session that the proxy capture made). The parser stores the HMAC of `x-claude-code-session-id` as the session hint and the session key of a proxied Claude Code main session, so the two keys are equal for the same session. When the row exists, the backfill **MUST NOT** add a call of that log session, **MUST** count the session in `sessions_already_captured` and its calls in `calls_already_captured`. For a Claude Code subagent file, the backfill **MUST** use the decision of its main session, because the proxied key of a subagent is the HMAC of `x-claude-code-agent-id` and the log has no verified field with the same value (judgement call). A log session that the backfill wrote before (`key_source` `log`) is not a processed session for this rule; the per-entry key of requirement 18 prevents a second insert.
+22. Decided by the human on 2026-10-20 (Decision 1): the session ID of a log session is unique, and the backfill **MUST** track the processed session IDs. Before it adds a call, the backfill **MUST** compute the session key of requirement 20 and **MUST** look for a row of `sessions` with that `key_hash` and a `key_source` other than `log` (a session that the proxy capture made). The parser stores the HMAC of `x-claude-code-session-id` as the session hint and the session key of a proxied Claude Code main session, so the two keys are equal for the same session. When the row exists, the backfill **MUST NOT** add a call of that log session, **MUST** count the session in `sessions_already_captured` and its calls in `calls_already_captured`. For a Claude Code subagent file, the backfill **MUST** use the decision of its main session, because the proxied key of a subagent is the HMAC of `x-claude-code-agent-id` and the log has no verified field with the same value (judgement call). A log session that the backfill wrote before (`key_source` `log`) is not a processed session for this rule; the per-entry key of requirement 18 prevents a second insert. Only the key sources `header` (`x-claude-code-session-id`) and `metadata` (the `session_id` inside `metadata.user_id`) carry the Claude Code session ID, so only they can match. A `cache_key` or `opening` key cannot match a log session ID, so this rule closes the double count only for a proxied session that has a key from the session ID. A log session that started before the proxy and continued after it is skipped as a whole, so its calls before the proxy are lost; Decision 1 accepts this loss.
 23. Judgement call, recorded with its reason: Pi sends no session header, and its proxied key source is `opening`, so no session ID of a Pi log matches a proxied key. For `pi`, the backfill **MUST** read the `started_at` of the oldest exchange whose agent label is the value of `--pi-label` (default `pi`, because the agent label is free text from the proxy route). A Pi log session **MUST** be backfilled only when its last entry is before that time, and **MUST** count as already captured when any entry is at or after that time. With no exchange of that label, every Pi log session **MUST** be backfilled, and the command **MUST** print one warning line on stderr that names `--pi-label` and the agent labels that exist, when other exchanges exist. Reason: the proxy sees every Pi call after its first proxied Pi exchange, a whole-session test keeps each session complete in one origin, and an opening-hash match needs a decrypt of every Pi exchange.
 
 **Accounts**
@@ -274,6 +274,7 @@ flowchart LR
 | `tests/backfill.cli.rs` | `closed_segment_not_reopened` | Req 21 | closed segment, then an older call | new segment; open segments closed at end of run |
 | `tests/backfill.cli.rs` | `unpriced_model_is_unpriced_call` | Req 25 | unknown model | unpriced call |
 | `tests/backfill.cli.rs` | `interrupted_run_keeps_whole_files` | Req 27 | failure injected in the second file | first file complete, second absent, rerun completes |
+| `tests/backfill.cli.rs` | `log_call_has_null_account` | Req 24 | fixtures | every call with `origin = 'log'` has `account_id` null; `accounts.md` lists none for origin `log` |
 | `tests/backfill.cli.rs` | `missing_account_key_fails` | Req 30 | no `LOUPE_ACCOUNT_KEY` | actionable error of the loader, non-zero exit |
 | `tests/backfill.cli.rs` | `pi_label_unmatched_warns` | Req 23 | exchanges only under label `pi-dev` | warning names `--pi-label`; with `--pi-label pi-dev` the boundary is that exchange |
 | `tests/backfill.cli.rs` | `range_does_not_bypass_processed_rule` | Req 4 | `--from` and `--to` over a captured session | no call of that session |
@@ -370,6 +371,15 @@ When the operator runs the backfill
 Then no marker string is in the database file or in the log file
 ```
 
+### AC-9: Changed days are queued
+
+```gherkin
+Given CR-0007 is implemented
+When the backfill adds calls on two days in LOUPE_TZ
+Then agg_queue holds those two days
+And "days_queued: 2" is printed
+```
+
 ### AC-10: A malformed line does not stop the run
 
 ```gherkin
@@ -416,13 +426,13 @@ Then the segment has a session_summaries row with status "done" and a scrubbed l
 And no transcript text is in the database file
 ```
 
-### AC-9: Changed days are queued
+### AC-15: A backfilled call has no account
 
 ```gherkin
-Given CR-0007 is implemented
-When the backfill adds calls on two days in LOUPE_TZ
-Then agg_queue holds those two days
-And "days_queued: 2" is printed
+Given fixture logs of Claude Code and Pi
+When the operator runs the backfill
+Then every call with origin "log" has a null account_id
+And accounts.md lists no account for origin "log"
 ```
 
 ## Quality Standards Compliance
@@ -466,10 +476,6 @@ The formats are not a public contract. Mitigation: the readers skip unknown entr
 
 Mitigation: the processed-session rule of requirement 22, and the Pi rule of requirement 23 with `--pi-label` and a warning when the label has no exchange. A Claude Code session that started before the proxy and continued through it is skipped whole, so its calls before the proxy are lost (accepted by Decision 1).
 
-### Risk 5: A summary sends log content to the summary model
-
-Mitigation: the same transcript removals, request rules, and scrubber as a proxied segment (requirements 34 and 35), and no stored transcript (requirement 28).
-
 ### Risk 3: Claude Code repeats or rewrites usage across lines
 
 Mitigation: one call per `message.id` with the last usage (requirement 12), and a unit test.
@@ -477,6 +483,10 @@ Mitigation: one call per `message.id` with the last usage (requirement 12), and 
 ### Risk 4: Old logs were deleted
 
 Claude Code deletes old logs after a retention period. Mitigation: none in this CR. The history starts at the oldest kept log.
+
+### Risk 5: A summary sends log content to the summary model
+
+Mitigation: the same transcript removals, request rules, and scrubber as a proxied segment (requirements 34 and 35), and no stored transcript (requirement 28).
 
 ## Dependencies
 
@@ -517,4 +527,4 @@ None is open.
 
 ## Approval
 
-Not approved. Waiting for the reviewer agent.
+Reviewed and approved by an independent reviewer agent on 2026-10-20, after the human decisions were recorded.
