@@ -9,7 +9,9 @@ mod fake_github;
 fn main() {
     let a: Vec<String> = std::env::args().collect();
     let [_, port, merged, day, token] = a.as_slice() else {
-        eprintln!("error: needs <port> <merged> <day> <token>. Fix: run fake_github 8790 50 2026-10-18 t. Verify: GET /user returns a login");
+        eprintln!(
+            "error: needs <port> <merged> <day> <token>. Fix: run fake_github 8790 50 2026-10-18 t. Verify: GET /user returns a login"
+        );
         std::process::exit(2);
     };
     let mut w = fake_github::world(token, "bench");
