@@ -12,6 +12,8 @@ The loader resolves each value from the first source that has it, in this order:
 
 The source of a value is one of `flag`, `env`, `file`, or `default`.
 
+The subcommands `serve` and `config show` take the flags `--env`, `--listen`, `--data-dir`, and `--idle-secs`. Each flag overrides the variable with the same name.
+
 ## Environment name
 
 The flag `--env` or the variable `LOUPE_ENV` gives the name of the environment. The default is `local`. The file `config/<env>.toml` in the repository holds the values for that environment. This file holds only values that are not secret. The repository has `config/local.toml` and `config/container.toml`.

@@ -52,6 +52,9 @@ pub struct ConfigArgs {
     /// Directory for the database and the logs. Overrides LOUPE_DATA_DIR.
     #[arg(long)]
     pub data_dir: Option<String>,
+    /// Seconds without a call before a session ends. Overrides LOUPE_IDLE_SECS.
+    #[arg(long)]
+    pub idle_secs: Option<String>,
 }
 
 impl ConfigArgs {
@@ -61,6 +64,7 @@ impl ConfigArgs {
             ("LOUPE_ENV", &self.env),
             ("LOUPE_LISTEN", &self.listen),
             ("LOUPE_DATA_DIR", &self.data_dir),
+            ("LOUPE_IDLE_SECS", &self.idle_secs),
         ]
         .into_iter()
         .filter_map(|(k, v)| v.clone().map(|v| (k.to_string(), v)))
