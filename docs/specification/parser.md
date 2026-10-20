@@ -15,7 +15,7 @@ The capture keeps every rule of the proxy. It does not delay the stream, it reda
 
 `loupe serve` starts one parser worker. The worker wakes every `LOUPE_PARSE_INTERVAL_SECS` seconds (default `5`). It reads the exchanges with an id above its cursor, in id order, in batches of at most 100.
 
-The table `worker_cursors` holds the cursor: the name, the last id, and the updated time. For each exchange, the insert of its calls, the session changes, and the cursor advance are in one transaction. Thus a restart does not lose a call and does not repeat a call.
+The table `worker_cursors` holds the cursor: the name, the last id, and the updated time. For each exchange, the insert of its calls, the session changes, and the cursor advance are in one transaction. The same transaction sets `exchanges.parsed_at`, the parse time in UTC. Thus a restart does not lose a call and does not repeat a call.
 
 The parse is idempotent. The table `calls` has a unique key on (exchange id, call index). A second parse of the same exchange adds no row.
 
@@ -146,7 +146,7 @@ A session that spans midnight counts on each day that has a call. The day record
 
 ## Retention
 
-The rows of `calls` and `sessions` stay forever. No step deletes them by age. The deletion of raw bodies after `LOUPE_RAW_RETENTION_HOURS` does not delete a call row or a session row.
+The rows of `calls` and `sessions` stay forever. No step deletes them by age. The deletion of raw bodies after `LOUPE_RAW_RETENTION_HOURS` does not delete a call row or a session row. `summaries.md`, section "Raw-body retention", gives the rules.
 
 ## `loupe parse`
 

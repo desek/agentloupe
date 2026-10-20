@@ -32,6 +32,9 @@ The flag `--env` or the variable `LOUPE_ENV` gives the name of the environment. 
 | `LOUPE_SUMMARY_API_KEY` | no | yes | none |
 | `LOUPE_SUMMARY_OAUTH_TOKEN` | no | yes | none |
 | `LOUPE_SUMMARY_MODEL` | no | no | `claude-haiku-5-5` |
+| `LOUPE_SUMMARY_BASE_URL` | no | no | `https://api.anthropic.com` |
+| `LOUPE_SUMMARY_INTERVAL_SECS` | no | no | `30` |
+| `LOUPE_SUMMARY_MAX_ATTEMPTS` | no | no | `5` |
 | `LOUPE_TZ` | no | no | `Europe/Stockholm` |
 | `LOUPE_PUBLISH_AT` | no | no | `01:00` |
 | `LOUPE_IDLE_SECS` | no | no | `3600` |
@@ -73,6 +76,11 @@ The subcommand also prints these lines:
 2. The number of entries in the price index.
 3. One line `subscription.<name>: <USD per month>` for each subscription.
 4. `subscription_total_per_month: <sum>`.
+5. `summary_credential`, the active credential kind of the summarizer: `api_key`, `oauth_token`, or `none`.
+
+## Summary credential
+
+`LOUPE_SUMMARY_API_KEY` and `LOUPE_SUMMARY_OAUTH_TOKEN` are the two credentials of the summarizer. Either one enables the summaries. If both are set, `api_key` is active. A model other than `claude-haiku-5-5` needs `LOUPE_SUMMARY_API_KEY`. `LOUPE_SUMMARY_BASE_URL` must use `https`, except for a loopback host. `summaries.md` gives the full rules.
 
 ## Subscription variables
 

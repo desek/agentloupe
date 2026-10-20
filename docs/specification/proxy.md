@@ -114,6 +114,8 @@ The proxy stores one exchange for each forwarded request in the table `exchanges
 | `session_hint_hash` | The HMAC of the first present session header, or null. See `parser.md`, section "Session hint capture". |
 | `session_hint_source` | The lowercase name of that session header, or null. |
 | `parse_outcome` | The result of the parse, or null before the parse. See `parser.md`, section "Parse outcomes". |
+| `parsed_at` | The parse time in UTC, or null before the parse. The parser sets it. |
+| `bodies_deleted_at` | The time in UTC when the raw-body retention set the two body columns to null, or null. See `summaries.md`, section "Raw-body retention". |
 | `outcome` | `complete`, `client_aborted`, `upstream_aborted`, or `upstream_unreachable`. |
 | `error` | The cause of a failure, or null. |
 

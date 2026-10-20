@@ -28,6 +28,11 @@ The canonical vocabulary of the project. One row per term, one physical line per
 | **GitHub token label** | The `<LABEL>` part of a `LOUPE_GITHUB_TOKEN_<LABEL>` variable, recorded with each pull request so an analysis can group by it. | A proxy token; the GitHub token value, which stays in the environment. | `docs/specification/github.md` |
 | **public API** | The open-CORS routes `GET /v1/days`, `GET /v1/days/{day}`, and `GET /healthz` that other sites can read. | The dashboard, which is a page that reads the public API. | `docs/specification/days-public-api.md` |
 | **dashboard** | The page that the same binary serves at `GET /`, which reads `/v1/days` and shows the data. | The public API, which returns data and no page. | `docs/specification/dashboard.md` |
+| **session summary** | The one scrubbed line for one closed segment, stored in `session_summaries` with its status: pending, done, skipped, failed, or disabled. | A day line, which covers one day; a transcript, which is the input and is never stored. | `docs/specification/summaries.md`, `src/summary/` |
+| **day line** | The one scrubbed paragraph of 3 to 8 sentences for one day, stored in `day_summaries` and built from the session summaries of that day. | A session summary, which is one line for one segment; a day record, which holds the published totals. | `docs/specification/summaries.md`, `src/summary/day.rs` |
+| **transcript** | The clipped text of the request body with the longest message history of a segment, with no system prompt, no tool definitions, and no system-reminder blocks. | An exchange body, which is stored encrypted and complete; a session summary, which is the model output. | `docs/specification/summaries.md`, `src/summary/transcript.rs` |
+| **scrubber** | The function that removes URLs, email addresses, paths, and tokens with a digit from a line or a paragraph, except names in `LOUPE_PUBLIC_PROJECTS`. | Redaction, which removes credential headers from a stored exchange. | `docs/specification/summaries.md`, `src/summary/scrub.rs` |
+| **raw-body retention** | The deletion of the encrypted bodies of an exchange after `LOUPE_RAW_RETENTION_HOURS` from the later of the parse and the summary. | A deletion of calls or sessions, which stay forever. | `docs/specification/summaries.md`, `src/retention/` |
 
 ## Foundation
 
