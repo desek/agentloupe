@@ -2,8 +2,8 @@
 name: "CR-0010 End-to-end acceptance on macOS with Claude Code and Pi"
 description: "Proves the definition of done of the CR set: the loupe container runs on the human's Mac, claude -p and pi -p reach Anthropic through the proxy with claude-haiku-5-5, and the sessions are captured, parsed, priced, summarized, published, and shown on the dashboard. Adds the connect script, the README instructions, and the persisted user scenario."
 id: "CR-0010"
-status: "approved"
-date: 2026-10-19
+status: "proposed"
+date: 2026-10-20
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
@@ -110,10 +110,10 @@ sequenceDiagram
 8. The script **MUST** be idempotent: a second run with the same inputs **MUST** give the same `models.json` bytes and the same output. It **MUST** support `--dry-run`, which prints the planned file path and content with the token masked as `lpt_…` and writes nothing.
 9. The script **MUST** support `--check`, which sends one `GET <base>/healthz` and stops with an actionable error if the container is not reachable.
 10. The README **MUST** gain a section "Connect the agents" after "Proxy tokens". The section **MUST** give, as numbered steps: start the container, make a proxy token into a file outside the repository, run the script for each agent, run `claude -p` and `pi -p` with the model `claude-haiku-5-5`, and open the dashboard. The README update is a stated requirement of this CR; this CR document does not edit README.md.
-11. The README section **MUST** state that, to see the day before the nightly publish, the human runs `docker compose exec loupe loupe aggregate --date YYYY-MM-DD`, and that a short `LOUPE_IDLE_SECS` makes the sessions close sooner.
+11. The README section **MUST** state that, to see the day before the nightly publish, the human runs `docker compose exec loupe loupe aggregate --date YYYY-MM-DD`, and that a short `LOUPE_IDLE_SECS` makes the sessions close sooner than the default of `3600` seconds.
 12. The repository **MUST** contain the user scenario `.agents/scenarios/acceptance.macos.end-to-end.md`, made and graded through the `user-scenario` skill. The scenario **MUST** state the user goal, the steps, and the success condition before its first run.
 13. The scenario **MUST** drive the real `claude` and `pi` CLIs and the real `api.anthropic.com`, and **MUST** read the dashboard in a real browser through the browser driver. It **MUST NOT** use the fake upstream of CR-0002 or the seed script of CR-0008.
-14. The scenario **MUST** set `LOUPE_IDLE_SECS` to `60` for the run through an untracked `compose.override.yaml` with `services.loupe.environment.LOUPE_IDLE_SECS: "60"`. A shell variable on `docker compose up` **MUST NOT** be used, because `compose.yaml` (CR-0001 requirement 19) does not interpolate `LOUPE_IDLE_SECS`, so the variable does not reach the container. `.gitignore` **MUST** list `compose.override.yaml`. It **MUST NOT** change the default of `LOUPE_IDLE_SECS` in the code or in `compose.yaml`.
+14. The scenario **MUST** set `LOUPE_IDLE_SECS` to `60` for the run through an untracked `compose.override.yaml` with `services.loupe.environment.LOUPE_IDLE_SECS: "60"`. A shell variable on `docker compose up` **MUST NOT** be used, because `compose.yaml` (CR-0001 requirement 19) does not interpolate `LOUPE_IDLE_SECS`, so the variable does not reach the container. `.gitignore` **MUST** list `compose.override.yaml`. It **MUST NOT** change the default of `LOUPE_IDLE_SECS` in the code or in `compose.yaml`. That default is `3600` seconds (decision D9). The short value `60` is an override for the acceptance run only.
 15. The success condition of the scenario **MUST** be the end state of AC-1 to AC-7. The scenario record **MUST** hold the number of attempts and the number of successes, for at least three runs.
 16. The scenario **MUST** not depend on a GitHub token. With no `LOUPE_GITHUB_TOKEN_<LABEL>`, the run **MUST** still pass, and the four PR fields of the day record are `null` (CR-0007 requirement 9, CR-0009 requirements 2 and 23), and the dashboard shows "GitHub not connected" (CR-0008 requirement 34).
 17. The prompts of the scenario **MUST** be short and neutral, for example "Reply with the word ok.", so that no project detail goes to the provider or into a summary.
@@ -121,8 +121,13 @@ sequenceDiagram
 19. If the real capture shows that an account ID source in the README "Accounts" list is wrong for Claude Code 2.1.302 or Pi 1.3.0, the implementation **MUST** update the README list and `docs/specification/` in the same change, as the README requires.
 20. `.taxonomy` **MUST** gain rows for the new nouns connect script and isolated agent directory, with `Lives in` that names the script and the README section.
 21. Governance identifiers **MUST NOT** appear in the script, the scenario file, or the README section.
-22. The summarizer credential for the run **MUST** be the same subscription token, set in `.env` as `LOUPE_SUMMARY_OAUTH_TOKEN` (CR-0006 requirement 17, decision D7). The README section **MUST** state this step.
+22. The summarizer credential for the run **MUST** be the same subscription token, set in `.env` as `LOUPE_SUMMARY_OAUTH_TOKEN` (CR-0006 requirement 17, decision D7). The summary model **MUST** be the default `claude-haiku-5-5` (decision D10). The run **MUST NOT** set `LOUPE_SUMMARY_MODEL` or `LOUPE_SUMMARY_API_KEY`. The README section **MUST** state this step.
 23. Before the first `pi -p` call, the scenario **MUST** run `PI_CODING_AGENT_DIR=<isolated agent directory> pi --list-models claude-haiku-5-5` and confirm that the output lists `claude-haiku-5-5` under the provider `anthropic`. If the model is not listed, the fallback **MUST** be a `models` entry for `claude-haiku-5-5` under `providers.anthropic` in the isolated `models.json`. The scenario **MUST** add this entry by hand, because the connect script writes only the `baseUrl` override (requirement 5). The scenario **MUST** record which route it used.
+
+24. The scenario **MUST** keep the default page title. AC-6 **MUST** check that the browser tab title is `AI agent activity` and that the page does not show the product name `Agentloupe` (decision D8). The run **MUST NOT** set `LOUPE_SITE_TITLE`.
+25. The scenario **MUST** keep the default `LOUPE_RAW_RETENTION_HOURS` of `168` (decision D11). The run **MUST NOT** set it.
+26. The pass of this CR, and of the CR set, **MUST** be the result of AC-1 to AC-9 of this CR and nothing more (decision D12). A later hosting of the product **MUST** stay single-user; this CR adds no multi-user feature.
+27. The day summary that AC-5 checks **MUST** be one paragraph of 3 to 8 sentences in a neutral tone (decision D10). A short or trivial session **MUST** still have a summary.
 
 ### Non-Functional Requirements
 
@@ -159,7 +164,7 @@ The day in the method is the date in `LOUPE_TZ`. If the local time zone of the M
 
 ### Out of Scope ("Here, But Not Further")
 
-* Public hosting of the dashboard or the API. It stays out of scope for the CR set.
+* Public hosting of the dashboard or the API. It stays out of scope for the CR set. A later hosting is single-user (decision D12).
 * claude.ai chats on the web, desktop, or mobile.
 * Providers other than `anthropic` for the acceptance run. The OpenAI upstreams of the README are not part of this run.
 * GitHub tokens. The GitHub worker is proven by CR-0009 against its fake API; this run passes with no token.
@@ -294,7 +299,7 @@ When the reader runs "docker compose exec loupe loupe aggregate --date <today>"
 Then "curl -s http://127.0.0.1:8787/v1/days/<today>" returns 200
   And "detail.by_agent" holds the keys "claude-code" and "pi", each with "calls" 1 or more
   And "cost_usd" is more than 0 and "unpriced_calls" is 0
-  And "summary" is a non-empty line
+  And "summary" is one paragraph of 3 to 8 sentences
 ```
 
 ### AC-6: The dashboard shows the day
@@ -304,6 +309,8 @@ Given AC-5 passed
 When the reader opens http://127.0.0.1:8787/ in a browser
 Then the daily log shows a row for <today> with a token count more than 0
   And the footer names Claude Code and Pi
+  And the browser tab title is "AI agent activity"
+  And the page does not show the word "Agentloupe"
   And the screenshot is kept in the scenario evidence
 ```
 
@@ -413,9 +420,15 @@ curl -s http://127.0.0.1:8787/v1/days/$(TZ=Europe/Stockholm date +%F)
 * D6: Pi gets its credential from the variable `ANTHROPIC_OAUTH_TOKEN`, which holds the subscription token that the human makes one time with `claude setup-token`. Nothing is copied or linked from `~/.pi/agent` (requirement 7). Decided by the human on 2026-10-19.
 * D7: the summarizer uses the same subscription token, set in `.env` as `LOUPE_SUMMARY_OAUTH_TOKEN` (requirement 22, CR-0006 requirement 17). Decided by the human on 2026-10-19.
 
+* D8: the product name does not show on the public page by default. `LOUPE_SITE_TITLE` sets the page title, with the default `AI agent activity` (requirement 24, AC-6). Decided by the human on 2026-10-20.
+* D9: the default of `LOUPE_IDLE_SECS` is `3600` seconds. A session that spans midnight counts on each day that has a call, and a subagent is its own session. The acceptance run keeps the override of `60` (requirement 14). Decided by the human on 2026-10-20.
+* D10: the summary model stays `claude-haiku-5-5` with the subscription token. The day summary is one paragraph of 3 to 8 sentences in a neutral tone, and trivial sessions get a summary (requirements 22 and 27, AC-5). Decided by the human on 2026-10-20.
+* D11: the default of `LOUPE_RAW_RETENTION_HOURS` is `168`. Calls and sessions are kept forever (requirement 25). Decided by the human on 2026-10-20.
+* D12: the acceptance criteria of this CR are the definition of pass. A later hosting is single-user (requirement 26). Decided by the human on 2026-10-20.
+
 ## Open Questions
 
-None. D6 and D7 close the two earlier open questions.
+None. D6 to D12 close the earlier open questions.
 
 ## Dependencies
 
@@ -449,3 +462,4 @@ Chosen approach: "a connect script that prints per-invocation environment and an
 * 2026-10-18: Reviewed and approved by an independent reviewer agent on 2026-10-18.
 * 2026-10-19: Recorded the human decisions D6 and D7 (requirements 7 and 22, AC-4, AC-5, Risk 1). Added requirement 23, a check of the Pi model list with a named fallback that the scenario adds by hand. Moved requirements 22 and 23 after requirement 21. The status is "proposed" until the next review.
 * 2026-10-19: Re-approved by an independent reviewer agent on 2026-10-19 after the human decisions were recorded.
+* 2026-10-20: Recorded the human decisions D8 to D12. Added requirements 24 to 27. Changed requirements 11, 14, and 22, AC-5, AC-6, and the scope. The status is "proposed" until the next review.
