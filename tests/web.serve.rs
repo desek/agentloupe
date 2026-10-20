@@ -82,7 +82,7 @@ async fn asset_content_types() {
         ("/", "text/html; charset=utf-8"),
         ("/assets/js/app.js", "text/javascript; charset=utf-8"),
         ("/assets/css/tokens.css", "text/css; charset=utf-8"),
-        ("/assets/fonts/Geist-Variable.woff2", "font/woff2"),
+        ("/assets/fonts/Geist-Regular.woff2", "font/woff2"),
         ("/favicon.ico", "image/x-icon"),
     ] {
         let res = reqwest::get(l.url(path)).await.unwrap();

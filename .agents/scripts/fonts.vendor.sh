@@ -19,8 +19,8 @@ tag=v1.7.2; mode=fetch; human=0
 [[ -t 1 ]] && human=1
 # local name -> upstream path at the tag
 FILES=(
-  "Geist-Variable.woff2=fonts/Geist/webfonts/Geist[wght].woff2"
-  "GeistMono-Variable.woff2=fonts/GeistMono/webfonts/GeistMono[wght].woff2"
+  "Geist-Regular.woff2=fonts/Geist/webfonts/Geist[wght].woff2"
+  "GeistMono-Regular.woff2=fonts/GeistMono/webfonts/GeistMono[wght].woff2"
   "OFL.txt=OFL.txt"
 )
 
