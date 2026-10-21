@@ -120,3 +120,21 @@ fn cache_is_bounded() {
     assert_eq!(trees.len(), 200, "{text}");
     assert!(!trees.contains(&format!("tree {:040x}", 0).as_str()));
 }
+
+#[test]
+fn whole_tree_hit_refreshes_stage_fingerprints() {
+    let f = Fixture::new();
+    assert_eq!(verdict(&f, &[], &[]).status.code(), Some(0));
+    f.write("src/lib.rs", "pub fn a() {}\n// probe\n");
+    assert_eq!(verdict(&f, &["--no-cache"], &[]).status.code(), Some(0));
+    f.write("src/lib.rs", "pub fn a() {}\n");
+    let hit = verdict(&f, &[], &[]);
+    assert_eq!(status(&hit, "format"), "cached", "{}", report(&hit));
+    f.take_ran();
+    // The reverted tree hit the whole-tree key; its stage fingerprints must be the last passed ones.
+    f.write("web/index.html", "<p>b</p>\n");
+    let out = verdict(&f, &[], &[]);
+    assert_eq!(out.status.code(), Some(0), "{}", report(&out));
+    assert_eq!(status(&out, "format"), "cached", "{}", report(&out));
+    assert_eq!(f.take_ran(), ["web", "image"]);
+}

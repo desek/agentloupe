@@ -8,7 +8,7 @@
 # Output (stdout): one line per stage, "stage: <name> status: passed|failed|cached seconds: <n>",
 # then "verdict: passed|failed seconds: <total>". Every stage that is not cached runs, so all failures show at once.
 # A stage is cached only if its fingerprint equals the last passed one (pipeline.fingerprint.sh decides);
-# a cached stage counts as passed. Any error in the fingerprint or the cache runs the stage in full.
+# a cached stage counts as passed and writes its fingerprint again. Any error in the fingerprint or the cache runs the stage in full.
 # This script only calls the stage entry points and pipeline.fingerprint.sh; it owns the list and the order of the stages.
 # Exit codes: 0 every stage passed, 1 one or more stages failed, 2 bad usage.
 set -uo pipefail
@@ -38,7 +38,9 @@ for stage in "${STAGES[@]}"; do
   fp="$(awk -v s="$stage" '$1 == "stage:" && $2 == s {print $4}' <<<"$plan")"
   action="$(awk -v s="$stage" '$1 == "stage:" && $2 == s {print $6}' <<<"$plan")"
   t0="$(now)"
-  if [[ "$action" == cached ]]; then status=cached
+  # A cached stage writes its fingerprint again: a whole-tree hit proves each stage fingerprint passed, so the
+  # cache then holds the fingerprints of this tree and not of an earlier, reverted tree.
+  if [[ "$action" == cached ]]; then status=cached; [[ -n "$fp" && "$fp" != none ]] && passed+=("$stage=$fp")
   elif "$DIR/pipeline.$stage.sh" >/dev/null; then status=passed; [[ -n "$fp" && "$fp" != none ]] && passed+=("$stage=$fp")
   else status=failed; failed+=("$stage"); fi
   seconds="$(perl -e "printf '%.1f', $(now) - $t0")"
