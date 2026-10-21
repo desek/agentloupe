@@ -2,7 +2,7 @@
 name: "CR-0017 Timer tests without real waits"
 description: "Removes real waits from the tests that assert a timer: each such test gets an injected paused clock or a short documented test-only timer, the tests that drive a real socket or process keep real time with a capped poll, and the test stage under nextest drops from 24 s to under 15 s."
 id: "CR-0017"
-status: "approved"
+status: "implemented"
 date: 2026-10-21
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
