@@ -304,3 +304,27 @@ path = "tests/live.memory.rs"
 [[test]]
 name = "config_live"
 path = "tests/config.live.rs"
+
+[[test]]
+name = "summary_session_days"
+path = "tests/summary.session_days.rs"
+
+[[test]]
+name = "summary_day_line"
+path = "tests/summary.day_line.rs"
+
+[[test]]
+name = "retention_session_days"
+path = "tests/retention.session_days.rs"
+
+[[test]]
+name = "api_public"
+path = "tests/api.public.rs"
+
+[[test]]
+name = "migrations"
+path = "tests/migrations.rs"
+
+[[test]]
+name = "summary_cli"
+path = "tests/summary.cli.rs"

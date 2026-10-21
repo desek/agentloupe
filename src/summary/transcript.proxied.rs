@@ -98,7 +98,9 @@ pub fn full(
 }
 
 /// The messages that the calls of [start, end) add beyond the longest history of the calls before
-/// `start`. A request body has no time for each message, so the history before the day is the cut.
+/// `start`. A request body has no time for each message, so the history before the day is the cut:
+/// the messages of the day history that repeat the earlier history, turn by turn, from its start,
+/// are left out. A new conversation in the same session repeats nothing and stays whole.
 pub fn day(
     conn: &Connection,
     data_key: &[u8; 32],
@@ -110,6 +112,15 @@ pub fn day(
     let (before, m1) = longest(conn, data_key, key, "", start)?;
     let (today, m2) = longest(conn, data_key, key, start, end)?;
     log_missing(key, day, m1 + m2);
-    let cut = before.len().min(today.len());
+    // A turn compares by its transcript text, so a changed cache marker does not end the shared part.
+    let same = |a: &Value, b: &Value| {
+        super::transcript::build_messages(std::slice::from_ref(a), 0)
+            == super::transcript::build_messages(std::slice::from_ref(b), 0)
+    };
+    let cut = before
+        .iter()
+        .zip(&today)
+        .take_while(|(a, b)| same(a, b))
+        .count();
     Ok(today[cut..].to_vec())
 }

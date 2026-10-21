@@ -30,6 +30,21 @@ pub fn summary_hits(mode: &str) -> usize {
         .map_or(0, |(_, n)| *n)
 }
 
+/// The request bodies of the summary modes that start with `rec`, so a test can read what was sent.
+static SUMMARY_BODIES: std::sync::Mutex<Vec<(String, serde_json::Value)>> =
+    std::sync::Mutex::new(Vec::new());
+
+/// The request bodies sent to a `rec` mode in this process, in arrival order.
+pub fn summary_bodies(mode: &str) -> Vec<serde_json::Value> {
+    SUMMARY_BODIES
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(m, _)| m == mode)
+        .map(|(_, b)| b.clone())
+        .collect()
+}
+
 fn hit(mode: &str) {
     let mut h = SUMMARY_HITS.lock().unwrap();
     match h.iter_mut().find(|(m, _)| m == mode) {
@@ -237,8 +252,21 @@ fn status(code: u16, retry_after: Option<&str>) -> Response {
 }
 
 /// A summary reply chosen by the path segment: line, day, day_short, skip, 429, 429_retry, 500, 401, bad.
-async fn summary(axum::extract::Path(mode): axum::extract::Path<String>) -> Response {
+/// A mode that starts with `rec` records the request body: `rec_word` replies with one word,
+/// `rec_401` with a 401, and any other `rec` mode with the line text.
+async fn summary(axum::extract::Path(mode): axum::extract::Path<String>, req: Request) -> Response {
     hit(&mode);
+    if mode.starts_with("rec") {
+        let body = request_json(req).await;
+        SUMMARY_BODIES.lock().unwrap().push((mode.clone(), body));
+        return if mode.contains("_word") {
+            message("Fixed")
+        } else if mode.contains("_401") {
+            status(401, None)
+        } else {
+            message(SUMMARY_LINE)
+        };
+    }
     match mode.as_str() {
         "line" | "line_counted" | "line_nocred" => message(SUMMARY_LINE),
         "day" => message(SUMMARY_DAY),
