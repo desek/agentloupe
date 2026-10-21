@@ -126,6 +126,25 @@ pub fn parse_and_close(data: &std::path::Path) {
     });
 }
 
+/// Like poll, for a check that awaits, such as an HTTP request.
+pub async fn poll_async<T, F: std::future::Future<Output = Result<T, String>>>(
+    cap: Duration,
+    expected: &str,
+    mut check: impl FnMut() -> F,
+) -> T {
+    let deadline = Instant::now() + cap;
+    loop {
+        let last = match check().await {
+            Ok(v) => return v,
+            Err(last) => last,
+        };
+        if Instant::now() >= deadline {
+            panic!("poll reached its cap of {cap:?}: expected {expected}, last observed {last}");
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
+
 /// Calls `check` every 100 ms until it returns `Ok`, and returns that value. At `cap` it panics
 /// with `expected` and the last state that `check` returned; the cap only ends the poll.
 pub fn poll<T>(cap: Duration, expected: &str, mut check: impl FnMut() -> Result<T, String>) -> T {

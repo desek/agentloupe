@@ -41,7 +41,7 @@ async fn valid_token_forwards_and_records_id() {
 async fn refused_request_is_401_without_exchange() {
     let fake = fake::spawn().await;
     let data = tempfile::tempdir().unwrap();
-    create_token(data.path(), "live");
+    let live = create_token(data.path(), "live");
     let old = create_token(data.path(), "old");
     revoke_token(data.path(), "old");
     let unknown =
@@ -74,8 +74,13 @@ async fn refused_request_is_401_without_exchange() {
         }
         assert!(!text.contains("lpt_"));
     }
-    tokio::time::sleep(Duration::from_millis(1500)).await;
-    assert_eq!(l.rows(), 0);
+    // A valid request after the refusals: its row is the end state, and it must be the only row.
+    let ok = reqwest::get(l.url(&format!("/{live}/pi/fake/json")))
+        .await
+        .unwrap();
+    assert_eq!(ok.status(), 200);
+    l.wait_rows(1);
+    assert_eq!(l.rows(), 1);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -88,10 +93,17 @@ async fn revoke_applies_without_restart() {
     let url = l.url(&format!("/{t}/pi/fake/json"));
     assert_eq!(reqwest::get(&url).await.unwrap().status(), 200);
     revoke_token(l.data.path(), "a");
-    tokio::time::sleep(Duration::from_secs(5)).await;
-    let resp = reqwest::get(&url).await.unwrap();
-    assert_eq!(resp.status(), 401);
-    let v: serde_json::Value = resp.json().await.unwrap();
+    // The cache of the gate expires after its TTL; poll with the cap of the old fixed wait.
+    let v = loupe::poll_async(Duration::from_secs(5), "401 token_revoked", || async {
+        let resp = reqwest::get(&url).await.unwrap();
+        let status = resp.status();
+        let v: serde_json::Value = resp.json().await.unwrap_or_default();
+        match status.as_u16() {
+            401 => Ok(v),
+            s => Err(format!("status {s}")),
+        }
+    })
+    .await;
     assert_eq!(v["error"], "token_revoked");
 }
 
@@ -141,16 +153,23 @@ async fn last_revoke_keeps_proxy_closed() {
     );
     l.wait_rows(1);
     revoke_token(l.data.path(), "only");
-    tokio::time::sleep(Duration::from_secs(2)).await;
-    let resp = reqwest::get(l.url("/pi/fake/json")).await.unwrap();
-    assert_eq!(resp.status(), 401);
-    let v: serde_json::Value = resp.json().await.unwrap();
-    assert_eq!(v["error"], "token_missing");
-    tokio::time::sleep(Duration::from_millis(1000)).await;
-    assert!(
-        l.log().contains("refuses all proxied requests"),
-        "{}",
-        l.log()
-    );
+    // Each request refuses; the warning comes when the gate reads the state after its TTL.
+    // The cap is the old fixed wait of 3 seconds.
+    let url = l.url("/pi/fake/json");
+    loupe::poll_async(
+        Duration::from_secs(3),
+        "the closed warning in the log",
+        || async {
+            let resp = reqwest::get(&url).await.unwrap();
+            assert_eq!(resp.status(), 401);
+            let v: serde_json::Value = resp.json().await.unwrap();
+            assert_eq!(v["error"], "token_missing");
+            match l.log().contains("refuses all proxied requests") {
+                true => Ok(()),
+                false => Err(l.log()),
+            }
+        },
+    )
+    .await;
     assert_eq!(l.rows(), 1);
 }

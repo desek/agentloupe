@@ -1,17 +1,19 @@
-//! @agents-index The token gate: reads the token state with a cache of at most 1 second, accepts or refuses a request, writes last use.
+//! @agents-index The token gate: reads the token state with a cache of at most 1 second on an injected clock, accepts or refuses a request, writes last use.
 
 use super::{format, store};
+use crate::clock::Clock;
 use rusqlite::Connection;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Mutex, mpsc};
-use std::time::{Duration, Instant};
+use std::sync::{Arc, Mutex, mpsc};
+use std::time::Duration;
 use subtle::ConstantTimeEq;
+use tokio::time::Instant;
 
 /// The longest time that a cached token state is used; the limit in the specification is 5 seconds.
-const TTL: Duration = Duration::from_secs(1);
+pub const TTL: Duration = Duration::from_secs(1);
 /// At most one write of `last_used_at` per token in this time.
-const TOUCH_EVERY: Duration = Duration::from_secs(60);
+pub const TOUCH_EVERY: Duration = Duration::from_secs(60);
 
 /// The three states of the gate, from the rows of `proxy_tokens`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,6 +69,8 @@ pub struct Gate {
     cache: Mutex<Option<Snapshot>>,
     last_touch: Mutex<HashMap<i64, Instant>>,
     touch_tx: mpsc::Sender<i64>,
+    /// The age of the cache and the interval of last use read this clock.
+    clock: Arc<dyn Clock>,
     /// How many writes of `last_used_at` were sent, for tests.
     pub touches: AtomicU64,
 }
@@ -74,6 +78,11 @@ pub struct Gate {
 impl Gate {
     /// `writes` moves to a thread that writes `last_used_at`, so a request never waits for that write.
     pub fn new(reads: Connection, writes: Connection) -> Gate {
+        Self::with_clock(reads, writes, crate::clock::system())
+    }
+
+    /// Like new, on `clock`, so a test can make the cache expire without a wait.
+    pub fn with_clock(reads: Connection, writes: Connection, clock: Arc<dyn Clock>) -> Gate {
         let (touch_tx, rx) = mpsc::channel::<i64>();
         std::thread::spawn(move || {
             for id in rx {
@@ -87,13 +96,14 @@ impl Gate {
             cache: Mutex::new(None),
             last_touch: Mutex::new(HashMap::new()),
             touch_tx,
+            clock,
             touches: AtomicU64::new(0),
         }
     }
 
     /// The current state, read from the database if the cache is older than the limit.
     pub fn state(&self) -> Result<State, String> {
-        self.with_snapshot(Instant::now(), |s| s.state)
+        self.with_snapshot(self.clock.now(), |s| s.state)
     }
 
     fn with_snapshot<T>(&self, now: Instant, f: impl FnOnce(&Snapshot) -> T) -> Result<T, String> {
@@ -132,10 +142,7 @@ impl Gate {
 
     /// Decides one request; `presented` is the raw token segment, if any. A read failure refuses.
     pub fn check(&self, presented: Option<&str>) -> Decision {
-        self.check_at(presented, Instant::now())
-    }
-
-    pub fn check_at(&self, presented: Option<&str>, now: Instant) -> Decision {
+        let now = self.clock.now();
         let h = presented.map(format::hash);
         let found = self.with_snapshot(now, |s| {
             let row = h.as_ref().and_then(|h| {
@@ -188,54 +195,45 @@ mod tests {
     use super::*;
     use std::collections::BTreeMap;
 
-    fn gate(dir: &std::path::Path) -> Gate {
+    fn gate(dir: &std::path::Path, clock: Arc<crate::clock::Set>) -> Gate {
         let open = || crate::store::open::open(dir).unwrap();
-        Gate::new(open(), open())
+        Gate::with_clock(open(), open(), clock)
     }
 
     #[test]
     fn gate_states() {
         let (d, conn) = store::tests::db();
-        let t = Instant::now();
-        let g = gate(d.path());
+        let clock = crate::clock::Set::new();
+        let g = gate(d.path(), clock.clone());
         let valid = format::generate();
         let other = format::generate();
-        assert_eq!(g.check_at(None, t), Decision::Accept(None));
-        assert_eq!(
-            g.check_at(Some(&valid), t),
-            Decision::Refuse("token_mode_off")
-        );
+        assert_eq!(g.check(None), Decision::Accept(None));
+        assert_eq!(g.check(Some(&valid)), Decision::Refuse("token_mode_off"));
         store::create(&conn, "a", &BTreeMap::new(), &format::hash(&valid)).unwrap();
         let old = format::generate();
         store::create(&conn, "old", &BTreeMap::new(), &format::hash(&old)).unwrap();
         store::revoke(&conn, "old").unwrap();
-        let t = t + TTL;
-        assert_eq!(g.check_at(None, t), Decision::Refuse("token_missing"));
-        assert_eq!(
-            g.check_at(Some(&other), t),
-            Decision::Refuse("token_unknown")
-        );
-        assert_eq!(g.check_at(Some(&old), t), Decision::Refuse("token_revoked"));
+        clock.advance(TTL);
+        assert_eq!(g.check(None), Decision::Refuse("token_missing"));
+        assert_eq!(g.check(Some(&other)), Decision::Refuse("token_unknown"));
+        assert_eq!(g.check(Some(&old)), Decision::Refuse("token_revoked"));
         let id: i64 = conn
             .query_row("SELECT id FROM proxy_tokens WHERE name = 'a'", [], |r| {
                 r.get(0)
             })
             .unwrap();
         assert_eq!(
-            g.check_at(Some(&valid), t),
+            g.check(Some(&valid)),
             Decision::Accept(Some(Accepted {
                 id,
                 name: "a".into()
             }))
         );
         store::revoke(&conn, "a").unwrap();
-        let t = t + TTL;
-        assert_eq!(g.state_at(t), State::Closed);
-        assert_eq!(g.check_at(None, t), Decision::Refuse("token_missing"));
-        assert_eq!(
-            g.check_at(Some(&valid), t),
-            Decision::Refuse("token_revoked")
-        );
+        clock.advance(TTL);
+        assert_eq!(g.state().unwrap(), State::Closed);
+        assert_eq!(g.check(None), Decision::Refuse("token_missing"));
+        assert_eq!(g.check(Some(&valid)), Decision::Refuse("token_revoked"));
     }
 
     #[test]
@@ -243,16 +241,16 @@ mod tests {
         let (d, conn) = store::tests::db();
         let raw = format::generate();
         store::create(&conn, "a", &BTreeMap::new(), &format::hash(&raw)).unwrap();
-        let g = gate(d.path());
-        let t = Instant::now();
-        for i in 0..50 {
-            let at = t + Duration::from_millis(200 * i);
-            assert!(matches!(
-                g.check_at(Some(&raw), at),
-                Decision::Accept(Some(_))
-            ));
+        let clock = crate::clock::Set::new();
+        let g = gate(d.path(), clock.clone());
+        for _ in 0..50 {
+            assert!(matches!(g.check(Some(&raw)), Decision::Accept(Some(_))));
+            clock.advance(Duration::from_millis(200));
         }
         assert_eq!(g.touches.load(Ordering::Relaxed), 1);
+        clock.advance(TOUCH_EVERY);
+        assert!(matches!(g.check(Some(&raw)), Decision::Accept(Some(_))));
+        assert_eq!(g.touches.load(Ordering::Relaxed), 2);
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {
             let used: Option<String> = conn
@@ -263,12 +261,6 @@ mod tests {
             }
             assert!(Instant::now() < deadline, "last_used_at was not written");
             std::thread::sleep(Duration::from_millis(20));
-        }
-    }
-
-    impl Gate {
-        fn state_at(&self, now: Instant) -> State {
-            self.with_snapshot(now, |s| s.state).unwrap()
         }
     }
 }
