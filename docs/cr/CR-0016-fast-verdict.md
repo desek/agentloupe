@@ -135,9 +135,10 @@ flowchart TD
 | Metric | Method | Baseline | Threshold |
 |---|---|---|---|
 | Warm full verdict | `.agents/scripts/pipeline.verdict.sh --no-cache`, second run, total seconds, with the image stage (`IMAGE_IN_DEFAULT` is `yes`) | about 104 s (2026-10-21) | at most 40 s, every stage `status: passed` |
-| Test stage | seconds of the `test` line in the run above | 99 s | at most 30 s |
+| Test stage, first run after a Rust edit | seconds of the `test` line in the run above, on this Mac with the macOS first-start scan of the new test binaries | 99 s | at most 210 s (decided by the human on 2026-10-21, see Decisions) |
+| Test stage, warm run | seconds of the `test` line of a second `--no-cache` run after the same edit | 99 s | at most 30 s |
 | Docs-only change | edit `docs/specification/operations.md`, then `.agents/scripts/pipeline.verdict.sh`, total seconds | about 104 s | at most 3 s, every stage `status: cached`, exit 0 |
-| Web-only change | edit a file under `web/`, then the verdict | about 104 s | format, lint, test `status: cached`; web and image `status: passed`, because the Dockerfile copies `web` (requirement 10) |
+| Web-only change | edit a file under `web/`, then the verdict | about 104 s | format `status: cached`; lint, test, web, and image `status: passed`, because `build.rs` embeds `web/`, the tests read it, and the Dockerfile copies it (requirement 10) |
 | Soundness | test `tests/pipeline.cache.rs` (see Test Strategy) | no cache exists | a changed input always runs its stage; a failed stage never gives `status: cached` |
 | Input coverage | test `tests_read_only_declared_inputs` | no check exists | every path that a test reads is a declared input of the test stage |
 | Toolchain in fingerprint | test `toolchain_change_runs_stage` | no check exists | a changed `--toolchain` output runs the stage |
@@ -289,7 +290,8 @@ Given the verdict passed on the current tree
 And I change a file under web/
 When I run .agents/scripts/pipeline.verdict.sh
 Then the web line has status: passed
-And the format, lint, and test lines have status: cached
+And the format line has status: cached
+And the lint and test lines have status: passed, because build.rs embeds web/ into the crate and the tests read it
 And the image line has status: passed, because the Dockerfile copies web
 ```
 
@@ -418,6 +420,8 @@ Pending the reviewer.
 ## Decisions
 
 * nextest without a fallback, per the request of the supervisor and the measured gain (99 s to 24 s).
+* 2026-10-21, the human: the test-stage target after a Rust edit is raised to 210 seconds on this Mac, because macOS scans each freshly linked test binary on its first start (140 to 170 seconds for 82 binaries), a machine cost outside the repository; the warm second run keeps the 30-second target so the loop itself stays measured. Evidence: three measurements of 166.6, 181.3, and 201.5 seconds on the first run and 27.7 to 29.5 seconds on the warm run.
+* 2026-10-21, the supervisor: `web/` is an input of the lint and test stages, because `build.rs` embeds it and the tests read it; the safety invariant of the fast feedback loop wins over the web-only expectation, so AC-5 and the web-only target row changed.
 * 2026-10-21, the human: the image stage stays in the default verdict. Parameter `IMAGE_IN_DEFAULT` is `yes`. Requirement 26, AC-5, and the targets use this value.
 * 2026-10-21, the human: the real-timer tests get a paused clock or shorter configurable timers where the test asserts a timer. A separate small CR (CR-0017) does this work. It is out of scope of this CR.
 
