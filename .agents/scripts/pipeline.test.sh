@@ -23,13 +23,13 @@ human=0
 usage() { awk 'NR>=4 && /^#/ {sub(/^# ?/, ""); print; next} NR>=4 {exit}' "$0"; }
 
 # The declared inputs: a change outside them cannot change the result of this stage. web is declared
-# because build.rs embeds web/ into the crate and tests read web/; a test checks that every repository
+# because build.rs embeds web/ into the crate and tests read web/; Dockerfile because a test reads its COPY lines; a test checks that every repository
 # path that a test reads is in this list.
 inputs() {
   printf '%s\n' src tests Cargo.toml Cargo.lock build.rs migrations vendor rust-toolchain.toml examples \
     .cargo rustfmt.toml .rustfmt.toml clippy.toml .clippy.toml .agents/scripts/pipeline.test.sh \
     .tool-versions .config/nextest.toml upstreams.toml config .agents/scripts \
-    docs/specification/accounts.md web
+    docs/specification/accounts.md web Dockerfile
 }
 toolchain() { (cd "$ROOT" && rustc -V && cargo -V && cargo nextest --version | head -n 1); }
 

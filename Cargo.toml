@@ -348,3 +348,19 @@ path = "tests/providers_route.rs"
 [[test]]
 name = "private_config"
 path = "tests/private_config.rs"
+
+[[test]]
+name = "pipeline_cache"
+path = "tests/pipeline.cache.rs"
+
+[[test]]
+name = "pipeline_fingerprint"
+path = "tests/pipeline.fingerprint.rs"
+
+[[test]]
+name = "pipeline_test_runner"
+path = "tests/pipeline.test.runner.rs"
+
+[[test]]
+name = "pipeline_inputs"
+path = "tests/pipeline.inputs.rs"
