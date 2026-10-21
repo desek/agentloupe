@@ -25,6 +25,8 @@
   --color-input: #5E86E0;
   --color-output: #BB7F35;
   --color-positive: #3FA864;
+  --color-cache-read: #8C6BC8;
+  --color-cache-write: #4FA3A5;
   --color-highlight: #D9C27A;
   --color-link: #9DB6EE;
   --color-link-hover: #C9D7F6;
@@ -35,6 +37,7 @@
   --heat-4: #4FCB74;
   --font-sans: 'Geist', system-ui, sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --space-card-gap: 24px;
   --size-headline: 72px;
   --size-figure: 34px;
   --size-figure-small: 30px;

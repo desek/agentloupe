@@ -216,3 +216,32 @@ async fn no_cookie_set() {
         assert!(!res.headers().contains_key("set-cookie"), "{path}");
     }
 }
+
+/// The cost footnote names LiteLLM, the price file, and the short commit from vendor/litellm/SOURCE.md.
+#[tokio::test(flavor = "multi_thread")]
+async fn cost_footnote_has_price_commit() {
+    let source = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/vendor/litellm/SOURCE.md"
+    ))
+    .unwrap();
+    let line = source
+        .lines()
+        .find(|l| l.starts_with("| Commit |"))
+        .unwrap();
+    let commit = line.split('`').nth(1).unwrap();
+    let l = start(&[]);
+    let body = reqwest::get(l.url("/"))
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    assert!(body.contains("LiteLLM"), "{body}");
+    assert!(body.contains("model_prices_and_context_window.json"));
+    assert!(body.contains(&format!("<code>{}</code>", &commit[..7])));
+    assert!(
+        body.contains(r#"href="https://github.com/BerriAI/litellm" rel="noopener noreferrer""#)
+    );
+    assert!(!body.contains("{{price_commit}}"));
+}

@@ -66,6 +66,8 @@ export function build(resp, key) {
       tokens: sum(tok),
       input: s('input_total'),
       output: s('output'),
+      cacheRead: s('cache_read'),
+      cacheWrite: s('cache_write'),
       cost: s('cost_usd'),
       unpriced: s('unpriced_calls'),
       prsOpened: s('prs_opened'),

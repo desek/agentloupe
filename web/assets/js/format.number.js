@@ -26,3 +26,8 @@ export function usd(n) {
   const [int, frac] = Math.abs(v).toFixed(2).split('.');
   return `${v < 0 ? '-' : ''}$${grouped(int)}.${frac}`;
 }
+
+/** A share (0 to 1) as a percentage with one decimal, for example 42.5%. */
+export function percent(share) {
+  return `${(Math.round((Number(share) || 0) * 1000) / 10).toFixed(1)}%`;
+}

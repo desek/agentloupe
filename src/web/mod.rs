@@ -2,6 +2,7 @@
 
 pub mod embed;
 pub mod etag;
+pub mod footnote;
 pub mod headers;
 pub mod path;
 pub mod serve;
@@ -32,7 +33,8 @@ impl Site {
                 let content_type = embed::content_type(path)?;
                 let body: Cow<'static, [u8]> = if *path == "index.html" {
                     Cow::Owned(
-                        title::apply(&String::from_utf8_lossy(bytes), site_title).into_bytes(),
+                        footnote::apply(&title::apply(&String::from_utf8_lossy(bytes), site_title))
+                            .into_bytes(),
                     )
                 } else {
                     Cow::Borrowed(*bytes)
