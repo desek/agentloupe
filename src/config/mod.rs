@@ -28,6 +28,8 @@ pub struct Config {
     pub headers_timeout: std::time::Duration,
     /// The raw bootstrap token, already checked against the token format.
     pub bootstrap_token: Option<secret::Secret>,
+    /// The admin token of the private page, at least 32 characters; None (unset or empty) turns the page off.
+    pub admin_token: Option<secret::Secret>,
     /// Seconds with no call after which the parser closes a session segment.
     pub idle_secs: u64,
     /// The time between two passes of the parser worker.

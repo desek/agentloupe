@@ -89,6 +89,17 @@ fn check(e: &Entry) -> Result<(), ConfigError> {
                 ],
             )
         }),
+        // An empty value turns the private page off; a short value would be easy to guess.
+        ("LOUPE_ADMIN_TOKEN", Some(v)) if !v.is_empty() && v.chars().count() < 32 => {
+            Err(ConfigError::new(
+                n,
+                "has fewer than 32 characters, so the private page would be easy to open",
+                vec![
+                    format!("run `loupe token generate` and put the value in .env as {n}=<value>"),
+                    format!("unset {n} to turn the private page off"),
+                ],
+            ))
+        }
         ("LOUPE_PUBLISH_AT", Some(v)) if super::publish_at(v).is_none() => {
             Err(bad(n, "is not a time in HH:MM", "a time such as 01:00"))
         }
@@ -159,6 +170,9 @@ impl Loaded {
             bootstrap_token: self
                 .get("LOUPE_BOOTSTRAP_TOKEN")
                 .and_then(text)
+                .map(|v| super::secret::Secret::new(v.to_string())),
+            admin_token: opt("LOUPE_ADMIN_TOKEN")
+                .filter(|v| !v.is_empty())
                 .map(|v| super::secret::Secret::new(v.to_string())),
             idle_secs: num("LOUPE_IDLE_SECS"),
             site_title: get("LOUPE_SITE_TITLE").trim().to_string(),
