@@ -2,7 +2,7 @@
 name: "CR-0016 Fast verdict by content"
 description: "Makes the local verdict fast and keeps it sound: the test stage runs cargo nextest, the verdict caches passed results by the exact content fingerprint of the tree and of each stage's inputs, and an unchanged stage prints status: cached, so a docs-only change gets a verdict in at most 3 seconds and a warm full verdict takes at most 40 seconds."
 id: "CR-0016"
-status: "draft"
+status: "approved"
 date: 2026-10-21
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
@@ -97,14 +97,14 @@ flowchart TD
 
 12. The tree fingerprint **MUST** be the git tree hash of a temporary index that holds `HEAD` plus every tracked change and every untracked file that `.gitignore` does not exclude. The verdict **MUST** make it with `GIT_INDEX_FILE` set to a temporary file, `git add -A`, and `git write-tree`. The verdict **MUST NOT** change the real index, the working tree, or the stash.
 13. The stage fingerprint **MUST** be the hash of the sorted list of `<path> <object id>` entries for the declared inputs of the stage in that same temporary tree, plus the name of the stage, plus the toolchain identity of the stage (requirement 13a).
-13a. Each stage entry point **MUST** support a flag `--toolchain` that prints the versions of the tools outside the tree that the stage uses, and the verdict **MUST** add that output to the stage fingerprint: format and lint `rustc -V` and `cargo -V`; test also `cargo nextest --version`; web `node --version` and the version of the package manager; image `docker version --format '{{.Server.Version}}'` and the resolved digest of each `FROM` image. A `--toolchain` that fails, or a base image whose digest cannot be resolved, **MUST** make the stage run in full (requirement 21).
+13a. Each stage entry point **MUST** support a flag `--toolchain` that prints the versions of the tools outside the tree that the stage uses, and the verdict **MUST** add that output to the stage fingerprint: format and lint `rustc -V` and `cargo -V`; test also `cargo nextest --version`; web `node --version` and the version of the package manager; image `docker version --format '{{.Server.Version}}'` and the digest of each `FROM` image as the local Docker image store gives it (`docker image inspect`), without a network call. A `--toolchain` that fails, or a base image that is absent from the local image store, **MUST** make the stage run in full (requirement 21).
 14. A fingerprint **MUST** depend only on content. Two trees with equal content **MUST** give the same fingerprint, whatever their commits.
 
 **Verdict cache**
 
 15. The cache **MUST** be stored under `.agents/logs/` and **MUST NOT** be tracked by git.
 16. The verdict **MUST** write the fingerprint of a stage to the cache only after the stage passed in a run of this verdict. A failed stage **MUST NOT** write.
-17. If the tree fingerprint equals a tree fingerprint for which every stage passed, the verdict **MUST** print each stage with `status: cached` and exit 0.
+17. The tree-level cache entry **MUST** be keyed on the tree fingerprint plus the `--toolchain` output of every stage. If that key equals a key for which every stage passed, the verdict **MUST** print each stage with `status: cached` and exit 0. A tree fingerprint match alone **MUST NOT** skip a stage.
 18. Else, for each stage, if the stage fingerprint equals the last passed fingerprint of that stage, the verdict **MUST** print `status: cached` for the stage and **MUST NOT** run it. Else it **MUST** run the stage.
 19. A stage line **MUST** keep the form `stage: <name> status: passed|failed|cached seconds: <n>`. The verdict line **MUST** stay `verdict: passed|failed seconds: <total>`. A cached stage counts as passed for the exit code.
 20. The flag `--no-cache` **MUST** run every stage and **MUST** still write the passed fingerprints.
@@ -116,7 +116,7 @@ flowchart TD
 
 24. Only the hermetic stages format, lint, test, web, and image **MUST** enter the verdict. Live scenarios and benches **MUST** stay outside the verdict, as today.
 25. The verdict **MUST** stay a caller of the stage entry points. The fingerprint and cache logic **MUST** live in a separate script under `.agents/scripts/` that the verdict calls, so that each file has one purpose.
-26. The image stage **MUST** be in the default verdict if parameter `IMAGE_IN_DEFAULT` is `yes`, and **MUST** move behind a `--full` flag if it is `no`. `IMAGE_IN_DEFAULT` is pending the human (open question 2); provisional value: `yes`.
+26. The image stage **MUST** be in the default verdict.
 
 **Documentation**
 
@@ -134,10 +134,10 @@ flowchart TD
 
 | Metric | Method | Baseline | Threshold |
 |---|---|---|---|
-| Warm full verdict | `.agents/scripts/pipeline.verdict.sh --no-cache`, second run, total seconds (with the image stage, also if `IMAGE_IN_DEFAULT` is `no`, through `--full`) | about 104 s (2026-10-21) | at most 40 s, every stage `status: passed` |
+| Warm full verdict | `.agents/scripts/pipeline.verdict.sh --no-cache`, second run, total seconds, with the image stage (`IMAGE_IN_DEFAULT` is `yes`) | about 104 s (2026-10-21) | at most 40 s, every stage `status: passed` |
 | Test stage | seconds of the `test` line in the run above | 99 s | at most 30 s |
 | Docs-only change | edit `docs/specification/operations.md`, then `.agents/scripts/pipeline.verdict.sh`, total seconds | about 104 s | at most 3 s, every stage `status: cached`, exit 0 |
-| Web-only change | edit a file under `web/`, then the verdict | about 104 s | format, lint, test `status: cached`; image `status: cached` if `IMAGE_IN_DEFAULT` is `yes`, else no image line; web `status: passed` |
+| Web-only change | edit a file under `web/`, then the verdict | about 104 s | format, lint, test `status: cached`; web and image `status: passed`, because the Dockerfile copies `web` (requirement 10) |
 | Soundness | test `tests/pipeline.cache.rs` (see Test Strategy) | no cache exists | a changed input always runs its stage; a failed stage never gives `status: cached` |
 | Input coverage | test `tests_read_only_declared_inputs` | no check exists | every path that a test reads is a declared input of the test stage |
 | Toolchain in fingerprint | test `toolchain_change_runs_stage` | no check exists | a changed `--toolchain` output runs the stage |
@@ -161,7 +161,7 @@ flowchart TD
 
 ### Out of Scope ("Here, But Not Further")
 
-* A change to the timers in the tests (open question 1).
+* A change to the timers in the tests (see Decisions, item 2; a separate CR, CR-0017).
 * A verdict cache on a platform, or a shared remote cache.
 * A change to the Dockerfile or to the stages themselves, other than the runner.
 * Removal of a test or a stage.
@@ -290,10 +290,8 @@ And I change a file under web/
 When I run .agents/scripts/pipeline.verdict.sh
 Then the web line has status: passed
 And the format, lint, and test lines have status: cached
-And the image line has status: cached if IMAGE_IN_DEFAULT is yes
+And the image line has status: passed, because the Dockerfile copies web
 ```
-
-AC-5 depends on parameter `IMAGE_IN_DEFAULT` (pending the human).
 
 ### AC-6: A failure is never cached
 
@@ -397,30 +395,35 @@ Mitigation: only a passed stage writes, writes are atomic, and any read error ru
 
 About one unit of work: six scripts, four test files, and three documents.
 
-## Open Questions
-
-1. Do the long real-timer tests get a paused clock or shorter configurable timers? Recommendation: yes, where the test asserts a timer and not a real socket. Out of scope of this CR.
-2. Parameter `IMAGE_IN_DEFAULT`: does the image stage stay in the default verdict? Recommendation: `yes`, because its fingerprint makes it instant on an unchanged input set. Status: pending the human. The supervisor must send this question through the structured question tool and record the answer here. Requirement 26, AC-5, and the web-only and warm full verdict targets depend on it.
-
 ## Decision Outcome
 
 Pending the reviewer.
+
+## Notes
+
+* The reviewer did not load the governance skill. The review used the CR text, the Dockerfile, and the taxonomy rows.
+* Both decisions of 2026-10-21 are in Decisions with the date. `IMAGE_IN_DEFAULT` is `yes`. No parameter stays pending.
+* Judgement Calls and the front matter now both give the status `draft`.
+* Requirement 13a uses the digest of the local image, so the docs-only target of 3 s needs no network.
+* Requirement 26 keeps only the rule. The decision stays in Decisions.
+* Requirements 11a and 13a are numbered out of sequence. Renumber them in the next edit.
 
 ## Judgement Calls
 
 * The cache sits under `.agents/logs/`, because that path is already git-ignored and holds pipeline state.
 * A separate fingerprint script keeps the verdict a caller only (`portable_pipeline`, small files).
 * The cache keeps 200 trees, which covers a long session and stays small.
-* Status `proposed`, because the governance skill sets that initial status.
+* Status `draft`, the same value as the front matter.
 
 ## Decisions
 
 * nextest without a fallback, per the request of the supervisor and the measured gain (99 s to 24 s).
+* 2026-10-21, the human: the image stage stays in the default verdict. Parameter `IMAGE_IN_DEFAULT` is `yes`. Requirement 26, AC-5, and the targets use this value.
+* 2026-10-21, the human: the real-timer tests get a paused clock or shorter configurable timers where the test asserts a timer. A separate small CR (CR-0017) does this work. It is out of scope of this CR.
 
 ## Open Questions
 
-1. Do the long real-timer tests (15 s heartbeat, 10 s waits) get a paused clock or shorter configurable timers, to cut the 24 s further? Recommendation: yes, where the test asserts a timer and not a real socket. This is out of scope here and pending the human.
-2. Does the image stage leave the default verdict and move to a `--full` flag? Recommendation: no. Keep it, because its fingerprint makes it instant on an unchanged input set. Requirement 26 holds this recommendation as provisional, pending the human.
+None is open. The human answered both questions on 2026-10-21 (see Decisions).
 
 ## Implementation Status
 
