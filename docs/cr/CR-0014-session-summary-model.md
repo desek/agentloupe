@@ -138,8 +138,6 @@ sequenceDiagram
 21. A text with fewer than 2 words after the scrub **MUST** give the status `skipped`.
 22. The public API **MUST NOT** publish a full session summary or a session day summary. They are for reference and for a check of correctness.
 
-27c. The summary worker **MUST NOT** send a model request for the line of a segment, and **MUST NOT** write a new row of `session_summaries`. The existing rows stay (requirements 19 and 28). The worker **MUST** find new work from the two new tables or from the close time of the segment, not from `session_summaries`.
-
 **Day line**
 
 23. `build_day_line(day)` **MUST** read the `done` session day summaries of the day in place of the `done` session summaries, and **MUST** keep the statuses `empty`, `done`, `fallback`, and `not_ready` of CR-0006 requirements 32 to 36.
@@ -152,6 +150,7 @@ sequenceDiagram
 27. The model **MUST** apply to backfilled sessions and to proxied sessions, one model for every session.
 27a. The raw-body retention **MUST NOT** delete the bodies of an exchange until the session day summary of each day of the session of each of its calls has a final status. A final status is `done`, `skipped`, `failed`, or `disabled`. While a segment of the session stays open, the bodies of the session stay, with no time limit; Risk 4 accepts this hold. The retention **MUST NOT** need a `session_summaries` row, and the summary time of the retention **MUST** be the latest updated time of the session day summaries of the session. The other conditions of the retention stay in force.
 27b. The retention worker **MUST** log the count of the exchanges whose bodies it keeps under requirement 27a, as the counter `bodies_held`, on each run.
+27c. The summary worker **MUST NOT** send a model request for the line of a segment, and **MUST NOT** write a new row of `session_summaries`. The existing rows stay (requirements 19 and 28). The worker **MUST** find new work from the two new tables or from the close time of the segment, not from `session_summaries`.
 28. A flag `loupe summarize --rebuild-days FROM..TO` **MUST** make or reset the rows of `session_full_summaries` and `session_day_summaries` for each day in the range to `pending`, and then **MUST** rebuild the day line of each day in the range. The flag **MUST NOT** change rows of `session_summaries` or rows outside the range.
 29. The flag `--rebuild-days` **MUST** support `--dry-run`, which prints the counter `summaries_reset` and changes nothing.
 30. A missing or bad value of that flag **MUST** fail with exit code 2 and an actionable error on stderr that names the valid form.
@@ -489,6 +488,26 @@ Then the request holds the text of the remaining bodies
   And the log holds the error kind bodies_missing with only the session key and the day
 ```
 
+### AC-20: The worker sends no line request
+
+```gherkin
+Given a closed segment of a session
+When the summary worker runs
+Then it sends no model request for the line of the segment
+  And it writes no new row of session_summaries
+  And the existing rows of session_summaries stay
+```
+
+### AC-21: The private list shows the session day summary
+
+```gherkin
+Given a session with a segment that starts on day D in LOUPE_TZ
+  And a done session day summary of that session for day D
+When GET /private/api/v1/sessions lists the segment
+Then the text of the row is the session day summary of day D
+  And it is not the full session summary
+```
+
 ## Quality Standards Compliance
 
 ### Build & Compilation
@@ -559,7 +578,7 @@ Pending the reviewer agent.
 3. Decided by the human on 2026-10-21, in answer to the former Open Question 1 (the origin of the sessions): the model applies to backfilled and proxied sessions, one model for every session. The proxied transcript uses the whole session history from the stored request bodies, so the raw-body retention waits until the session day summary of each day of the session has a final status. Requirements 8a, 8b, 27, and 27a state this.
 4. Decided by the human on 2026-10-21, in answer to the former Open Question 1 (the re-summary of earlier rows): option (a), the flag `loupe summarize --rebuild-days FROM..TO` with `--dry-run` and the counter `summaries_reset`. Options (b), a one-time migration, and (c), no rebuild, are rejected. Requirements 28 to 30 state this.
 
-5. Decided by the oracle on 2026-10-21 (Decision 1 of the oracle consultation): the summary worker sends no per-segment line request and writes no new `session_summaries` row, the table and its rows stay, and the private session list of CR-0011 requirement 16 shows the session day summary of the start day of the session; the line requests cost about 278 of 793 requests on the two-day window and no reader needs a new line. Two segments of one session on one day show the same text, a known property. The request-count target does not change, and the count is re-measured after the code change.
+5. Decided by the oracle on 2026-10-21 (Decision 1 of the oracle consultation): the summary worker sends no per-segment line request and writes no new `session_summaries` row, the table and its rows stay, and the private session list of CR-0011 requirement 16 shows the session day summary of the start day of the segment in LOUPE_TZ; the line requests cost about 278 of 793 requests on the two-day window and no reader needs a new line. Two segments of one session on one day show the same text, a known property. The request-count target does not change, and the count is re-measured after the code change.
 6. Decided by the oracle on 2026-10-21 (Decision 2 of the oracle consultation): the common-prefix cut of the proxied day transcript is the correct reading of requirement 13a, because only a turn-by-turn comparison keeps a new conversation or a compacted history whole; the CR and the specification change, not the code.
 
 ## Open Questions
