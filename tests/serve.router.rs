@@ -30,13 +30,15 @@ async fn check_reserved(l: &Loupe) {
             "{path}"
         );
     }
-    for path in ["/v1/other", "/assets/app.js"] {
+    for path in ["/v1/other", "/assets/app.js", "/live/x"] {
         assert_eq!(
             reqwest::get(l.url(path)).await.unwrap().status(),
             404,
             "{path}"
         );
     }
+    // The live route takes /live, so the proxy never gets it.
+    assert_eq!(reqwest::get(l.url("/live")).await.unwrap().status(), 426);
     tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
     assert_eq!(fake::HITS.load(std::sync::atomic::Ordering::SeqCst), 0);
     assert_eq!(l.rows(), 0);

@@ -210,6 +210,7 @@ tracing-subscriber = { version = "0.3", features = ["fmt", "registry"] }
 [dev-dependencies]
 jsonschema = { version = "0.59.0", default-features = false }
 tempfile = "3"
+tokio = { version = "1", features = ["test-util"] }
 tokio-tungstenite = "0.29"
 
 [[test]]
@@ -275,3 +276,31 @@ path = "tests/calls.schema.rs"
 [[test]]
 name = "calls_readers"
 path = "tests/calls.readers.rs"
+
+[[test]]
+name = "live_route"
+path = "tests/live.route.rs"
+
+[[test]]
+name = "live_events"
+path = "tests/live.events.rs"
+
+[[test]]
+name = "live_rate"
+path = "tests/live.rate.rs"
+
+[[test]]
+name = "live_backpressure"
+path = "tests/live.backpressure.rs"
+
+[[test]]
+name = "live_latency"
+path = "tests/live.latency.rs"
+
+[[test]]
+name = "live_memory"
+path = "tests/live.memory.rs"
+
+[[test]]
+name = "config_live"
+path = "tests/config.live.rs"

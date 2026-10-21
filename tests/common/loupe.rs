@@ -228,6 +228,11 @@ impl Loupe {
         }
     }
 
+    /// The process ID of the server, for a read of its resident memory.
+    pub fn pid(&self) -> u32 {
+        self.child.id()
+    }
+
     pub fn url(&self, path: &str) -> String {
         format!("http://127.0.0.1:{}{path}", self.port)
     }

@@ -154,6 +154,23 @@ async fn security_headers_on_root() {
     assert!(!h.contains_key("access-control-allow-origin"));
 }
 
+/// The live section opens a same-origin socket under the unchanged policy of the page.
+#[tokio::test(flavor = "multi_thread")]
+async fn csp_connect_src_self_unchanged() {
+    let l = start(&[]);
+    let res = reqwest::get(l.url("/")).await.unwrap();
+    let csp = res.headers()["content-security-policy"]
+        .to_str()
+        .unwrap()
+        .to_string();
+    assert_eq!(
+        csp,
+        "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    );
+    let html = res.text().await.unwrap();
+    assert!(html.contains("/assets/css/live.css"));
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn post_is_405() {
     let l = start(&[]);

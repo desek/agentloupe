@@ -156,6 +156,7 @@ it shows is public.
 | Section | Data |
 |---|---|
 | Header | Title from `LOUPE_SITE_TITLE`, token velocity as the headline, time of the last update, range selector (3M, 6M, 1Y) |
+| Live | Below the headline: calls, tokens, open segments, and API-equivalent cost of the current day, the exchanges in flight, and a rolling chart of tokens per 10 seconds over the last 10 minutes, from the WebSocket route `/live` |
 | Pull requests | PRs opened and PRs merged for the range, bar chart per week |
 | Lines changed | The lines card shows lines added, lines removed, and net lines for the selected range |
 | Tokens per day | Input and output, two line charts, each on its own scale |
@@ -167,7 +168,9 @@ it shows is public.
 The headline is the token velocity: the input and output tokens of the range divided by the
 days of the range, in tokens per day. The ranges are 3M (the last 91 days), 6M (the last 182
 days), and 1Y (the last 365 days), each ending on the newest day of the API. The URL fragment
-keeps the range, for example `#range=6M`. The subscription cost card shows the subscription
+keeps the range, for example `#range=6M`. The live section updates while calls occur. When the
+socket closes it shows "Live feed paused, reconnecting" and connects again; `LOUPE_LIVE_ENABLED=false`
+removes the route, and the page then hides the section. The subscription cost card shows the subscription
 cost of the range next to the API-equivalent cost. The page shows only sums for the range. It
 shows no streaks and no record days.
 
@@ -393,6 +396,7 @@ the public API.
 | Exchange metadata | Agent, upstream, method, path, status, sizes, timing |
 | Calls | Model, status, token counts, cost |
 | Public data | Daily totals, totals per agent and per model, PR and line counts, one summary line per day |
+| Live feed (`/live`) | Counts and token sums only: exchange start and end with the HTTP status, the five token counts and the cost of each call, the open segment count. No agent, model, prompt, body, path, header, key, or token |
 
 A call that `loupe backfill` reads from a session log stores only the token counts, the model, the
 time, and HMAC keys; it stores no prompt, no path, no directory name, and no raw ID of the log.
