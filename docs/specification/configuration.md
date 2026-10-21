@@ -36,7 +36,7 @@ The flag `--env` or the variable `LOUPE_ENV` gives the name of the environment. 
 | `LOUPE_SUMMARY_BASE_URL` | no | no | `https://api.anthropic.com` |
 | `LOUPE_SUMMARY_INTERVAL_SECS` | no | no | `30` |
 | `LOUPE_SUMMARY_MAX_ATTEMPTS` | no | no | `5` |
-| `LOUPE_SUMMARY_MIN_CONVERSATION_CHARS` | no | no | `400` |
+| `LOUPE_SUMMARY_MIN_CONVERSATION_CHARS` | no | no | `200` |
 | `LOUPE_TZ` | no | no | `Europe/Stockholm` |
 | `LOUPE_PUBLISH_AT` | no | no | `01:00` |
 | `LOUPE_PUBLISH_INTERVAL_SECS` | no | no | `60` |

@@ -67,7 +67,7 @@ fn check(e: &Entry) -> Result<(), ConfigError> {
         ("LOUPE_SUMMARY_MIN_CONVERSATION_CHARS", Some(v)) if v.parse::<u64>().is_err() => Err(bad(
             n,
             "is not a whole number of 0 or more",
-            "a whole number of characters, 0 or more, such as 400",
+            "a whole number of characters, 0 or more, such as 200",
         )),
         ("LOUPE_SUMMARY_BASE_URL", Some(v)) if !https_or_loopback(v) => Err(bad(
             n,

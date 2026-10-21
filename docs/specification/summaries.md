@@ -34,7 +34,7 @@ The builder applies these rules:
 1. It removes the system prompt (`system` or `instructions`) and the tool definitions.
 2. It removes each `<system-reminder>...</system-reminder>` block from the message text.
 3. It makes the conversation transcript first, from the user and assistant text only.
-4. If the conversation transcript has fewer than `LOUPE_SUMMARY_MIN_CONVERSATION_CHARS` characters (default `400`), it adds the tool inputs and the tool results in line order, each clipped to at most 300 characters with the marker `[clipped]`. Otherwise it adds no tool input and no tool result. For a day transcript, the builder measures the threshold on the day transcript.
+4. If the conversation transcript has fewer than `LOUPE_SUMMARY_MIN_CONVERSATION_CHARS` characters (default `200`), it adds the tool inputs and the tool results in line order, each clipped to at most 300 characters with the marker `[clipped]`. Otherwise it adds no tool input and no tool result. For a day transcript, the builder measures the threshold on the day transcript.
 5. It writes each turn as one line that starts with `user:` or `assistant:`.
 6. It replaces an image or another binary part with the marker `[attachment]`.
 7. If the transcript is longer than 24000 characters, it keeps the first 6000 and the last 18000 characters. It puts the marker `[... earlier turns omitted ...]` between them.
