@@ -135,7 +135,7 @@ flowchart TD
 | Metric | Method | Baseline | Threshold |
 |---|---|---|---|
 | Warm full verdict | `.agents/scripts/pipeline.verdict.sh --no-cache`, second run, total seconds, with the image stage (`IMAGE_IN_DEFAULT` is `yes`) | about 104 s (2026-10-21) | at most 40 s, every stage `status: passed` |
-| Test stage, first run after a Rust edit | seconds of the `test` line in the run above, on this Mac with the macOS first-start scan of the new test binaries | 99 s | at most 210 s (decided by the human on 2026-10-21, see Decisions) |
+| Test stage, first run after a Rust edit | seconds of the `test` line in the run above, on this Mac with the macOS first-start scan of the new test binaries | 99 s | at most 300 s (decided by the human on 2026-10-21, see Decisions) |
 | Test stage, warm run | seconds of the `test` line of a second `--no-cache` run after the same edit | 99 s | at most 30 s |
 | Docs-only change | edit `docs/specification/operations.md`, then `.agents/scripts/pipeline.verdict.sh`, total seconds | about 104 s | at most 3 s, every stage `status: cached`, exit 0 |
 | Web-only change | edit a file under `web/`, then the verdict | about 104 s | format `status: cached`; lint, test, web, and image `status: passed`, because `build.rs` embeds `web/`, the tests read it, and the Dockerfile copies it (requirement 10) |
@@ -420,6 +420,7 @@ Pending the reviewer.
 ## Decisions
 
 * nextest without a fallback, per the request of the supervisor and the measured gain (99 s to 24 s).
+* 2026-10-21, the human, second decision: the first-run target is raised again to 300 seconds, because the re-measurement gave 206.7, 225.4, 234.8, and 255.1 seconds on the first run with the scan; the warm run stays at 30 seconds (measured 26.7 seconds). Evidence: the measurement of 2026-10-21 in docs/specification/operations.md.
 * 2026-10-21, the human: the test-stage target after a Rust edit is raised to 210 seconds on this Mac, because macOS scans each freshly linked test binary on its first start (140 to 170 seconds for 82 binaries), a machine cost outside the repository; the warm second run keeps the 30-second target so the loop itself stays measured. Evidence: three measurements of 166.6, 181.3, and 201.5 seconds on the first run and 27.7 to 29.5 seconds on the warm run.
 * 2026-10-21, the supervisor: `web/` is an input of the lint and test stages, because `build.rs` embeds it and the tests read it; the safety invariant of the fast feedback loop wins over the web-only expectation, so AC-5 and the web-only target row changed.
 * 2026-10-21, the human: the image stage stays in the default verdict. Parameter `IMAGE_IN_DEFAULT` is `yes`. Requirement 26, AC-5, and the targets use this value.
