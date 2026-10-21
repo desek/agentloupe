@@ -13,13 +13,17 @@ The product domains are `agentloupe.dev` and `agentloupe.app`.
 
 ## Status
 
-The project is at the brainstorm stage. No code base exists yet. The two sources in
-[`brainstorm/`](brainstorm/) record the brainstorm:
+The `loupe` binary is implemented. Thirteen change requests under [`docs/cr/`](docs/cr/) carry the
+specification of each part, and [`docs/specification/`](docs/specification/) describes the behaviour
+of the code. The binary runs in the container, captures Claude Code and Pi through the proxy, prices
+and summarizes the calls, publishes the day records, serves the dashboard with its live section and
+the private page, and backfills the session logs that predate the proxy. The two archives in
+[`brainstorm/`](brainstorm/) record the brainstorm and stay as reference only:
 
 | Source | What it is | Use |
 |---|---|---|
-| `brainstorm/agent-ledger.zip` | Untested prototype code for the proxy, in Rust. | Reference only, to understand the brainstorm. The code base is written from scratch to this README. |
-| `brainstorm/dashboard.grenemark.se-html.zip` | A design mockup of the public dashboard, with sample data. | Reference design for colors, sizes, and layout. Not production code. |
+| `brainstorm/agent-ledger.zip` | Untested prototype code for the proxy, in Rust. | Reference only. The code base was written from scratch to this README. |
+| `brainstorm/dashboard.grenemark.se-html.zip` | A design mockup of the public dashboard, with sample data. | The source of the design values of the dashboard. Not production code. |
 
 This README is the authority. Where a source differs from it, the README is correct.
 
