@@ -127,7 +127,7 @@ The headline is directly below the header, before every other section.
 
 The live section is directly below the headline. `live.md` gives the live route.
 
-1. The section shows four figures for the current day: calls, tokens (the sum of the five token counts), open segments, and API-equivalent cost. It also shows the count of exchanges in flight.
+1. The section shows four figures for the current day: calls, tokens (the sum of the five token counts), open segments, and API-equivalent cost. The label of the cost figure is "API-equivalent cost*". The asterisk refers to the asterisk sentence of the footer. The section also shows the count of exchanges in flight.
 2. The section shows a rolling chart of tokens for each 10-second bucket over the last 10 minutes. The chart is inline SVG with the design tokens of this page. The chart starts empty when the page loads.
 3. The page opens the socket with `ws://` or `wss://` at the page origin, path `/live`. The `snapshot` frame sets the figures, and each later frame adds to them.
 4. After a close, the page connects again after 1, 2, 4, 8, 16, and then 30 seconds. A `snapshot` frame resets this sequence.
@@ -146,17 +146,16 @@ The totals row shows only sums for the range. The page shows no streak, no count
 
 ### Pull requests
 
-1. The sum of `prs_opened` and the sum of `prs_merged`.
-2. A bar chart with one group per ISO week (Monday to Sunday) and two bars per group: opened and merged.
-
-### Lines changed in the range
-
-1. Two figures, each with a visible label: "lines added" (the sum of `lines_added`) and "lines removed" (the sum of `lines_removed`). The card shows no net value.
-2. Reason for "lines added": it shows how much new code the agent work put into the repositories in the range.
-3. Reason for "lines removed": it shows how much code the agent work deleted or replaced in the range. A reader compares it with the added figure to see the balance of growth and clean-up.
-4. The net value is not on the card. A reader cannot act on the net value alone, and the two labelled figures already show it.
-5. The added figure uses `--color-positive`. The removed figure uses `--color-output`. A negative number uses the minus sign U+2212.
-6. A change of range changes these figures.
+1. The pull request card is a wide card. At 1440 px it takes the width of two cards, and the tokens-per-day card keeps its own width beside it. The page shows no separate card for the lines.
+2. One horizontal legend row shows two items: opened and merged. Each item has its color square, its label, and its sum (the sum of `prs_opened` or of `prs_merged`) in the integer format of the totals.
+3. A bar chart with one group per ISO week (Monday to Sunday) and two bars per group: opened and merged. The chart fills the width of the card.
+4. The last element of the card is one footer line below the chart, in the note style of the card. The line shows "lines added" (the sum of `lines_added`) and "lines removed" (the sum of `lines_removed`), each with its label, in the integer format of the totals with a thin space as the group mark.
+5. Reason for "lines added": it shows how much new code the agent work put into the repositories in the range.
+6. Reason for "lines removed": it shows how much code the agent work deleted or replaced in the range. A reader compares it with the added figure to see the balance of growth and clean-up.
+7. The footer line shows no net value. A reader cannot act on the net value alone, and the two labelled figures already show it.
+8. The added figure uses `--color-positive`. The removed figure uses `--color-output`. A negative number uses the minus sign U+2212.
+9. A change of range changes the legend figures, the chart, and the footer line.
+10. At 360 px, the card takes the full width. The legend row and the footer line can wrap or stack when they do not fit on one row. The page has no horizontal scroll.
 
 ### Tokens per day
 
@@ -176,13 +175,10 @@ The totals row shows only sums for the range. The page shows no streak, no count
 
 ### Cost (API-equivalent)
 
-1. A card in the totals row with the label "Cost (API-equivalent)*". The asterisk refers to the footnote of item 6.
+1. A card in the totals row with the label "Cost (API-equivalent)*". The asterisk refers to the asterisk sentence of the footer.
 2. The sum of `cost_usd` in US dollars with two decimals.
-3. The text "List price of the tokens, not money paid."
-4. When the sum of `unpriced_calls` is more than zero, the text "<n> calls not priced", where `<n>` is that sum.
-5. A daily line chart of `cost_usd`, in the style of the token charts.
-6. A footnote line that starts with an asterisk. It names LiteLLM and its price file `model_prices_and_context_window.json` as the source of the prices. It links to `https://github.com/BerriAI/litellm` with a plain link that has `rel="noopener noreferrer"`. The page loads no remote script, style, or font for the footnote.
-7. The footnote names the short form of the price commit. The binary reads the commit from `vendor/litellm/SOURCE.md` at build time and puts it into the page when the server starts. The page code holds no literal commit, so a refresh of the prices also changes the footnote.
+3. When the sum of `unpriced_calls` is more than zero, the text "<n> calls not priced", where `<n>` is that sum.
+4. A daily line chart of `cost_usd`, in the style of the token charts.
 
 ### Subscription cost
 
@@ -210,7 +206,12 @@ The totals row shows only sums for the range. The page shows no streak, no count
 
 ### Footer
 
-The footer names the covered sources "Claude Code and Pi". It states that claude.ai chats are not covered.
+1. The footer shows the sentence "Covers Claude Code and Pi. claude.ai chats are not covered."
+2. Beside it, the footer shows one short sentence that starts with an asterisk, for example "* LiteLLM list prices at a1b2c3d, not money paid." The sentence states that the cost is a list price and not money paid.
+3. The word LiteLLM in the sentence is a plain link to `https://github.com/BerriAI/litellm` with `rel="noopener noreferrer"`.
+4. The sentence names the short form of the price commit. The binary reads the commit from `vendor/litellm/SOURCE.md` at build time and puts it into the page when the server starts. The page code holds no literal commit, so a refresh of the prices also changes the sentence.
+5. The page loads no remote script, style, or font for the footer.
+6. The gap between the footer and the cards above it is the gap token `--space-card-gap` of the cards.
 
 ## States
 
@@ -220,8 +221,8 @@ When the response holds no record, the page shows the header, the headline with 
 
 ### GitHub not connected
 
-1. When `prs_opened`, `prs_merged`, `lines_added`, and `lines_removed` are `null` in every record of the response, the pull request section and the lines section show "GitHub not connected" in place of the figures and the charts.
-2. When some records have `null` in these fields, a `null` counts as zero, and each of the two sections shows "Partial GitHub data".
+1. When `prs_opened`, `prs_merged`, `lines_added`, and `lines_removed` are `null` in every record of the response, the pull request card shows "GitHub not connected" in place of the legend, the chart, and the footer line.
+2. When some records have `null` in these fields, a `null` counts as zero, and the pull request card shows "Partial GitHub data" one time.
 
 ### Live feed paused
 
