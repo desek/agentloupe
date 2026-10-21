@@ -2,7 +2,7 @@
 name: "CR-0016 Fast verdict by content"
 description: "Makes the local verdict fast and keeps it sound: the test stage runs cargo nextest, the verdict caches passed results by the exact content fingerprint of the tree and of each stage's inputs, and an unchanged stage prints status: cached, so a docs-only change gets a verdict in at most 3 seconds and a warm full verdict takes at most 40 seconds."
 id: "CR-0016"
-status: "approved"
+status: "implemented"
 date: 2026-10-21
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
