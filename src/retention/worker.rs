@@ -1,4 +1,4 @@
-//! @agents-index The retention worker: nulls the bodies of parsed, summarized, not held exchanges after LOUPE_RAW_RETENTION_HOURS; logs bodies_held.
+//! @agents-index The retention worker: nulls the bodies of parsed, not held exchanges with final session texts after LOUPE_RAW_RETENTION_HOURS; logs bodies_held.
 
 use crate::session::time;
 use rusqlite::{Connection, params};
@@ -24,12 +24,15 @@ const HELD: &str = "EXISTS (SELECT 1 FROM calls c JOIN sessions s ON s.id = c.se
 /// The exchanges whose bodies can still go: parsed, not decrypt_failed, bodies present.
 const LIVE: &str = "FROM exchanges e WHERE e.bodies_deleted_at IS NULL AND e.parse_outcome IS NOT NULL AND e.parse_outcome != 'decrypt_failed'";
 
-/// The exchanges whose bodies can go: live, every call in a segment with a final summary, not held,
-/// and the later of the parse time and the summary time at or before the cutoff.
+/// The exchanges whose bodies can go: live, not held, and the later of the parse time and the summary
+/// time at or before the cutoff. The summary time is the latest update of the session day summaries
+/// of the session of each call. A call with no session day summary row holds the bodies: its pairs
+/// are not discovered yet.
 const ELIGIBLE: &str = "FROM exchanges e WHERE e.bodies_deleted_at IS NULL AND e.parse_outcome IS NOT NULL AND e.parse_outcome != 'decrypt_failed' \
-    AND NOT {HELD} AND NOT EXISTS (SELECT 1 FROM calls c LEFT JOIN session_summaries ss ON ss.session_id = c.session_id \
-        WHERE c.exchange_id = e.id AND (ss.status IS NULL OR ss.status = 'pending')) \
-    AND max(coalesce(e.parsed_at, ''), coalesce((SELECT max(ss.updated_at) FROM calls c JOIN session_summaries ss ON ss.session_id = c.session_id WHERE c.exchange_id = e.id), '')) <= ?1";
+    AND NOT {HELD} AND NOT EXISTS (SELECT 1 FROM calls c JOIN sessions s ON s.id = c.session_id WHERE c.exchange_id = e.id \
+        AND NOT EXISTS (SELECT 1 FROM session_day_summaries r WHERE r.session_key = s.key_hash)) \
+    AND max(coalesce(e.parsed_at, ''), coalesce((SELECT max(r.updated_at) FROM calls c JOIN sessions s ON s.id = c.session_id \
+        JOIN session_day_summaries r ON r.session_key = s.key_hash WHERE c.exchange_id = e.id), '')) <= ?1";
 
 /// One retention pass at `now_ms`. Keeps every other column; calls and sessions are never touched.
 pub fn pass(conn: &Connection, hours: u64, now_ms: i64, dry_run: bool) -> rusqlite::Result<Counts> {

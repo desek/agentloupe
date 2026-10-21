@@ -57,7 +57,7 @@ fn insert_pending(
 }
 
 /// Makes a pending row in both tables for each day of each session with new work: an open segment,
-/// or a closed segment with no final session line. Only those sessions are read, so the days of
+/// or a segment that closed after the last update of every session day summary of its session. Only those sessions are read, so the days of
 /// sessions that ended before the tables existed get rows only through a rebuild.
 /// `label` limits the sessions to one agent label; None reads every label.
 pub fn discover(
@@ -66,8 +66,9 @@ pub fn discover(
     label: Option<&str>,
     now: &str,
 ) -> rusqlite::Result<usize> {
-    let open_work = "s.key_hash IN (SELECT n.key_hash FROM sessions n LEFT JOIN session_summaries ss ON ss.session_id = n.id \
-        WHERE n.state = 'open' OR ss.id IS NULL OR ss.status = 'pending')";
+    // A new pending row has an update time after the close, so a closed segment is read once.
+    let open_work = "s.key_hash IN (SELECT n.key_hash FROM sessions n WHERE n.state = 'open' OR NOT EXISTS \
+        (SELECT 1 FROM session_day_summaries r WHERE r.session_key = n.key_hash AND r.updated_at >= n.closed_at))";
     let filter = match label {
         Some(_) => format!("s.agent_label = ?1 AND {open_work}"),
         None => open_work.to_string(),

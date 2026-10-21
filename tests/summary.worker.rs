@@ -1,4 +1,4 @@
-//! @agents-index Integration test: the summary worker writes a scrubbed line, handles SKIP and failures, disables without a credential.
+//! @agents-index Integration test: the summary worker writes the session texts and no segment line, handles SKIP and failures, disables without a credential.
 
 #[path = "common/backfill.rs"]
 mod bf;
@@ -44,18 +44,18 @@ fn run(l: &Loupe, url: &str) -> std::process::Output {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn closed_segment_gets_line() {
+async fn closed_segment_gets_session_texts_and_no_line() {
     let fake = fake::spawn().await;
     let l = one_closed(fake, 3).await;
     let out = run(&l, &base(fake, "line"));
     assert_eq!(loupe::count(&out, "segments_read"), 1);
     assert_eq!(loupe::count(&out, "done"), 1);
+    assert_eq!(scalar(&l, "SELECT count(*) FROM session_summaries"), 0);
     let line = text(
         &l,
-        "SELECT line FROM session_summaries WHERE status = 'done'",
+        "SELECT text FROM session_day_summaries WHERE status = 'done'",
     )
     .unwrap();
-    assert_eq!(line, "fixed the parser in per for in places");
     for bad in ["/", "@", "http", "42", ".rs"] {
         assert!(!line.contains(bad), "{line}");
     }
@@ -73,7 +73,8 @@ async fn skip_and_failures() {
     let l = one_closed(fake, 1).await;
     let out = run(&l, &base(fake, "skip"));
     assert_eq!(loupe::count(&out, "retry_later"), 1);
-    let row = "SELECT status || ':' || last_error_kind || ':' || attempts FROM session_summaries";
+    let row =
+        "SELECT status || ':' || last_error_kind || ':' || attempts FROM session_full_summaries";
     assert_eq!(text(&l, row).unwrap(), "pending:skip:1");
 
     let l = one_closed(fake, 1).await;
@@ -90,14 +91,18 @@ async fn skip_and_failures() {
         if i < 5 {
             assert_eq!(text(&l, row).unwrap(), format!("pending:rate_limited:{i}"));
             l.db()
-                .execute("UPDATE session_summaries SET next_attempt_at = NULL", [])
+                .execute(
+                    "UPDATE session_full_summaries SET next_attempt_at = NULL",
+                    [],
+                )
                 .unwrap();
         }
     }
     assert_eq!(text(&l, row).unwrap(), "failed:rate_limited:5");
     let out = loupe::summarize(l.data.path(), &["--retry"], &[]);
-    assert_eq!(loupe::count(&out, "rows"), 1);
-    let after = "SELECT status || ':' || attempts FROM session_summaries";
+    // The full session summary and the session day summary that took its status.
+    assert_eq!(loupe::count(&out, "rows"), 2);
+    let after = "SELECT status || ':' || attempts FROM session_full_summaries";
     assert_eq!(text(&l, after).unwrap(), "pending:0");
 }
 
@@ -126,7 +131,7 @@ async fn no_credential_is_disabled() {
     );
     assert_eq!(loupe::count(&out, "disabled"), 1);
     assert_eq!(
-        text(&l, "SELECT status FROM session_summaries").unwrap(),
+        text(&l, "SELECT status FROM session_day_summaries").unwrap(),
         "disabled"
     );
     assert_eq!(fake::summary_hits("line_nocred"), 0);
@@ -145,8 +150,8 @@ async fn summary_call_not_counted() {
     };
     let before = counts(&l);
     run(&l, &base(fake, "line_counted"));
-    // One session line, one full session summary, and one session day summary.
-    assert_eq!(fake::summary_hits("line_counted"), 3);
+    // One full session summary and one session day summary; no segment line.
+    assert_eq!(fake::summary_hits("line_counted"), 2);
     loupe::parse_and_close(l.data.path());
     assert_eq!(counts(&l), before);
 }
@@ -160,7 +165,7 @@ fn worker_skips_log_segment_transcript() {
         &["--source", "claude-code", "--path", root.to_str().unwrap()],
         &[],
     );
-    let pending = "SELECT count(*) FROM session_summaries WHERE status = 'pending'";
+    let pending = "SELECT count(*) FROM session_day_summaries WHERE status = 'pending'";
     let retry = loupe::summarize(data.path(), &["--retry"], &[]);
     assert!(retry.status.success());
     assert_eq!(bf::scalar(data.path(), pending), 1);

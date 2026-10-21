@@ -1,11 +1,11 @@
-//! @agents-index Summarizes the due backfilled sessions and segments through the shared summary path, with transcripts built again from the log.
+//! @agents-index Summarizes the due backfilled sessions through the shared summary path, with transcripts built again from the log.
 
 use super::run::{Counts, Outcome};
 use super::{Source, transcript};
 use crate::session::time;
 use crate::summary::session_day::{self, Window};
 use crate::summary::store_session_day::Pair;
-use crate::summary::{store, worker};
+use crate::summary::worker;
 use rusqlite::Connection;
 use serde_json::Value;
 
@@ -38,8 +38,8 @@ impl session_day::Source for Log<'_> {
     }
 }
 
-/// One summary request for each due backfilled segment of `source` whose log files the run found.
-/// The transcript exists only in memory for the request; only the scrubbed line is stored.
+/// The session texts of the due backfilled pairs of `source` whose log files the run found; no
+/// request for the line of a segment. The summary counters are of the session day summary rows.
 pub fn pass(
     conn: &Connection,
     ws: &worker::Settings,
@@ -49,7 +49,6 @@ pub fn pass(
     c: &mut Counts,
 ) -> rusqlite::Result<()> {
     let rt = worker::runtime()?;
-    // The session texts come first: their discovery reads the segments that have no final line yet.
     let src = Log { source, k, o };
     let t = session_day::pass(conn, ws, &rt, &src, Some(source.name()))?;
     tracing::info!(
@@ -61,29 +60,10 @@ pub fn pass(
         retry_later = t.retry_later,
         "session text pass done"
     );
-    let now = time::text(chrono::Utc::now().timestamp_millis());
-    for d in store::due_log(conn, &now, source.name())? {
-        let Some(idx) = o.index.get(&d.key_hash) else {
-            continue;
-        };
-        let files: Vec<_> = idx.iter().map(|i| &o.files[*i]).collect();
-        let after = d.after.as_deref().map(time::ms);
-        let until = time::ms(&d.last_call_at);
-        let status = worker::summarize(conn, ws, &rt, d.id, false, || {
-            let m = transcript::messages(source, k, &files, &d.key_hash, after, until);
-            Ok(crate::summary::transcript::build_messages(
-                &m,
-                ws.min_conversation,
-            ))
-        })?;
-        match status.as_str() {
-            "done" => c.summaries_done += 1,
-            "skipped" => c.summaries_skipped += 1,
-            "pending" => c.summaries_retry_later += 1,
-            "failed" => c.summaries_failed += 1,
-            "disabled" => c.summaries_disabled += 1,
-            _ => {}
-        }
-    }
+    c.summaries_done += t.done;
+    c.summaries_skipped += t.skipped;
+    c.summaries_retry_later += t.retry_later;
+    c.summaries_failed += t.failed;
+    c.summaries_disabled += t.disabled;
     Ok(())
 }

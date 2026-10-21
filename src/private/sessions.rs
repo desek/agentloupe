@@ -9,6 +9,20 @@ use std::str::FromStr;
 /// The most rows of one response.
 pub const PAGE: usize = 200;
 
+/// The session day summary of the session `key` on `day`; two segments of one session on one day
+/// share it. Never the full session summary.
+fn day_text(conn: &Connection, key: &str, day: &str) -> rusqlite::Result<Option<String>> {
+    use rusqlite::OptionalExtension;
+    Ok(conn
+        .query_row(
+            "SELECT text FROM session_day_summaries WHERE session_key = ?1 AND day = ?2",
+            [key, day],
+            |r| r.get::<_, Option<String>>(0),
+        )
+        .optional()?
+        .flatten())
+}
+
 /// The sessions with a call of the token `name` in the range, by session ID from the newest; the
 /// name `(no token)` selects the calls with no proxy token. `cursor` is the `next` of the page before.
 /// The tokens and the cost are of the calls in the range.
@@ -36,10 +50,9 @@ pub fn list(
         }
     };
     let mut st = conn.prepare(
-        "SELECT s.id, s.agent_label, s.started_at, s.last_call_at, s.call_count, ss.line, \
+        "SELECT s.id, s.agent_label, s.started_at, s.last_call_at, s.call_count, s.key_hash, \
          c.input + c.output + c.cache_read + c.cache_write_5m + c.cache_write_1h, c.cost_usd \
          FROM calls c JOIN sessions s ON s.id = c.session_id \
-         LEFT JOIN session_summaries ss ON ss.session_id = s.id \
          WHERE c.proxy_token_id IS ?1 AND c.started_at >= ?2 AND c.started_at < ?3 AND c.session_id < ?4 \
          ORDER BY c.session_id DESC",
     )?;
@@ -53,12 +66,14 @@ pub fn list(
                 next = out.last().map(|o| o.0);
                 break;
             }
+            let started: String = r.get(2)?;
+            let day = crate::day::boundary::day_of_text(&started, tz).to_string();
             let base = json!({
                 "agent_label": r.get::<_, String>(1)?,
-                "started_at": r.get::<_, String>(2)?,
+                "started_at": started,
                 "last_call_at": r.get::<_, String>(3)?,
                 "call_count": r.get::<_, i64>(4)?,
-                "summary": r.get::<_, Option<String>>(5)?,
+                "summary": day_text(conn, &r.get::<_, String>(5)?, &day)?,
             });
             out.push((sid, base, 0, Decimal::ZERO));
         }

@@ -70,11 +70,22 @@ pub fn seed(db: &rusqlite::Connection) {
         )
         .unwrap();
     }
+    // The list shows the session day summary; a kept segment line and the full summary are not shown.
     db.execute(
-        "INSERT INTO session_summaries (session_id, status, line, attempts, created_at, updated_at) VALUES (1, 'done', 'Fixed the parser', 1, ?1, ?1)",
+        "INSERT INTO session_summaries (session_id, status, line, attempts, created_at, updated_at) VALUES (1, 'done', 'Old segment line', 1, ?1, ?1)",
         [&t],
     )
     .unwrap();
+    for (table, text) in [
+        ("session_day_summaries", "Fixed the parser"),
+        ("session_full_summaries", "The whole session"),
+    ] {
+        db.execute(
+            &format!("INSERT INTO {table} (session_key, day, status, text, attempts, created_at, updated_at) VALUES ('k', ?1, 'done', ?2, 1, ?3, ?3)"),
+            rusqlite::params![day, text, t],
+        )
+        .unwrap();
+    }
     let calls = [
         (1, Some(laptop), 100, 10, Some("0.5")),
         (1, Some(laptop), 100, 10, None),

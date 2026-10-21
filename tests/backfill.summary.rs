@@ -1,4 +1,4 @@
-//! @agents-index Integration test: a backfilled segment gets a scrubbed session line from the log transcript, and a re-run retries it.
+//! @agents-index Integration test: a backfilled session gets a session day summary and no segment line, and a re-run retries it.
 
 #[path = "common/backfill.rs"]
 mod bf;
@@ -25,7 +25,7 @@ fn run(data: &std::path::Path, root: &std::path::Path, url: &str) -> std::proces
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn backfilled_segment_gets_scrubbed_line() {
+async fn backfilled_session_gets_day_text_and_no_line() {
     let fake = fake::spawn().await;
     let (logs, data) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
     let root = bf::claude_tree(logs.path(), false);
@@ -35,14 +35,19 @@ async fn backfilled_segment_gets_scrubbed_line() {
         &format!("http://127.0.0.1:{fake}/summary/line"),
     );
     assert_eq!(loupe::count(&o, "summaries_done"), 1);
-    let line: String = bf::db(data.path())
+    let db = bf::db(data.path());
+    let text: Option<String> = db
         .query_row(
-            "SELECT line FROM session_summaries WHERE status = 'done'",
+            "SELECT text FROM session_day_summaries WHERE status = 'done'",
             [],
             |r| r.get(0),
         )
         .unwrap();
-    assert_eq!(line, "fixed the parser in per for in places");
+    assert!(text.is_some_and(|t| !t.is_empty()));
+    let lines: i64 = db
+        .query_row("SELECT count(*) FROM session_summaries", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(lines, 0, "the run writes no segment line");
     let bytes: Vec<u8> = ["loupe.db", "loupe.db-wal"]
         .iter()
         .flat_map(|f| std::fs::read(data.path().join(f)).unwrap_or_default())
@@ -68,13 +73,15 @@ async fn rerun_retries_pending_summary() {
     assert_eq!(loupe::count(&a, "summaries_retry_later"), 1);
     let status = |d: &std::path::Path| -> String {
         bf::db(d)
-            .query_row("SELECT status FROM session_summaries", [], |r| r.get(0))
+            .query_row("SELECT status FROM session_day_summaries", [], |r| r.get(0))
             .unwrap()
     };
     assert_eq!(status(data.path()), "pending");
     // The time of the next attempt passes.
     bf::db(data.path())
-        .execute_batch("UPDATE session_summaries SET next_attempt_at = NULL")
+        .execute_batch(
+            "UPDATE session_full_summaries SET next_attempt_at = NULL; UPDATE session_day_summaries SET next_attempt_at = NULL",
+        )
         .unwrap();
     let b = run(
         data.path(),

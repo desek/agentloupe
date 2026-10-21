@@ -1,11 +1,11 @@
-//! @agents-index The summary worker: one pass over the due closed segments, a scrubbed line or a status for each, then the sleep.
+//! @agents-index The summary worker: one pass over the due session texts of the proxied sessions, then the sleep.
 
-use super::client::{self, Client, Outcome};
-use super::{body, retry, rules, scrub, store};
+use super::client::Client;
+use super::store_session_day;
 use crate::session::time;
 use rusqlite::Connection;
 
-/// What a pass needs. No client means no credential, so every segment gets `disabled`.
+/// What a pass needs. No client means no credential, so every row gets `disabled`.
 pub struct Settings {
     pub data_key: [u8; 32],
     pub client: Option<Client>,
@@ -17,7 +17,7 @@ pub struct Settings {
     pub min_conversation: usize,
 }
 
-/// The counts that `loupe summarize --once` prints.
+/// The counts that `loupe summarize --once` prints: `segments_read` is the count of the pairs read.
 #[derive(Debug, Default, PartialEq)]
 pub struct Counts {
     pub segments_read: u64,
@@ -28,60 +28,6 @@ pub struct Counts {
     pub retry_later: u64,
 }
 
-fn now_ms() -> i64 {
-    chrono::Utc::now().timestamp_millis()
-}
-
-/// The new row of a segment after one model request.
-fn after_request(
-    out: Outcome,
-    s: &Settings,
-    attempts: u32,
-) -> (
-    String,
-    Option<String>,
-    Option<&'static str>,
-    Option<String>,
-    u32,
-) {
-    let attempts = attempts + 1;
-    let (kind, retry_after) = match out {
-        Outcome::Text(t) if client::is_skip(&t) => ("skip", None),
-        Outcome::Text(t) => {
-            return match scrub::line(&t, &s.public) {
-                Some(l) => ("done".into(), Some(l), None, None, attempts),
-                None => ("skipped".into(), None, None, None, attempts),
-            };
-        }
-        Outcome::Fatal { kind } => return ("failed".into(), None, Some(kind), None, attempts),
-        Outcome::Retry { kind, retry_after } => (kind, retry_after),
-    };
-    if attempts >= s.max_attempts {
-        return ("failed".into(), None, Some(kind), None, attempts);
-    }
-    let next = now_ms() + 1000 * retry::delay_secs(attempts, retry_after) as i64;
-    (
-        "pending".into(),
-        None,
-        Some(kind),
-        Some(time::text(next)),
-        attempts,
-    )
-}
-
-/// Summarizes one proxied segment from its request bodies.
-fn one(
-    conn: &Connection,
-    s: &Settings,
-    rt: &tokio::runtime::Runtime,
-    id: i64,
-    dry_run: bool,
-) -> rusqlite::Result<String> {
-    summarize(conn, s, rt, id, dry_run, || {
-        body::load(conn, &s.data_key, id, s.min_conversation)
-    })
-}
-
 /// The runtime that sends the summary requests of one pass.
 pub fn runtime() -> rusqlite::Result<tokio::runtime::Runtime> {
     tokio::runtime::Builder::new_current_thread()
@@ -90,117 +36,35 @@ pub fn runtime() -> rusqlite::Result<tokio::runtime::Runtime> {
         .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
 }
 
-/// Summarizes one segment and writes its row; returns the new status. A dry run sends nothing.
-/// `load` gives the transcript; it is the only part that differs between a proxied and a backfilled segment.
-pub fn summarize(
-    conn: &Connection,
-    s: &Settings,
-    rt: &tokio::runtime::Runtime,
-    id: i64,
-    dry_run: bool,
-    load: impl FnOnce() -> rusqlite::Result<String>,
-) -> rusqlite::Result<String> {
-    let t0 = std::time::Instant::now();
-    let attempts = store::attempts(conn, id)?;
-    let model = s.client.as_ref().map(|c| c.model.clone());
-    let (status, line, kind, next, attempts) = match &s.client {
-        None => ("disabled".to_string(), None, None, None, attempts),
-        Some(c) => {
-            let transcript = load()?;
-            if transcript.is_empty() {
-                ("skipped".to_string(), None, None, None, attempts)
-            } else if dry_run {
-                return Ok("would_request".into());
-            } else {
-                let system = rules::system(rules::SESSION_RULES, &s.public);
-                let out =
-                    rt.block_on(c.send(&system, &rules::user(&transcript), client::LINE_TOKENS));
-                // The transcript drops here; only the scrubbed line is kept.
-                drop(transcript);
-                after_request(out, s, attempts)
-            }
-        }
-    };
-    if !dry_run {
-        let row = store::Row {
-            status: &status,
-            line: line.as_deref(),
-            model: model.as_deref(),
-            attempts,
-            last_error_kind: kind,
-            next_attempt_at: next,
-        };
-        let now = time::text(now_ms());
-        // A final status and the queue write of the days of the segment share one transaction.
-        conn.execute_batch("BEGIN IMMEDIATE")?;
-        let r = store::put(conn, id, &row, &now).and_then(|_| {
-            if status == "pending" {
-                return Ok(());
-            }
-            crate::day::queue::put_session_days(
-                conn,
-                id,
-                s.tz,
-                crate::day::queue::SUMMARY_FINAL,
-                &now,
-            )
-        });
-        conn.execute_batch(if r.is_ok() { "COMMIT" } else { "ROLLBACK" })?;
-        r?;
-    }
-    tracing::info!(session_id = id, status = %status, attempts, error_kind = kind.unwrap_or(""), duration_ms = t0.elapsed().as_millis() as u64, "session summary");
-    Ok(status)
-}
-
-/// One pass over every due segment, in batches of 20. A dry run reads all due segments once and writes nothing.
+/// One pass over the session texts: discovery, then each due pair of a proxied session. The worker
+/// sends no request for the line of a segment. The counts are of the session day summary rows.
+/// A dry run counts the due pairs and writes nothing.
 pub fn pass(conn: &Connection, s: &Settings, dry_run: bool) -> rusqlite::Result<Counts> {
-    let rt = runtime()?;
-    if !dry_run {
-        // The session texts come first: their discovery reads the segments that have no final line yet.
-        let src = super::session_day::Proxied {
-            conn,
-            data_key: s.data_key,
-        };
-        let t = super::session_day::pass(conn, s, &rt, &src, None)?;
-        if t.pairs_read > 0 {
-            tracing::info!(
-                pairs_read = t.pairs_read,
-                done = t.done,
-                skipped = t.skipped,
-                failed = t.failed,
-                disabled = t.disabled,
-                retry_later = t.retry_later,
-                "session text pass done"
-            );
-        }
-    }
-    let mut c = Counts::default();
-    let mut seen = std::collections::HashSet::new();
-    loop {
-        let limit = if dry_run { -1 } else { store::BATCH };
-        let ids: Vec<i64> = store::due(conn, &time::text(now_ms()), limit)?
+    if dry_run {
+        let now = time::text(chrono::Utc::now().timestamp_millis());
+        let n = store_session_day::due(conn, &now)?
             .into_iter()
-            .filter(|id| seen.insert(*id))
-            .collect();
-        if ids.is_empty() {
-            break;
-        }
-        for id in ids {
-            c.segments_read += 1;
-            match one(conn, s, &rt, id, dry_run)?.as_str() {
-                "done" => c.done += 1,
-                "skipped" => c.skipped += 1,
-                "failed" => c.failed += 1,
-                "disabled" => c.disabled += 1,
-                "pending" => c.retry_later += 1,
-                _ => {}
-            }
-        }
-        if dry_run {
-            break;
-        }
+            .filter(|p| p.key_source != "log")
+            .count();
+        return Ok(Counts {
+            segments_read: n as u64,
+            ..Counts::default()
+        });
     }
-    Ok(c)
+    let rt = runtime()?;
+    let src = super::session_day::Proxied {
+        conn,
+        data_key: s.data_key,
+    };
+    let t = super::session_day::pass(conn, s, &rt, &src, None)?;
+    Ok(Counts {
+        segments_read: t.pairs_read,
+        done: t.done,
+        skipped: t.skipped,
+        failed: t.failed,
+        disabled: t.disabled,
+        retry_later: t.retry_later,
+    })
 }
 
 /// Starts the worker thread of `loupe serve`: a pass, then a sleep of `interval`, until the process ends.

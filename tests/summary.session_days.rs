@@ -274,6 +274,45 @@ async fn proxied_day_transcript_holds_new_messages() {
     assert!(t2.contains("DAYTWO ask") && !t2.contains("DAYONE"), "{t2}");
 }
 
+/// The day 2 transcript of the day 2 request of the recorder `mode`.
+fn day2_transcript(mode: &str) -> String {
+    let day = sd::requests(mode, DAY_MARK);
+    assert_eq!(day.len(), 2);
+    day[1].1.split("<transcript>").nth(1).unwrap().to_string()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn proxied_new_conversation_stays_whole() {
+    let fake = fake::spawn().await;
+    let l = two_day_proxied(
+        fake,
+        &[&["DAYONE first", "DAYONE second", "DAYONE third"]],
+        &[&["DAYTWO unrelated"]],
+    )
+    .await;
+    summarize(&l, fake, "rec_proxied_newconv");
+    let t2 = day2_transcript("rec_proxied_newconv");
+    assert!(t2.contains("DAYTWO unrelated"), "{t2}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn proxied_compacted_history_stays_whole() {
+    let fake = fake::spawn().await;
+    // A shorter day 2 history whose first turn differs, as after a compaction.
+    let l = two_day_proxied(
+        fake,
+        &[&["DAYONE first", "DAYONE second", "DAYONE third"]],
+        &[&["COMPACTED recap", "DAYTWO next"]],
+    )
+    .await;
+    summarize(&l, fake, "rec_proxied_compact");
+    let t2 = day2_transcript("rec_proxied_compact");
+    assert!(
+        t2.contains("COMPACTED recap") && t2.contains("DAYTWO next"),
+        "{t2}"
+    );
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn missing_bodies_use_remaining_and_log() {
     let fake = fake::spawn().await;
