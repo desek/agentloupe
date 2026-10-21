@@ -2,7 +2,7 @@
 name: "CR-0012 backfill of calls and sessions from the agent session logs"
 description: "Adds the command loupe backfill, which reads the Claude Code and Pi session logs on disk and writes calls and sessions for the time before the proxy captured them, with the same token columns, segment rule, and prices as a proxied call, a rule that skips a log session that the proxy already captured, an idempotent key per log entry, and a summary line per backfilled segment from the log content."
 id: "CR-0012"
-status: "approved"
+status: "implemented"
 date: 2026-10-20
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
