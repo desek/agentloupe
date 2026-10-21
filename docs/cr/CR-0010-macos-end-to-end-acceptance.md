@@ -2,7 +2,7 @@
 name: "CR-0010 End-to-end acceptance on macOS with Claude Code and Pi"
 description: "Proves the definition of done of the CR set: the loupe container runs on the human's Mac, claude -p and pi -p reach Anthropic through the proxy with claude-haiku-5-5, and the sessions are captured, parsed, priced, summarized, published, and shown on the dashboard. Adds the connect script, the README instructions, and the persisted user scenario."
 id: "CR-0010"
-status: "approved"
+status: "implemented"
 date: 2026-10-20
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
