@@ -36,6 +36,7 @@ The flag `--env` or the variable `LOUPE_ENV` gives the name of the environment. 
 | `LOUPE_SUMMARY_BASE_URL` | no | no | `https://api.anthropic.com` |
 | `LOUPE_SUMMARY_INTERVAL_SECS` | no | no | `30` |
 | `LOUPE_SUMMARY_MAX_ATTEMPTS` | no | no | `5` |
+| `LOUPE_SUMMARY_MIN_CONVERSATION_CHARS` | no | no | `400` |
 | `LOUPE_TZ` | no | no | `Europe/Stockholm` |
 | `LOUPE_PUBLISH_AT` | no | no | `01:00` |
 | `LOUPE_PUBLISH_INTERVAL_SECS` | no | no | `60` |
@@ -94,6 +95,8 @@ The subcommand also prints these lines:
 ## Summary credential
 
 `LOUPE_SUMMARY_API_KEY` and `LOUPE_SUMMARY_OAUTH_TOKEN` are the two credentials of the summarizer. Either one enables the summaries. If both are set, `api_key` is active. A model other than `claude-haiku-5-5` needs `LOUPE_SUMMARY_API_KEY`. `LOUPE_SUMMARY_BASE_URL` must use `https`, except for a loopback host. `summaries.md` gives the full rules.
+
+`LOUPE_SUMMARY_MIN_CONVERSATION_CHARS` is the minimum count of characters of the conversation transcript. Below it, the transcript also holds the clipped tool inputs and tool results. The value is an integer of 0 or more. A bad value stops the start of `loupe serve` and of `loupe backfill` with exit code 2 and an actionable error that names the variable and the valid range.
 
 ## Day variables
 

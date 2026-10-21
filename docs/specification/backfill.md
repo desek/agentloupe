@@ -164,16 +164,18 @@ A log line of the backfill holds only counters, a summary status and an error ki
 
 The backfill uses `LOUPE_ACCOUNT_KEY`, `LOUPE_IDLE_SECS`, `LOUPE_TZ`, and the summary variables (`LOUPE_SUMMARY_*`, `LOUPE_PUBLIC_PROJECTS`). It adds no variable. See `configuration.md`.
 
-## Summaries of backfilled segments
+## Summaries of backfilled sessions
 
-Each closed backfilled segment gets a session summary. The transcript comes from the log entries of the segment: the user and assistant messages of the log session in line order, from the first entry of the segment up to its last call. This is the longest message history of the segment. For Claude Code, a subagent file gives the transcript of its own session.
+Each closed backfilled segment gets a session summary row. Each backfilled session also gets one full session summary and one session day summary for each day that has a call of the session. `summaries.md` gives the rules of the two texts and of their tables.
 
-The transcript follows the rules of `summaries.md`, section "Transcript": no system prompt, no tool definition, and no `<system-reminder>` block; each tool result and tool input clipped to 300 characters with `[clipped]`; the clip at 24000 characters with `[... earlier turns omitted ...]`; one `user:` or `assistant:` line per turn and `[attachment]` for a binary part; and the status `skipped` for an empty transcript.
+The transcript comes from the log entries of the session. The transcript of the session for day D holds the entries of the whole log session in line order, from the first entry up to the end of day D in `LOUPE_TZ`. The day transcript holds the entries of day D only. For Claude Code, a subagent file gives the transcript of its own session, and the transcript of a main session does not include its entries.
 
-A backfilled segment uses the same summary path as a proxied segment: the request rules, the credentials, the response and retry rules, the scrubber, and one `session_summaries` row per segment. The transcript source is the only difference.
+The transcript follows the rules of `summaries.md`, section "Transcript": the conversation first, the tool inputs and the tool results only when the conversation is shorter than `LOUPE_SUMMARY_MIN_CONVERSATION_CHARS`, the clip of 300 characters with `[clipped]`, and the clip at 24000 characters. The transcript exists only in memory.
 
-1. The backfill stores no log content and no path, so the backfill run builds the transcript and sends the summary request for each segment that it closes.
-2. The summary worker builds no transcript for a segment with calls of origin `log`.
-3. A new run of the backfill builds the transcript again for each backfilled segment with a `pending` row whose time of the next attempt is null or past. This includes a `failed` or `disabled` row that `loupe summarize --retry` set back to `pending`.
+A backfilled session uses the same summary path as a proxied session: the request rules, the credentials, the response and retry rules, the scrubber, and the tables. The transcript source is the only difference.
 
-The day of a backfilled session line follows the day rule of `summaries.md`, section "Day line". The day line reads backfilled session lines like proxied ones.
+1. The backfill stores no log content and no path, so the backfill run builds the transcripts and sends the summary requests. A run adds the rows of `session_full_summaries` and `session_day_summaries`.
+2. The summary worker builds no transcript for a session with calls of origin `log`.
+3. A new run of the backfill builds the transcript again for each backfilled row in status `pending` whose time of the next attempt is null or past. This includes a row that `loupe summarize --retry` or `loupe summarize --rebuild-days` set back to `pending`.
+
+The day line reads the session day summaries of backfilled sessions like those of proxied sessions.
