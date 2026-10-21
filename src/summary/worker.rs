@@ -67,7 +67,7 @@ fn after_request(
     )
 }
 
-/// Summarizes one segment and writes its row; returns the new status. A dry run sends nothing.
+/// Summarizes one proxied segment from its request bodies.
 fn one(
     conn: &Connection,
     s: &Settings,
@@ -75,13 +75,36 @@ fn one(
     id: i64,
     dry_run: bool,
 ) -> rusqlite::Result<String> {
+    summarize(conn, s, rt, id, dry_run, || {
+        body::load(conn, &s.data_key, id)
+    })
+}
+
+/// The runtime that sends the summary requests of one pass.
+pub fn runtime() -> rusqlite::Result<tokio::runtime::Runtime> {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
+}
+
+/// Summarizes one segment and writes its row; returns the new status. A dry run sends nothing.
+/// `load` gives the transcript; it is the only part that differs between a proxied and a backfilled segment.
+pub fn summarize(
+    conn: &Connection,
+    s: &Settings,
+    rt: &tokio::runtime::Runtime,
+    id: i64,
+    dry_run: bool,
+    load: impl FnOnce() -> rusqlite::Result<String>,
+) -> rusqlite::Result<String> {
     let t0 = std::time::Instant::now();
     let attempts = store::attempts(conn, id)?;
     let model = s.client.as_ref().map(|c| c.model.clone());
     let (status, line, kind, next, attempts) = match &s.client {
         None => ("disabled".to_string(), None, None, None, attempts),
         Some(c) => {
-            let transcript = body::load(conn, &s.data_key, id)?;
+            let transcript = load()?;
             if transcript.is_empty() {
                 ("skipped".to_string(), None, None, None, attempts)
             } else if dry_run {
@@ -129,10 +152,7 @@ fn one(
 
 /// One pass over every due segment, in batches of 20. A dry run reads all due segments once and writes nothing.
 pub fn pass(conn: &Connection, s: &Settings, dry_run: bool) -> rusqlite::Result<Counts> {
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+    let rt = runtime()?;
     let mut c = Counts::default();
     let mut seen = std::collections::HashSet::new();
     loop {

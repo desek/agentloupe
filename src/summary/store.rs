@@ -5,15 +5,46 @@ use rusqlite::{Connection, OptionalExtension, params};
 /// The most segments that one batch reads.
 pub const BATCH: i64 = 20;
 
-/// Closed segments with no summary row, or with a pending row that is due; oldest close first.
+/// The condition of a due segment: closed, with no summary row or a pending row that is due.
+const DUE: &str = "s.state = 'closed' AND (ss.id IS NULL OR (ss.status = 'pending' AND (ss.next_attempt_at IS NULL OR ss.next_attempt_at <= ?1)))";
+
+/// Due proxied segments, oldest close first. A backfilled segment (key source log) is left out,
+/// because its transcript exists only in the log files that the backfill run reads.
 /// `limit` -1 reads every due segment, for a dry run that writes nothing.
 pub fn due(conn: &Connection, now: &str, limit: i64) -> rusqlite::Result<Vec<i64>> {
-    conn.prepare(
+    conn.prepare(&format!(
         "SELECT s.id FROM sessions s LEFT JOIN session_summaries ss ON ss.session_id = s.id \
-         WHERE s.state = 'closed' AND (ss.id IS NULL OR (ss.status = 'pending' AND (ss.next_attempt_at IS NULL OR ss.next_attempt_at <= ?1))) \
-         ORDER BY s.closed_at, s.id LIMIT ?2",
-    )?
+         WHERE {DUE} AND s.key_source != 'log' ORDER BY s.closed_at, s.id LIMIT ?2"
+    ))?
     .query_map(params![now, limit], |r| r.get(0))?
+    .collect()
+}
+
+/// One due backfilled segment: its id, key hash, and the time window of its log entries.
+pub struct DueLog {
+    pub id: i64,
+    pub key_hash: String,
+    /// The last call of the previous segment of the scope; entries after it belong to this segment.
+    pub after: Option<String>,
+    pub last_call_at: String,
+}
+
+/// Due backfilled segments of one agent label, oldest close first.
+pub fn due_log(conn: &Connection, now: &str, agent_label: &str) -> rusqlite::Result<Vec<DueLog>> {
+    conn.prepare(&format!(
+        "SELECT s.id, s.key_hash, (SELECT max(p.last_call_at) FROM sessions p WHERE p.agent_label = s.agent_label \
+         AND p.proxy_token_id IS s.proxy_token_id AND p.key_hash = s.key_hash AND p.segment < s.segment), s.last_call_at \
+         FROM sessions s LEFT JOIN session_summaries ss ON ss.session_id = s.id \
+         WHERE {DUE} AND s.key_source = 'log' AND s.agent_label = ?2 ORDER BY s.closed_at, s.id"
+    ))?
+    .query_map(params![now, agent_label], |r| {
+        Ok(DueLog {
+            id: r.get(0)?,
+            key_hash: r.get(1)?,
+            after: r.get(2)?,
+            last_call_at: r.get(3)?,
+        })
+    })?
     .collect()
 }
 

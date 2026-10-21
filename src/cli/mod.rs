@@ -1,6 +1,7 @@
 //! @agents-index Command-line surface of loupe: the clap definitions and the dispatch to each subcommand.
 
 mod aggregate;
+mod backfill;
 mod config_show;
 #[path = "day.approve.rs"]
 mod day_approve;
@@ -115,6 +116,38 @@ enum Command {
     Day {
         #[command(subcommand)]
         command: DayCommand,
+    },
+    /// Read the session logs of Claude Code or Pi into the calls and the sessions, as calls of origin log.
+    ///
+    /// Prints files_read, entries_read, calls_added, calls_existing, calls_already_captured,
+    /// sessions_already_captured, calls_out_of_range, entries_skipped, sessions_opened, days_queued,
+    /// summaries_done, summaries_skipped, summaries_retry_later, summaries_failed, summaries_disabled
+    /// as key: value lines. Exit codes: 0 done, 1 a database failure, 2 bad input or configuration,
+    /// 3 the log directory is missing or unreadable.
+    Backfill {
+        /// The log source: claude-code or pi. Required.
+        #[arg(long, value_name = "claude-code|pi")]
+        source: Option<String>,
+        /// The root directory of the logs. Default: ~/.claude/projects or ~/.pi/agent/sessions.
+        #[arg(long, value_name = "DIR")]
+        path: Option<String>,
+        /// The first day of the range, YYYY-MM-DD in LOUPE_TZ, inclusive.
+        #[arg(long, value_name = "YYYY-MM-DD")]
+        from: Option<String>,
+        /// The last day of the range, YYYY-MM-DD in LOUPE_TZ, inclusive.
+        #[arg(long, value_name = "YYYY-MM-DD")]
+        to: Option<String>,
+        /// The agent label of the proxied Pi exchanges; Pi log sessions before its first exchange are backfilled.
+        #[arg(long, value_name = "LABEL", default_value = "pi")]
+        pi_label: String,
+        /// Read the files and print the counters; write nothing and send no summary request.
+        #[arg(long)]
+        dry_run: bool,
+        /// Print a table instead of key: value lines.
+        #[arg(long)]
+        human: bool,
+        #[command(flatten)]
+        args: ConfigArgs,
     },
     /// Inspect the configuration.
     Config {
@@ -314,6 +347,27 @@ pub fn run() -> ExitCode {
             DayCommand::Delete(d) => day_delete::run(&d.args, &d.date, d.dry_run),
             DayCommand::Restore(d) => day_restore::run(&d.args, &d.date, d.dry_run),
         },
+        Command::Backfill {
+            source,
+            path,
+            from,
+            to,
+            pi_label,
+            dry_run,
+            human,
+            args,
+        } => backfill::run(
+            &args,
+            &backfill::Flags {
+                source,
+                path,
+                from,
+                to,
+                pi_label,
+                dry_run,
+                human,
+            },
+        ),
         Command::Config {
             command: ConfigCommand::Show { args, human },
         } => config_show::run(&args, human),

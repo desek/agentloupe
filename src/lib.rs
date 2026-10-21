@@ -2,6 +2,7 @@
 
 pub mod account;
 pub mod api;
+pub mod backfill;
 pub mod capture;
 pub mod cli;
 pub mod config;

@@ -1,4 +1,4 @@
-//! @agents-index Builds the clipped transcript of a segment from the request body with the longest message history.
+//! @agents-index Builds the clipped transcript of a segment from a message list: the longest request body, or the log entries.
 
 use serde_json::Value;
 
@@ -137,12 +137,17 @@ fn cut(t: String) -> String {
 /// The transcript of one request body: no system prompt, no tool definitions, no reminders.
 /// Empty when no turn has text.
 pub fn build(body: &Value) -> String {
-    let turns = body
-        .get("messages")
+    body.get("messages")
         .or_else(|| body.get("input"))
         .and_then(Value::as_array)
-        .map(|a| a.iter().filter_map(turn).collect::<Vec<_>>())
-        .unwrap_or_default();
+        .map(|a| build_messages(a))
+        .unwrap_or_default()
+}
+
+/// The transcript of a list of messages in the Anthropic or OpenAI shape, with the same rules as `build`.
+/// The backfill gives the messages of a log segment here, so both origins share one set of rules.
+pub fn build_messages(messages: &[Value]) -> String {
+    let turns: Vec<String> = messages.iter().filter_map(turn).collect();
     cut(turns.join("\n"))
 }
 
