@@ -5,7 +5,7 @@ use std::time::Duration;
 use tokio::net::TcpListener;
 
 /// How long open requests may run after the signal.
-const DRAIN: Duration = Duration::from_secs(10);
+pub const DRAIN: Duration = Duration::from_secs(10);
 
 async fn signal() {
     let ctrl_c = async {

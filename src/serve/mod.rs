@@ -2,7 +2,7 @@
 
 mod health;
 pub mod router;
-mod shutdown;
+pub mod shutdown;
 
 use crate::capture::writer::{self, Capture};
 use crate::config::Config;

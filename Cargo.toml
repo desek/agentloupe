@@ -364,3 +364,11 @@ path = "tests/pipeline.test.runner.rs"
 [[test]]
 name = "pipeline_inputs"
 path = "tests/pipeline.inputs.rs"
+
+[[test]]
+name = "timer_defaults"
+path = "tests/timer.defaults.rs"
+
+[[test]]
+name = "common_poll"
+path = "tests/common.poll.rs"
