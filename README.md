@@ -391,6 +391,10 @@ the public API.
 | Calls | Model, status, token counts, cost |
 | Public data | Daily totals, totals per agent and per model, PR and line counts, one summary line per day |
 
+A private page exists behind `LOUPE_ADMIN_TOKEN`. It shows usage, cost, and sessions per proxy
+token and per tag. Its data never reaches the public API. Without the admin token, every path
+under `/private/` returns 404. The section Private page gives the use.
+
 The summary model gets the transcript as data, without the system prompt, the tool definitions,
 or system-reminder blocks. Its rules: a neutral tone in the third person, with no opinion and no
 praise; one line of at most 12 words for a session, which starts with a past-tense verb; no names of
