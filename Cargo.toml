@@ -210,7 +210,6 @@ tracing-subscriber = { version = "0.3", features = ["fmt", "registry"] }
 [dev-dependencies]
 jsonschema = { version = "0.59.0", default-features = false }
 tempfile = "3"
-tokio = { version = "1", features = ["test-util"] }
 tokio-tungstenite = "0.29"
 
 [[test]]

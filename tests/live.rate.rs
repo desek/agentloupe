@@ -57,14 +57,15 @@ async fn coalesces_above_rate() {
     println!("frames: {}", at.len());
 }
 
-#[tokio::test(start_paused = true)]
+// The real clock: a paused clock advances past the frame while the socket write is still pending.
+#[tokio::test(flavor = "multi_thread")]
 async fn heartbeat_when_idle() {
     let (port, _d) = serve(Hub::new(64), config(10, 64)).await;
     let (mut ws, _) = open(port, "/live", &[]).await.unwrap();
     frame(&mut ws, 5).await;
     let t0 = tokio::time::Instant::now();
-    let f = frame(&mut ws, 16).await;
+    let f = frame(&mut ws, 20).await;
     assert_eq!(f["kind"], "heartbeat");
     assert_eq!(live::keys(&f), ["ts"]);
-    assert!(t0.elapsed() >= Duration::from_secs(15));
+    assert!(t0.elapsed() >= Duration::from_millis(14_500));
 }
