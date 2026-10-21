@@ -2,7 +2,7 @@
 name: "CR-0018 Dashboard readability"
 description: "Four readability changes to the dashboard after a review of the live page with backfilled history: spacing between the cards, a footnote for the API-equivalent cost that names the LiteLLM price file, a share view of the token kinds in the range, and a lines card where every figure has a label and a reason."
 id: "CR-0018"
-status: "approved"
+status: "implemented"
 date: 2026-10-21
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
