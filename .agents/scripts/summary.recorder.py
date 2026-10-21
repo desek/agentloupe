@@ -9,12 +9,16 @@
 # characters of the system text plus the user message. No text, header, or credential is written.
 import http.server
 import json
+import os
+import ssl
 import sys
 import urllib.error
 import urllib.request
 
 PORT, OUT = int(sys.argv[1]), sys.argv[2]
 UPSTREAM = sys.argv[3] if len(sys.argv) > 3 else "https://api.anthropic.com"
+# The system CA bundle: a python without its own certificates cannot verify the upstream otherwise.
+CTX = ssl.create_default_context(cafile="/etc/ssl/cert.pem" if os.path.exists("/etc/ssl/cert.pem") else None)
 
 
 def kind(system: str) -> str:
@@ -40,7 +44,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         headers = {h: v for h, v in self.headers.items() if h.lower() not in ("host", "content-length", "accept-encoding")}
         r = urllib.request.Request(UPSTREAM + self.path, data=body, headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(r, timeout=60) as resp:
+            with urllib.request.urlopen(r, timeout=60, context=CTX) as resp:
                 status, data, rh = resp.status, resp.read(), resp.headers
         except urllib.error.HTTPError as e:
             status, data, rh = e.code, e.read(), e.headers
