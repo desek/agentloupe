@@ -53,7 +53,7 @@ For a backfilled session, the source is the log entries of the session. The back
 
 ## Summary client
 
-The client sends one request to the summary provider (`configuration.md`). For `anthropic`, the request is `POST /v1/messages` to `ANTHROPIC_BASE_URL` (default `https://api.anthropic.com`). The request uses the model `LOUPE_SUMMARY_MODEL` (default `claude-haiku-5-5`). The request has no `temperature` field, because the API refuses `temperature` for `claude-haiku-5-5` with a `400` ("`temperature` is deprecated for this model", observed on 2026-10-20). `max_tokens` is 64 for a session line and 600 for a day paragraph. The timeout of a request is 30 seconds.
+The client sends one request to the summary provider (`configuration.md`). For `anthropic`, the request is `POST /v1/messages` to `ANTHROPIC_BASE_URL` (default `https://api.anthropic.com`). The request uses the model `LOUPE_SUMMARY_MODEL` (default `claude-haiku-5-5`). The request has no `temperature` field, because the API refuses `temperature` for `claude-haiku-5-5` with a `400` ("`temperature` is deprecated for this model", observed on 2026-10-20). `max_tokens` is 64 for a session line and 600 for a day paragraph. The request turns thinking off with `thinking: {"type": "disabled"}`, because the model thinks by default, and its thinking alone can use the whole `max_tokens` and leave no text (observed on 2026-10-21 in 6 of 14 day requests). The timeout of a request is 30 seconds.
 
 The client never sends the request through the proxy routes of `loupe serve`. A summary request makes no row in `exchanges` or `calls`. It does not count in a session, a day record, or a cost.
 
@@ -162,6 +162,10 @@ With no detected provider, the worker gives each closed segment the status `disa
 ## Response handling
 
 A response with the text `SKIP`, after trim and in any case, is a retryable failure with the error kind `skip`. The rules ask for a line for each session, also for a trivial or a failed session.
+
+When a response stops at the token limit (`stop_reason` `max_tokens`, or `finish_reason` `length` for `openai`), the client keeps the text up to its last sentence end and drops the cut tail, so a cut word never becomes a sentence of a summary. A cut response with no complete sentence counts as a response with no text.
+
+A valid response with no text block, for example a response that holds only a thinking block because the model reached `max_tokens`, is a retryable failure with the error kind `no_text`. The client logs the stop reason, the block types, and the output token count of that response, never its content.
 
 A retryable failure is a network error, a timeout, a `429`, a `500` to `599`, or a `529`. It increases the attempt count, stores the kind of the error, and sets the time of the next attempt. The delay is 60 seconds times 2 to the power of (attempt count minus 1), with a maximum of 1 hour. A `retry-after` header sets the delay when it is longer.
 

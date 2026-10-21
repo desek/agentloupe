@@ -61,9 +61,12 @@ impl Client {
                 json!({"type": "text", "text": super::headers::BILLING_BLOCK}),
             );
         }
+        // Thinking stays off: the current Haiku model thinks by default, and its thinking alone
+        // reached `max_tokens` in 6 of 14 observed day requests, which left no text block.
         json!({
             "model": self.model,
             "max_tokens": max_tokens,
+            "thinking": {"type": "disabled"},
             "system": blocks,
             "messages": [{"role": "user", "content": user}],
         })
@@ -120,12 +123,21 @@ impl Client {
         }
         match status {
             200..=299 => match resp.json::<Value>().await {
-                Ok(v) => self.text(&v).map_or(
-                    Outcome::Fatal {
+                Ok(v) => match self.text(&v).map(|t| complete_sentences(&v, t)) {
+                    None => Outcome::Fatal {
                         kind: "invalid_response",
                     },
-                    Outcome::Text,
-                ),
+                    // A valid message with no text block, for example thinking up to `max_tokens`:
+                    // a retry gives a text where a final `skipped` would lose the summary.
+                    Some(t) if t.is_empty() => {
+                        log_no_text(&v);
+                        Outcome::Retry {
+                            kind: "no_text",
+                            retry_after: None,
+                        }
+                    }
+                    Some(t) => Outcome::Text(t),
+                },
                 Err(e) if e.is_timeout() => Outcome::Retry {
                     kind: "timeout",
                     retry_after: None,
@@ -186,6 +198,47 @@ impl Client {
     }
 }
 
+/// The text up to its last sentence end when the response stopped at the token limit, so a cut
+/// word such as "the worker cor" never becomes a sentence; the whole text otherwise.
+pub fn complete_sentences(v: &Value, text: String) -> String {
+    let cut = v["stop_reason"] == "max_tokens" || v["choices"][0]["finish_reason"] == "length";
+    if !cut {
+        return text;
+    }
+    let end = text
+        .char_indices()
+        .filter(|(i, c)| {
+            matches!(c, '.' | '!' | '?')
+                && text[i + c.len_utf8()..]
+                    .chars()
+                    .next()
+                    .is_none_or(char::is_whitespace)
+        })
+        .map(|(i, c)| i + c.len_utf8())
+        .next_back();
+    end.map(|e| text[..e].to_string()).unwrap_or_default()
+}
+
+/// Logs the shape of a response that has no text: the stop reason, the block types, and the output
+/// token count. Never the content, so a reader can tell an empty answer from a block that is not text.
+fn log_no_text(v: &Value) {
+    let types = v["content"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .map(|b| b["type"].as_str().unwrap_or("?"))
+                .collect::<Vec<_>>()
+                .join(",")
+        })
+        .unwrap_or_default();
+    tracing::warn!(
+        stop_reason = v["stop_reason"].as_str().unwrap_or(""),
+        block_types = %types,
+        output_tokens = v["usage"]["output_tokens"].as_u64().unwrap_or(0),
+        "model response without text; the row retries with the error kind no_text"
+    );
+}
+
 /// The text of a valid Messages response: the joined text blocks; None for another shape.
 pub fn text_of(v: &Value) -> Option<String> {
     if v["type"] != "message" {
@@ -229,6 +282,7 @@ mod tests {
         );
         let b = c.body("S", "U", LINE_TOKENS);
         assert!(b.get("temperature").is_none());
+        assert_eq!(b["thinking"], json!({"type": "disabled"}));
         assert_eq!(b["system"].as_array().unwrap().len(), 1);
         assert_eq!(b["max_tokens"], 64);
         assert_eq!(c.base_url, "http://127.0.0.1:1");
@@ -240,6 +294,58 @@ mod tests {
         let b = o.body("S", "U", DAY_TOKENS);
         assert_eq!(b["system"][0]["text"], super::super::headers::BILLING_BLOCK);
         assert_eq!(b["system"][1]["text"], "S");
+    }
+
+    #[test]
+    fn cut_response_keeps_only_complete_sentences() {
+        let cut = json!({"stop_reason": "max_tokens"});
+        let s = "Fixed the parser. Then the worker cor".to_string();
+        assert_eq!(complete_sentences(&cut, s), "Fixed the parser.");
+        let s = "No end at all".to_string();
+        assert_eq!(complete_sentences(&cut, s), "");
+        let s = "Done? Yes. Then it".to_string();
+        assert_eq!(complete_sentences(&cut, s), "Done? Yes.");
+        let s = "Version 1.5 shipped".to_string();
+        assert_eq!(complete_sentences(&cut, s), "");
+        let s = "Then the worker cor".to_string();
+        assert_eq!(
+            complete_sentences(&json!({"stop_reason": "end_turn"}), s.clone()),
+            s
+        );
+        let s = "Fixed it. Then the".to_string();
+        assert_eq!(
+            complete_sentences(&json!({"choices":[{"finish_reason":"length"}]}), s),
+            "Fixed it."
+        );
+    }
+
+    /// A message whose only block is thinking, cut at `max_tokens`, is the shape that the current
+    /// Haiku model returned for 6 of 14 day requests; it must retry, not end as `skipped`.
+    #[tokio::test]
+    async fn response_without_text_is_retryable() {
+        let app = axum::Router::new().fallback(|| async {
+            axum::Json(json!({
+                "type": "message",
+                "content": [{"type": "thinking", "thinking": ""}],
+                "stop_reason": "max_tokens",
+                "usage": {"output_tokens": 600}
+            }))
+        });
+        let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", l.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(l, app).await.unwrap() });
+        let c = Client::new(
+            &base,
+            "m",
+            Credential::ApiKey(crate::config::secret::Secret::new("k".into())),
+        );
+        assert_eq!(
+            c.send("RULES", "TEXT", DAY_TOKENS).await,
+            Outcome::Retry {
+                kind: "no_text",
+                retry_after: None
+            }
+        );
     }
 
     #[tokio::test]
