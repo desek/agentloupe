@@ -2,7 +2,7 @@
 name: "CR-0013 Live metrics over a WebSocket on the dashboard"
 description: "Adds a live route at GET /live that upgrades to a WebSocket and streams allowlisted live events (exchange start and end, stored calls with token counts, open segments, cost) from a bounded broadcast channel in the binary, and a live section on the dashboard under the headline that shows today's calls, tokens, open segments, and a rolling chart in real time."
 id: "CR-0013"
-status: "approved"
+status: "implemented"
 date: 2026-10-20
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
