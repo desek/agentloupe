@@ -85,6 +85,8 @@ A call is one of these entries:
 
 Verified on the source of Pi 1.3.0: `cacheWrite` includes `cacheWrite1h`. The usage type declares `cacheWrite1h` as the subset of `cacheWrite` that has the 1-hour retention. The Anthropic adapter fills `cacheWrite` from `cache_creation_input_tokens` and `cacheWrite1h` from `cache_creation.ephemeral_1h_input_tokens`. Thus the subtraction gives the 5-minute part.
 
+An entry with no `model` or `provider` of its own, for example a `compaction` entry, takes the model and the provider of the latest assistant message or `model_change` entry before it in the file. An entry with no provider at all makes no call, because `upstream` is required.
+
 The backfill does not store the `cost` field of Pi, and does not use it as the cost of the call.
 
 ## Calls of origin log

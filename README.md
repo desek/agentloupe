@@ -81,6 +81,9 @@ One binary holds the full product: the proxy, the workers, the public API, and t
 - Commands:
   - `loupe serve`: the proxy, the workers, the public API, and the dashboard.
   - `loupe aggregate [--date YYYY-MM-DD|today] [--dry-run]`: build one day now.
+  - `loupe backfill --source claude-code|pi [--path DIR] [--from YYYY-MM-DD] [--to YYYY-MM-DD]
+    [--pi-label LABEL] [--dry-run]`: read the session logs on disk into the calls and the sessions,
+    for the work before the proxy. A session that the proxy captured is skipped.
   - `loupe gen-key`: print a new 32-byte key for `LOUPE_DATA_KEY` or `LOUPE_ACCOUNT_KEY`.
   - `loupe day approve --date YYYY-MM-DD`: publish a day that waits for review.
   - `loupe day edit --date YYYY-MM-DD --summary TEXT`: replace the summary of a day.
@@ -390,6 +393,9 @@ the public API.
 | Exchange metadata | Agent, upstream, method, path, status, sizes, timing |
 | Calls | Model, status, token counts, cost |
 | Public data | Daily totals, totals per agent and per model, PR and line counts, one summary line per day |
+
+A call that `loupe backfill` reads from a session log stores only the token counts, the model, the
+time, and HMAC keys; it stores no prompt, no path, no directory name, and no raw ID of the log.
 
 A private page exists behind `LOUPE_ADMIN_TOKEN`. It shows usage, cost, and sessions per proxy
 token and per tag. Its data never reaches the public API. Without the admin token, every path
