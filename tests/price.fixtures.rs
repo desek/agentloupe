@@ -39,5 +39,5 @@ fn fixture_calls_match_hand_costs() {
         );
         seen += 1;
     }
-    assert_eq!(seen, 3);
+    assert_eq!(seen, 4);
 }

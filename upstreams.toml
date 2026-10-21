@@ -12,3 +12,16 @@ litellm_provider = "openai"
 [chatgpt]
 base_url = "https://chatgpt.com"
 litellm_provider = "openai"
+
+# Pi providers. The names equal the provider field of the Pi log.
+[github-copilot]
+base_url = "https://api.githubcopilot.com"
+litellm_provider = "github_copilot"
+
+[groq]
+base_url = "https://api.groq.com"
+litellm_provider = "groq"
+
+[cerebras]
+base_url = "https://api.cerebras.ai"
+litellm_provider = "cerebras"

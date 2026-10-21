@@ -24,6 +24,9 @@ The file `upstreams.toml` at the root of the repository is the allowlist. The co
 | `anthropic` | `https://api.anthropic.com` | `anthropic` |
 | `openai` | `https://api.openai.com` | `openai` |
 | `chatgpt` | `https://chatgpt.com` | `openai` |
+| `github-copilot` | `https://api.githubcopilot.com` | `github_copilot` |
+| `groq` | `https://api.groq.com` | `groq` |
+| `cerebras` | `https://api.cerebras.ai` | `cerebras` |
 
 An entry has this shape:
 

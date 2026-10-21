@@ -1,4 +1,4 @@
-//! @agents-index Finds the price entry of a model under one provider, with one fallback that removes a trailing -YYYYMMDD.
+//! @agents-index Finds the price entry of a model under one provider, also under the key <provider>/<model>, with a fallback that removes a trailing -YYYYMMDD.
 
 use super::index::{Entry, Index};
 
@@ -8,12 +8,18 @@ fn strip_date(model: &str) -> Option<&str> {
     (tail.len() == 8 && tail.bytes().all(|b| b.is_ascii_digit())).then_some(head)
 }
 
-/// Exact match on (model, provider), then the same with the date suffix removed.
-/// Never matches another provider, a prefix, or a similar name.
-pub fn find<'a>(index: &'a Index, model: &str, provider: &str) -> Option<&'a Entry> {
+/// The entry of the model name or of the key `<provider>/<model>`, because the price file keys some providers (github_copilot, groq) with the provider prefix.
+fn exact<'a>(index: &'a Index, model: &str, provider: &str) -> Option<&'a Entry> {
     index
         .get(model, provider)
-        .or_else(|| strip_date(model).and_then(|m| index.get(m, provider)))
+        .or_else(|| index.get(&format!("{provider}/{model}"), provider))
+}
+
+/// Exact match on (model, provider), then the same with the date suffix removed.
+/// Never matches another provider or a similar name.
+pub fn find<'a>(index: &'a Index, model: &str, provider: &str) -> Option<&'a Entry> {
+    exact(index, model, provider)
+        .or_else(|| strip_date(model).and_then(|m| exact(index, m, provider)))
 }
 
 #[cfg(test)]
@@ -39,6 +45,14 @@ mod tests {
         let i = Index::from_entries(vec![entry("m", "anthropic")]);
         assert_eq!(find(&i, "m-20250101", "anthropic").unwrap().key, "m");
         assert!(find(&i, "m-2025010", "anthropic").is_none());
+    }
+
+    #[test]
+    fn provider_prefixed_key() {
+        let e = find(Index::embedded(), "claude-haiku-5.5", "github_copilot").unwrap();
+        assert_eq!(e.key, "github_copilot/claude-haiku-5.5");
+        let i = Index::from_entries(vec![entry("groq/m", "groq")]);
+        assert!(find(&i, "m", "openai").is_none());
     }
 
     #[test]

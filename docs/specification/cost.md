@@ -13,11 +13,11 @@ At start, `loupe serve` parses the embedded file one time into a price index. Th
 
 ## Provider of an upstream
 
-Each entry of `upstreams.toml` names a LiteLLM provider. See `proxy.md`. The shipped file maps `anthropic` to `anthropic`, and `openai` and `chatgpt` to `openai`. Thus a call through `chatgpt` gets the price of the OpenAI API.
+Each entry of `upstreams.toml` names a LiteLLM provider. See `proxy.md`. The shipped file maps `anthropic` to `anthropic`, and `openai` and `chatgpt` to `openai`. Thus a call through `chatgpt` gets the price of the OpenAI API. The file maps the Pi providers `github-copilot`, `groq`, and `cerebras` to `github_copilot`, `groq`, and `cerebras`. The names of these upstreams are equal to the provider names in the Pi log. The Pi providers `evroc` and `unsloth` have no entry, so their calls stay unpriced.
 
 ## Lookup
 
-The pricing function looks up the model of the call with the provider of its upstream. If no entry matches, it removes one trailing date suffix from the model name and looks up again. A date suffix is a hyphen and eight digits, for example `-20250929`.
+The pricing function looks up the model of the call with the provider of its upstream. If no entry matches, it looks up the key `<provider>/<model>` with the same provider, because the price file keys some providers with the provider prefix, for example `github_copilot/claude-haiku-5.5`. If no entry matches, it removes one trailing date suffix from the model name and does the two lookups again. A date suffix is a hyphen and eight digits, for example `-20250929`.
 
 The function never matches an entry of a different provider. It never matches by prefix or by similarity.
 

@@ -1,0 +1,4 @@
+{"model": "claude-haiku-5.5", "provider": "github_copilot", "service_tier": null,
+ "input": 1000, "cache_read": 0, "cache_write_5m": 0, "cache_write_1h": 0, "output": 500,
+ "expected_cost_usd": "0.00035",
+ "hand_computation": "upstream github-copilot, entry github_copilot/claude-haiku-5.5: 1000*0.0000001 + 500*0.0000005"}

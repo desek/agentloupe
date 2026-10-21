@@ -133,6 +133,12 @@ fn chatgpt_uses_openai_prices() {
         std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/upstreams.toml")).unwrap();
     let t: toml::Table = text.parse().unwrap();
     assert_eq!(t["chatgpt"]["litellm_provider"].as_str(), Some("openai"));
+    assert_eq!(
+        t["github-copilot"]["litellm_provider"].as_str(),
+        Some("github_copilot")
+    );
+    assert_eq!(t["groq"]["litellm_provider"].as_str(), Some("groq"));
+    assert_eq!(t["cerebras"]["litellm_provider"].as_str(), Some("cerebras"));
     assert_eq!(t["openai"]["litellm_provider"].as_str(), Some("openai"));
     assert_eq!(
         t["anthropic"]["litellm_provider"].as_str(),
