@@ -223,10 +223,12 @@ proxy token from a file (`--token-file`) or from `LOUPE_PROXY_TOKEN`, never as a
    The file holds only the token value. `docker compose exec loupe loupe token list` shows the name.
 4. Connect Claude Code in the shell that runs it:
    `eval "$(.agents/scripts/agent.connect.sh --agent claude-code --token-file ~/.config/agentloupe-token --check)"`.
+   The script prints `export ANTHROPIC_BASE_URL=...`, which points Claude Code at the proxy.
 5. Run Claude Code: `claude -p "Reply with the word ok." --model claude-haiku-5-5`.
 6. Connect Pi: `eval "$(.agents/scripts/agent.connect.sh --agent pi --token-file ~/.config/agentloupe-token)"`.
    The script writes only `models.json` into the isolated agent directory
    `${XDG_STATE_HOME:-$HOME/.local/state}/agentloupe/pi-agent`. That directory holds no credential.
+   The script prints `export PI_CODING_AGENT_DIR=...`, which points Pi at that directory.
 7. Give Pi its credential from the environment. Use one of the two routes:
    - The plain route: run `claude setup-token` one time. Then export `ANTHROPIC_OAUTH_TOKEN`
      with that token in the shell that runs `pi -p`.
