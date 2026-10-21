@@ -30,3 +30,10 @@ Run log, 2026-10-21:
 - `session_summaries` rows: 260 (closed segments of the run). `agg_queue` rows: 3.
 - Dump search: 0 matches for each search term.
 - The scratch database had no proxied session, so the check for no proxied session key is proven by the tests `captured_session_is_skipped` and `only_new_session_is_added`.
+
+Run log, 2026-10-21, with the session texts (scratch data dir, `--from 2026-10-20 --to 2026-10-21`, real Haiku requests through `.agents/scripts/summary.recorder.py`):
+
+- Backfill: `calls_added` 2591, `sessions_opened` 281, `entries_skipped` 0, exit 0.
+- `session_day_summaries`: 233 `done`, 46 `skipped` (16.3 percent), 3 `pending` of open segments. `session_full_summaries`: 236 `done`, 43 `skipped`, 3 `pending`.
+- Requests: 278 line, 279 full, 236 day. Request characters of the full and day requests: maximum 25708, median 2403.
+- Dump search: 0 matches for the repository slug, `/Users/`, and a prompt word.
