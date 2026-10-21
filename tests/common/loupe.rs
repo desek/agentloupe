@@ -1,7 +1,7 @@
 //! @agents-index Test helper: starts loupe serve on a free port with a temp data dir, reads rows and stderr, runs token and parse commands.
 #![allow(dead_code)]
 
-use std::net::{TcpListener, TcpStream};
+use std::net::TcpListener;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
@@ -170,60 +170,48 @@ impl Loupe {
         let up = data.path().join("upstreams.toml");
         std::fs::write(&up, file).unwrap();
         let err_dir = tempfile::tempdir().unwrap();
-        // Parallel tests can get the same free port; a child that cannot bind exits, so retry on a new port.
-        for _ in 0..5 {
-            let port = free_port();
-            if let Some(child) = Self::spawn(data.path(), &up, port, err_dir.path(), env) {
-                return Loupe {
-                    port,
-                    data,
-                    err_dir,
-                    child,
-                };
-            }
+        // The server binds port 0 and logs the port it got, so two parallel tests never share a port.
+        let (child, port) = Self::spawn(data.path(), &up, err_dir.path(), env);
+        Loupe {
+            port,
+            data,
+            err_dir,
+            child,
         }
-        panic!(
-            "loupe did not start: {}",
-            std::fs::read_to_string(err_dir.path().join("stderr.log")).unwrap_or_default()
-        );
     }
 
-    /// Spawns loupe serve on `port`; None if the child exits before it is ready.
+    /// Spawns loupe serve on a port that the kernel picks, and reads that port from the log line.
     fn spawn(
         data: &std::path::Path,
         up: &std::path::Path,
-        port: u16,
         err: &std::path::Path,
         env: &[(&str, &str)],
-    ) -> Option<Child> {
-        let data_path = data;
+    ) -> (Child, u16) {
+        let log = err.join("stderr.log");
         let mut cmd = Command::new(env!("CARGO_BIN_EXE_loupe"));
         cmd.arg("serve")
             .current_dir(env!("CARGO_MANIFEST_DIR"))
             .env_clear()
-            .env("LOUPE_LISTEN", format!("127.0.0.1:{port}"))
-            .env("LOUPE_DATA_DIR", data_path)
+            .env("LOUPE_LISTEN", "127.0.0.1:0")
+            .env("LOUPE_DATA_DIR", data)
             .env("LOUPE_DATA_KEY", KEY)
             .env("LOUPE_ACCOUNT_KEY", KEY)
             .env("LOUPE_UPSTREAMS_FILE", up)
-            .stderr(Stdio::from(
-                std::fs::File::create(err.join("stderr.log")).unwrap(),
-            ));
+            .stderr(Stdio::from(std::fs::File::create(&log).unwrap()));
         for (k, v) in env {
             cmd.env(k, v);
         }
         let mut child = cmd.spawn().unwrap();
         let deadline = Instant::now() + Duration::from_secs(10);
         loop {
-            if child.try_wait().unwrap().is_some() {
-                return None;
+            let text = std::fs::read_to_string(&log).unwrap_or_default();
+            if let Some(status) = child.try_wait().unwrap() {
+                panic!("loupe exited before it listened ({status}): {text}");
             }
-            if TcpStream::connect(("127.0.0.1", port)).is_ok() {
-                // A connect can reach another test's server on the same port; ours must still be alive.
-                std::thread::sleep(Duration::from_millis(100));
-                return child.try_wait().unwrap().is_none().then_some(child);
+            if let Some(port) = listening_port(&text) {
+                return (child, port);
             }
-            assert!(Instant::now() < deadline, "loupe did not start");
+            assert!(Instant::now() < deadline, "loupe did not start: {text}");
             std::thread::sleep(Duration::from_millis(50));
         }
     }
@@ -285,4 +273,12 @@ impl Loupe {
 
 pub fn contains(hay: &[u8], needle: &[u8]) -> bool {
     hay.windows(needle.len()).any(|w| w == needle)
+}
+
+/// The port of the `listening` log line, whose field is `"listen":"127.0.0.1:PORT"`.
+fn listening_port(log: &str) -> Option<u16> {
+    let line = log.lines().find(|l| l.contains("\"listening\""))?;
+    let tag = "\"listen\":\"127.0.0.1:";
+    let start = line.find(tag)? + tag.len();
+    line[start..].split('"').next()?.parse().ok()
 }

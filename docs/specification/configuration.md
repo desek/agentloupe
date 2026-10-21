@@ -58,6 +58,8 @@ The flag `--env` or the variable `LOUPE_ENV` gives the name of the environment. 
 | `LOUPE_LIVE_MAX_CONNECTIONS` | no | no | `32` (1 to 1024) |
 | `LOUPE_LIVE_BUFFER` | no | no | `1024` (64 to 65536) |
 
+A `LOUPE_LISTEN` port of `0` makes the kernel select a free port, and the `listening` log line shows the bound address, so a test can run many servers at one time.
+
 The loader parses and validates every value. A value that only a later product area uses does not change the behaviour of the binary until that area exists.
 
 ## Key encoding
