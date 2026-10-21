@@ -116,14 +116,15 @@ sequenceDiagram
 **Full session summary**
 
 9. For each session and each day D that has a call of that session, loupe **MUST** write one full session summary that describes the session from its first entry up to the end of day D.
+9a. The request for a full session summary **MUST** hold the rule text of requirement 10 and the transcript of requirement 1 for day D, made under requirements 2 to 5.
 10. The rule text of the full session summary **MUST** follow the rules of CR-0006 requirement 14, with a paragraph of at most 8 sentences in place of the one-line and 12-word rules, and **MUST** live in the one rule source file of CR-0006 requirement 16.
 11. A full session summary **MUST** be written only after every segment of the session that has a call on day D is closed.
 
 **Session day summary**
 
 12. For each session and each day D that has a call of that session, loupe **MUST** write one session day summary that describes what the session did on day D.
-9a. The request for a full session summary **MUST** hold the rule text of requirement 10 and the transcript of requirement 1 for day D, made under requirements 2 to 5.
 13. The request for a session day summary **MUST** hold the scrubbed full session summary of the same session and day as context, and the day transcript of day D. The day transcript of day D **MUST** hold only the entries whose time is on day D in `LOUPE_TZ`, and **MUST** be made under requirements 2 to 5: the conversation-first rule, the threshold of requirement 3 measured on the day transcript, and the 24000-character clip. A session day summary **MUST NOT** be requested before the full session summary of the same session and day has a final status.
+13a. For a proxied session, the stored request bodies have no time for each message. The day transcript of day D **MUST** hold the messages that the longest message history of the calls that started on day D adds beyond the longest message history of the calls that started before day D. If no call of the session started before day D, the day transcript **MUST** hold the whole longest history of the calls of day D.
 14. The rule text of the session day summary **MUST** follow CR-0006 requirement 14, with a paragraph of at most 4 sentences, and **MUST** live in the same rule source file.
 15. If the full session summary of the same session and day has the status `skipped`, `failed`, or `disabled`, the session day summary **MUST** get the same status with no model request.
 
@@ -147,7 +148,8 @@ sequenceDiagram
 **Scope and re-summary**
 
 27. The model **MUST** apply to backfilled sessions and to proxied sessions, one model for every session.
-27a. The raw-body retention **MUST NOT** delete the bodies of an exchange until the session day summary of each day of the session of each of its calls has a final status. The other conditions of the retention stay in force.
+27a. The raw-body retention **MUST NOT** delete the bodies of an exchange until the session day summary of each day of the session of each of its calls has a final status. A final status is `done`, `skipped`, `failed`, or `disabled`. While a segment of the session stays open, the bodies of the session stay, with no time limit; Risk 4 accepts this hold. The other conditions of the retention stay in force.
+27b. The retention worker **MUST** log the count of the exchanges whose bodies it keeps under requirement 27a, as the counter `bodies_held`, on each run.
 28. The treatment of earlier rows **MUST** follow the answer of the human to Open Question 1. The options are in Open Question 1.
 29. A rebuild flag, if the answer to Open Question 1 adds one, **MUST** support `--dry-run`, which prints the counter `summaries_reset` and changes nothing.
 30. A missing or bad value of that flag **MUST** fail with exit code 2 and an actionable error on stderr that names the valid form.
@@ -170,7 +172,7 @@ sequenceDiagram
 | Metric | Method | Baseline | Threshold |
 |---|---|---|---|
 | Skipped rate, Claude Code | On a copy of the database before the real two-day run, run `loupe backfill --source claude-code` over the same two-day window, then count `skipped` rows of `session_day_summaries` against all rows | 171 of 248 segments `skipped` (69 percent), window rule | at most 25 percent |
-| Request count | Count of model requests that the fake upstream records, `loupe backfill` over the two-day window on a copy of the database | the count of segments under the window rule | at most 2 times the count of distinct (session key, day of a call) pairs |
+| Request count | Count of model requests that the fake upstream records, `loupe backfill` over the two-day window on a copy of the database | 249 requests (248 Claude Code segments and 1 Pi segment under the window rule) | at most 2 times the count of distinct (session key, day of a call) pairs |
 | Characters per request | Maximum and median of the request characters that the fake upstream records, same run | measure before the change | maximum at most 24000 plus the rule text and the full session summary; median reported |
 | Skipped rate, Pi | Same method with `--source pi` | measure before the change | not above the baseline |
 | Day coverage | `sqlite3` count of `session_day_summaries` rows against the count of distinct (session key, day of a call) pairs in `calls`, over the two-day window | no table | equal counts |
@@ -190,7 +192,7 @@ Rule for the conversation threshold: the implementation agent measures the Claud
 * `src/summary/worker.rs`, `src/summary/store.rs`, `src/summary/rules.rs`: the two new texts, the tables, and the rule text.
 * `src/summary/day.rs`: `build_day_line` reads the session day summaries.
 * `src/backfill/summary.rs`, `src/backfill/run.rs`: the backfill writes the new rows.
-* `src/summary/transcript.rs` and the proxied transcript source in `src/summary/`: the whole-session read from the stored request bodies.
+* `src/summary/transcript.proxied.rs` (new): the proxied transcript source, the whole-session read and the day transcript of requirement 13a from the stored request bodies. `src/summary/transcript.rs` applies the rules of requirements 2 to 5 to it.
 * `src/retention/worker.rs`: the retention waits for a final status of the session day summaries.
 * A new migration for the two tables.
 * `docs/specification/summaries.md` (with the section "Raw-body retention"), `backfill.md`, and `.taxonomy`.
@@ -268,6 +270,8 @@ flowchart LR
 | `tests/summary.session_days.rs` | `failed_and_disabled_full_summary_chain` | Status chain | fake upstream with a non-retryable error; no credential | day row `failed`, then `disabled`, no day request |
 | `tests/summary.session_days.rs` | `open_segment_blocks_full_summary` | Requirement 11 | open segment with a call on day D | no request, no final row for day D |
 | `tests/summary.session_days.rs` | `proxied_session_reads_all_segments` | Proxied source | proxied session with segments on days 1 and 2 | the day 2 full request holds text of day 1 |
+| `tests/summary.session_days.rs` | `proxied_day_transcript_holds_new_messages` | Requirement 13a | proxied session with calls on days 1 and 2, the day 2 bodies repeat the day 1 history | the day 2 day request holds the day 2 messages only |
+| `tests/retention.session_days.rs` | `bodies_held_counter_logged` | Requirement 27b | exchange held under requirement 27a | the log line holds `bodies_held` 1 |
 | `tests/summary.session_days.rs` | `full_request_holds_transcript_to_day` | Requirement 9a | session on days 1 to 3, day 2 | full request holds days 1 and 2, day request holds day 2 only |
 | `tests/retention.session_days.rs` | `bodies_wait_for_session_day_summaries` | Retention | exchange past the retention hours, session day summary `pending` | bodies kept; deleted after `done` |
 | `tests/api.public.rs` | `public_api_hides_session_texts` | Requirement 22 | done rows with a marker | no marker in any public response |
@@ -361,6 +365,14 @@ When the run completes
 Then the database file, the log, and stderr hold no marker string
 ```
 
+### AC-8: The skipped rate goes down
+
+```gherkin
+Given a copy of the database before the real two-day run
+When the backfill runs over the same two-day window with the new model
+Then at most 25 percent of the Claude Code session day summaries have the status skipped
+```
+
 ### AC-9: The status chain covers failed and disabled
 
 ```gherkin
@@ -427,7 +439,16 @@ When the builder makes the full session summary of day 2
 Then the request holds text from the day 1 segment
 ```
 
-### AC-17: Retention waits for the session day summaries
+### AC-17: A proxied day transcript holds only the new messages
+
+```gherkin
+Given a proxied session with calls on days 1 and 2
+  And the request bodies of day 2 repeat the history of day 1
+When the builder makes the session day summary of day 2
+Then the day transcript holds only the messages that the day 2 calls add
+```
+
+### AC-18: Retention waits for the session day summaries
 
 ```gherkin
 Given an exchange older than LOUPE_RAW_RETENTION_HOURS
@@ -435,14 +456,6 @@ Given an exchange older than LOUPE_RAW_RETENTION_HOURS
 When the retention worker runs
 Then the bodies of the exchange stay
   And they are deleted after that row has a final status
-```
-
-### AC-8: The skipped rate goes down
-
-```gherkin
-Given a copy of the database before the real two-day run
-When the backfill runs over the same two-day window with the new model
-Then at most 25 percent of the Claude Code session day summaries have the status skipped
 ```
 
 ## Quality Standards Compliance
@@ -491,7 +504,7 @@ Mitigation: the scrubber, the in-memory rule, and a privacy test with a marker o
 
 ### Risk 4: A proxied session has no whole history
 
-If retention deletes the bodies before the session day summaries of the session have a final status, the full session summary of a later day misses the earlier history and can be wrong. Mitigation: requirement 27a holds the bodies; requirement 8b uses the remaining bodies and logs `bodies_missing`; AC-17 tests the rule. Bodies stay longer, so the database grows until the summaries are final.
+If retention deletes the bodies before the session day summaries of the session have a final status, the full session summary of a later day misses the earlier history and can be wrong. Mitigation: requirement 27a holds the bodies; requirement 8b uses the remaining bodies and logs `bodies_missing`; AC-18 tests the rule. Bodies stay longer, and the bodies of a session with an open segment stay with no time limit, so the database grows until the summaries are final. The counter `bodies_held` of requirement 27b measures this hold.
 
 ## Dependencies
 
