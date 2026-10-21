@@ -188,7 +188,8 @@ The totals row shows only sums for the range. The page shows no streak, no count
 1. One row per record in the range, newest first.
 2. Each row has the date, the `summary`, the PR count (`prs_opened`), and the token count (`input_total + output`).
 3. A record with `summary` `null` shows "No summary".
-4. The page puts the summary in as text, never as HTML.
+4. A record with `prs_opened` `null` shows no PR count. The row has the date, the `summary`, and the token count only. This agrees with the cards, which show "GitHub not connected" for the GitHub fields.
+5. The page puts the summary in as text, never as HTML.
 
 ### Footer
 

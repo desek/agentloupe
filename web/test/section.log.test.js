@@ -24,3 +24,16 @@ test('summary_is_text', () => {
   assert.ok(texts.includes(evil));
   assert.ok(texts.includes('No summary'));
 });
+
+test('null_prs_omits_pr_part', () => {
+  const doc = fakeDoc();
+  render(doc, { log: [{ day: '2026-10-20', summary: 's', prs: null, tokens: 10 }] });
+  assert.ok(!doc.made.some((n) => n.textContent.endsWith(' PRs')));
+  assert.ok(doc.made.some((n) => n.textContent.endsWith(' tokens')));
+});
+
+test('number_prs_shows_pr_part', () => {
+  const doc = fakeDoc();
+  render(doc, { log: [{ day: '2026-10-20', summary: 's', prs: 0, tokens: 10 }] });
+  assert.ok(doc.made.some((n) => n.textContent === '0 PRs'));
+});

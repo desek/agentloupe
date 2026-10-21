@@ -78,7 +78,7 @@ export function build(resp, key) {
     log: pts.filter((p) => p.rec).reverse().map((p) => ({
       day: p.day,
       summary: p.rec.summary ?? null,
-      prs: num(p.rec.prs_opened),
+      prs: typeof p.rec.prs_opened === 'number' ? p.rec.prs_opened : null,
       tokens: tokens(p.rec),
     })),
   };
