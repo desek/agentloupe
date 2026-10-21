@@ -2,7 +2,7 @@
 name: "CR-0014 session summary model: whole-session transcript, full session summary, and session day summaries"
 description: "Reads the whole session, conversation first, and stores one full session summary and one session day summary per day of a session, and builds the day line of a day from the session day summaries of that day."
 id: "CR-0014"
-status: "draft"
+status: "approved"
 date: 2026-10-21
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
@@ -150,8 +150,8 @@ sequenceDiagram
 27. The model **MUST** apply to backfilled sessions and to proxied sessions, one model for every session.
 27a. The raw-body retention **MUST NOT** delete the bodies of an exchange until the session day summary of each day of the session of each of its calls has a final status. A final status is `done`, `skipped`, `failed`, or `disabled`. While a segment of the session stays open, the bodies of the session stay, with no time limit; Risk 4 accepts this hold. The other conditions of the retention stay in force.
 27b. The retention worker **MUST** log the count of the exchanges whose bodies it keeps under requirement 27a, as the counter `bodies_held`, on each run.
-28. The treatment of earlier rows **MUST** follow the answer of the human to Open Question 1. The options are in Open Question 1.
-29. A rebuild flag, if the answer to Open Question 1 adds one, **MUST** support `--dry-run`, which prints the counter `summaries_reset` and changes nothing.
+28. A flag `loupe summarize --rebuild-days FROM..TO` **MUST** make or reset the rows of `session_full_summaries` and `session_day_summaries` for each day in the range to `pending`, and then **MUST** rebuild the day line of each day in the range. The flag **MUST NOT** change rows of `session_summaries` or rows outside the range.
+29. The flag `--rebuild-days` **MUST** support `--dry-run`, which prints the counter `summaries_reset` and changes nothing.
 30. A missing or bad value of that flag **MUST** fail with exit code 2 and an actionable error on stderr that names the valid form.
 
 **Documents**
@@ -203,7 +203,7 @@ Rule for the conversation threshold: the implementation agent measures the Claud
 
 * The transcript rule, the two new texts, their storage, and the input of the day line.
 * Backfilled and proxied sessions, and the change to the raw-body retention.
-* The re-summary of earlier days, per Open Question 1.
+* The re-summary of earlier days through the flag `loupe summarize --rebuild-days FROM..TO` (Decision 4).
 
 ### Out of Scope ("Here, But Not Further")
 
@@ -281,18 +281,35 @@ flowchart LR
 | `tests/migrations.rs` | `migration_keeps_session_summaries` | Requirement 19 | database with `session_summaries` rows | the same rows after the migration |
 | `tests/summary.cli.rs` | `bad_conversation_threshold_fails` | Requirement 4 | `LOUPE_SUMMARY_MIN_CONVERSATION_CHARS=abc` | exit 2, the variable and range on stderr |
 | `tests/summary.cli.rs` | `negative_conversation_threshold_fails_backfill` | Requirement 4 | `loupe backfill` with `LOUPE_SUMMARY_MIN_CONVERSATION_CHARS=-1` | exit 2, the variable and range on stderr |
+| `tests/summary.cli.rs` | `rebuild_days_resets_rows_in_range` | Requirement 28 | `done` and `skipped` rows on days 1 to 3, `session_summaries` rows, `--rebuild-days` for days 1 to 2 | rows of days 1 and 2 in both new tables `pending`, then rebuilt; day 3 rows and `session_summaries` rows unchanged |
 | `tests/summary.cli.rs` | `rebuild_days_dry_run_changes_nothing` | Requirement 29 | database with rows | `summaries_reset` printed, database unchanged |
 | `tests/summary.cli.rs` | `rebuild_days_bad_range_names_form` | Requirement 30 | `--rebuild-days yesterday` | exit 2, the form on stderr |
 
-The tests of the rebuild flag apply only if the answer to Open Question 1 adds the flag.
+Requirements 6, 8, 10, 14, 18, 20, 27, and 28 also trace to these tests:
+
+* Requirement 6: `conversation_only_when_above_threshold`, `tool_parts_added_below_threshold`, and `long_session_keeps_first_and_last_parts` test the one implementation in `src/summary/transcript.rs`; `transcript_ends_at_end_of_day` and `proxied_day_transcript_holds_new_messages` call it for each source.
+* Requirements 8 and 20: `no_prompt_path_or_raw_id_stored` (Tests to Modify).
+* Requirements 10 and 14: `day_summary_request_holds_full_summary` and `full_request_holds_transcript_to_day` check that each request holds the rule text from the one rule source file.
+* Requirement 18: `failed_and_disabled_full_summary_chain` and `skipped_full_summary_skips_day_summary`.
+* Requirement 27: `proxied_session_reads_all_segments` and `five_day_session_gets_five_of_each`.
+* Requirement 28: `rebuild_days_resets_rows_in_range`.
+
+Requirements 31 and 32 are documentation requirements. The Verification Commands and the code review verify them: the spec and `.taxonomy` change before the code, and the `grep` commands show the rows.
+
+The non-functional requirements trace as follows:
+
+* Non-functional requirement 1: `.agents/scripts/backfill.bench.sh --entries 10000 --dry-run`.
+* Non-functional requirements 2 and 3: the `grep` commands under Verification Commands, and `.agents/scripts/pipeline.verdict.sh`.
+* Non-functional requirement 4: `bad_conversation_threshold_fails` and `rebuild_days_bad_range_names_form`.
+* Non-functional requirement 5: `missing_bodies_use_remaining_and_log` and `bodies_held_counter_logged`.
 
 ### Tests to Modify
 
-| Test File | Test Name | Change |
-|---|---|---|
-| `src/backfill/transcript.rs` (unit) | `log_transcript_follows_summary_rules` | Use the whole-session input |
-| `tests/backfill.secrets.rs` | `no_prompt_path_or_raw_id_stored` | Add a marker on day 1 of a two-day session, and read both new tables |
-| `tests/summary.day_line.rs` (existing day line tests) | as named in the file | Read session day summaries |
+| Test File | Test Name | Requirement | Change |
+|---|---|---|---|
+| `src/backfill/transcript.rs` (unit) | `log_transcript_follows_summary_rules` | Requirements 1 and 5 | Use the whole-session input |
+| `tests/backfill.secrets.rs` | `no_prompt_path_or_raw_id_stored` | Requirements 8 and 20 | Add a marker on day 1 of a two-day session, and read both new tables |
+| `tests/summary.day_line.rs` (existing day line tests) | as named in the file | Requirement 23 | Read session day summaries |
 
 ### Tests to Remove
 
@@ -497,6 +514,8 @@ A reviewer agent reads the diff against the spec diff.
 .agents/scripts/pipeline.verdict.sh; echo $?
 .agents/scripts/backfill.bench.sh --entries 10000 --dry-run
 loupe backfill --source claude-code --dry-run
+grep -F -e '**full session summary**' -e '**session day summary**' .taxonomy
+grep -rnE '(CR|ADR|FR|NFR|AC)-[0-9]+' src tests docs/specification; test $? -eq 1
 ```
 
 ## Risks and Mitigation
@@ -535,11 +554,11 @@ Pending the reviewer agent.
 1. Decided by the human on 2026-10-21: widen the transcript of a backfilled segment to the whole log session under the CR-0006 rules.
 2. Decided by the human on 2026-10-21, in answer to the end-bound question of the first draft: a session is read in whole, conversation first and tool calls only if necessary; a session gets one full session summary and one session day summary per day that has data, and the full session summary of day D covers the session up to day D and gives the context of the session day summary; both texts are stored in the database for reference and correctness, apart from the published day line. The end-bound question is closed by this decision.
 3. Decided by the human on 2026-10-21, in answer to the former Open Question 1 (the origin of the sessions): the model applies to backfilled and proxied sessions, one model for every session. The proxied transcript uses the whole session history from the stored request bodies, so the raw-body retention waits until the session day summary of each day of the session has a final status. Requirements 8a, 8b, 27, and 27a state this.
+4. Decided by the human on 2026-10-21, in answer to the former Open Question 1 (the re-summary of earlier rows): option (a), the flag `loupe summarize --rebuild-days FROM..TO` with `--dry-run` and the counter `summaries_reset`. Options (b), a one-time migration, and (c), no rebuild, are rejected. Requirements 28 to 30 state this.
 
 ## Open Questions
 
-1. **The re-summary of earlier rows.** Context: the real two-day run left 171 `skipped` rows in `session_summaries`, and no day has rows in the new tables. A re-run of CR-0012 retries only `pending` rows. Options: (a) a flag `loupe summarize --rebuild-days FROM..TO` that makes or resets the rows of the two new tables for the days in the range, with `--dry-run`, and then rebuilds the day line; (b) a one-time migration that makes rows for each past day; (c) no rebuild, so only new days use the model. Recommendation: (a), because it is explicit, bounded by a range, supports `--dry-run`, and runs again for a later rule change. Status: pending the human.
-2. **The conversation threshold.** Context: requirement 3 needs a rule for when the conversation is not sufficient. Provisional value: 400 characters, set by `LOUPE_SUMMARY_MIN_CONVERSATION_CHARS`. The implementation agent measures at 200, 400, and 800 on the two-day window and applies the rule under Measurable Targets. This question goes to the oracle, not to the human, if no value meets the rule.
+1. **The conversation threshold.** Context: requirement 3 needs a rule for when the conversation is not sufficient. Provisional value: 400 characters, set by `LOUPE_SUMMARY_MIN_CONVERSATION_CHARS`. The implementation agent measures at 200, 400, and 800 on the two-day window and applies the rule under Measurable Targets. This question goes to the oracle, not to the human, if no value meets the rule.
 
 ## Related Items
 
