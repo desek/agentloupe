@@ -5,7 +5,7 @@
 
 The router gives the reserved routes precedence over the proxy. The reserved routes are `GET /healthz`, `/`, the static files of the dashboard, and every path under `/v1/`. Until the dashboard exists, `/` returns status 404.
 
-One source file holds the list of reserved first path segments. The list is `healthz`, `v1`, `assets`, and `favicon.ico`.
+One source file holds the list of reserved first path segments. The list is `healthz`, `v1`, `assets`, `favicon.ico`, and `private`.
 
 Every other path has the form `/<agent>/<upstream>/<path>`. The route parser returns one typed route: the agent label, the upstream name, the rest of the path, and the query. The parser is one function behind one interface, so a later change can add an optional leading segment without a change to the forwarder or the capture.
 

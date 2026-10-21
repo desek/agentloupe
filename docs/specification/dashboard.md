@@ -61,7 +61,7 @@ The static routes do not read a cookie or an `authorization` header. They do not
 
 ## Reserved names
 
-The router keeps a list of reserved first path segments. The proxy does not get a request whose first segment is on the list. The list is `healthz`, `v1`, `assets`, and `favicon.ico`. The list holds the names that the static handler and the public API serve, and one file in the router holds it. `proxy.md` gives the proxy routes.
+The router keeps a list of reserved first path segments. The proxy does not get a request whose first segment is on the list. The list is `healthz`, `v1`, `assets`, `favicon.ico`, and `private`. The list holds the names that the static handler and the public API serve, and one file in the router holds it. `proxy.md` gives the proxy routes.
 
 ## Site title
 
