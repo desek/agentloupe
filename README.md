@@ -433,4 +433,4 @@ token with a digit, except a name in `LOUPE_PUBLIC_PROJECTS`. Raw bodies are del
 
 ## License
 
-The vendored LiteLLM files are MIT licensed. The license of Agentloupe itself is not decided.
+Agentloupe is MIT licensed, see [`LICENSE`](LICENSE). The vendored LiteLLM files are MIT licensed, and the vendored Geist fonts are under the SIL Open Font License (`web/assets/fonts/OFL.txt`).

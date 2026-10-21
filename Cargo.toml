@@ -4,6 +4,7 @@ name = "agent-loupe"
 version = "0.1.0"
 edition = "2024"
 publish = false
+license = "MIT"
 build = "build.rs"
 
 [lib]
