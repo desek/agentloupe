@@ -260,6 +260,10 @@ name = "backfill_summary"
 path = "tests/backfill.summary.rs"
 
 [[test]]
+name = "backfill_rules"
+path = "tests/backfill.rules.rs"
+
+[[test]]
 name = "backfill_secrets"
 path = "tests/backfill.secrets.rs"
 
