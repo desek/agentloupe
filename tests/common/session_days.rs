@@ -50,7 +50,11 @@ pub fn days(session: &str, n: u32) -> Vec<String> {
         .flat_map(|d| {
             let at = format!("2026-01-0{d}T10:00:00Z");
             [
-                user(session, &format!("please do the work of DAYTEXT{d} now"), &at),
+                user(
+                    session,
+                    &format!("please do the work of DAYTEXT{d} now"),
+                    &at,
+                ),
                 answer(session, &format!("m{d}"), &format!("did DAYTEXT{d}"), &at),
             ]
         })
@@ -58,14 +62,12 @@ pub fn days(session: &str, n: u32) -> Vec<String> {
 }
 
 /// Runs `loupe backfill` over `root` in UTC; `mode` is the fake summary mode, None for no credential.
-pub fn backfill(
-    data: &Path,
-    root: &Path,
-    fake: u16,
-    mode: Option<&str>,
-) -> std::process::Output {
+pub fn backfill(data: &Path, root: &Path, fake: u16, mode: Option<&str>) -> std::process::Output {
     let url = format!("http://127.0.0.1:{fake}/summary/{}", mode.unwrap_or("none"));
-    let mut env = vec![("LOUPE_TZ", "UTC"), ("LOUPE_SUMMARY_BASE_URL", url.as_str())];
+    let mut env = vec![
+        ("LOUPE_TZ", "UTC"),
+        ("LOUPE_SUMMARY_BASE_URL", url.as_str()),
+    ];
     if mode.is_some() {
         env.push(("LOUPE_SUMMARY_API_KEY", "sk-test-Sd4Qr7"));
     }
@@ -83,7 +85,10 @@ pub fn requests(mode: &str, mark: &str) -> Vec<(String, String)> {
         .map(|b| {
             (
                 b["system"].to_string(),
-                b["messages"][0]["content"].as_str().unwrap_or("").to_string(),
+                b["messages"][0]["content"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string(),
             )
         })
         .filter(|(s, _)| s.contains(mark))

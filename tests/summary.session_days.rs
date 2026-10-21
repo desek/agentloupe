@@ -114,8 +114,17 @@ async fn tool_only_segment_gets_day_text() {
     let fake = fake::spawn().await;
     let (logs, data) = dirs();
     let lines = vec![
-        sd::user("st", "please fix the scrubber rules now", "2026-01-01T08:00:00Z"),
-        sd::answer("st", "m1", "fixed the scrubber rules", "2026-01-01T08:00:01Z"),
+        sd::user(
+            "st",
+            "please fix the scrubber rules now",
+            "2026-01-01T08:00:00Z",
+        ),
+        sd::answer(
+            "st",
+            "m1",
+            "fixed the scrubber rules",
+            "2026-01-01T08:00:01Z",
+        ),
         sd::tool_call("st", "m2", "2026-01-01T20:00:00Z"),
     ];
     let root = sd::tree(logs.path(), "st", &lines);
@@ -147,7 +156,10 @@ async fn open_segment_blocks_full_summary() {
     let root = sd::tree(logs.path(), "so", &lines);
     sd::backfill(data.path(), &root, fake, Some("rec_open"));
     assert_eq!(
-        bf::scalar(data.path(), "SELECT count(*) FROM sessions WHERE state = 'open'"),
+        bf::scalar(
+            data.path(),
+            "SELECT count(*) FROM sessions WHERE state = 'open'"
+        ),
         1
     );
     assert_eq!(sd::requests("rec_open", FULL_MARK).len(), 0);
@@ -219,7 +231,11 @@ fn summarize(l: &loupe::Loupe, fake: u16, mode: &str) {
             ("LOUPE_SUMMARY_BASE_URL", &url),
         ],
     );
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -237,7 +253,10 @@ async fn proxied_session_reads_all_segments() {
     // The day 2 request holds the longest history of both segments: the one of day 1.
     assert!(full[1].1.contains("DAYONE third"), "{}", full[1].1);
     assert_eq!(
-        summary::scalar(&l, "SELECT count(*) FROM session_day_summaries WHERE status = 'done'"),
+        summary::scalar(
+            &l,
+            "SELECT count(*) FROM session_day_summaries WHERE status = 'done'"
+        ),
         2
     );
 }
@@ -245,12 +264,7 @@ async fn proxied_session_reads_all_segments() {
 #[tokio::test(flavor = "multi_thread")]
 async fn proxied_day_transcript_holds_new_messages() {
     let fake = fake::spawn().await;
-    let l = two_day_proxied(
-        fake,
-        &[&["DAYONE ask"]],
-        &[&["DAYONE ask", "DAYTWO ask"]],
-    )
-    .await;
+    let l = two_day_proxied(fake, &[&["DAYONE ask"]], &[&["DAYONE ask", "DAYTWO ask"]]).await;
     summarize(&l, fake, "rec_proxied_new");
     let day = sd::requests("rec_proxied_new", DAY_MARK);
     assert_eq!(day.len(), 2);

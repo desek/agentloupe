@@ -6,6 +6,8 @@ mod bf;
 mod fake;
 #[path = "common/loupe.rs"]
 mod loupe;
+#[path = "common/session_days.rs"]
+mod sd;
 
 const MARKERS: &[&str] = &[
     "MARKERPROMPT",
@@ -27,6 +29,7 @@ const MARKERS: &[&str] = &[
     "MARKERPIFILE",
     "MARKERRESP",
     "MARKERSUMMARY",
+    "MARKERDAYONE",
     "sk-test-Sx9Pw4",
 ];
 
@@ -45,6 +48,21 @@ async fn no_prompt_path_or_raw_id_stored() {
         &claude.join(bf::SLUG).join("broken-MARKERFILE.jsonl"),
         "{not json MARKERPROMPT\n",
     );
+    // A two-day session with a marker on day 1: the session texts of day 2 read day 1 too.
+    bf::write(
+        &claude.join(bf::SLUG).join("twoday-MARKERFILE.jsonl"),
+        &[
+            sd::user(
+                "twoday",
+                "please fix MARKERDAYONE now",
+                "2026-03-01T10:00:00Z",
+            ),
+            sd::answer("twoday", "d1", "fixed it", "2026-03-01T10:00:01Z"),
+            sd::user("twoday", "please continue", "2026-03-02T10:00:00Z"),
+            sd::answer("twoday", "d2", "continued", "2026-03-02T10:00:01Z"),
+        ]
+        .join("\n"),
+    );
     let mut stderr = String::new();
     for (source, root) in [("claude-code", &claude), ("pi", &pi)] {
         let o = bf::ok(
@@ -56,6 +74,15 @@ async fn no_prompt_path_or_raw_id_stored() {
         assert!(loupe::count(&o, "summaries_done") > 0);
         stderr.push_str(&String::from_utf8_lossy(&o.stderr));
         stderr.push_str(&String::from_utf8_lossy(&o.stdout));
+    }
+    for table in ["session_full_summaries", "session_day_summaries"] {
+        let n = bf::scalar(
+            data.path(),
+            &format!(
+                "SELECT count(*) FROM {table} WHERE status = 'done' AND day IN ('2026-03-01', '2026-03-02')"
+            ),
+        );
+        assert!(n >= 2, "{table} has {n} done rows of the two-day session");
     }
     let bad = bf::run(data.path(), &["--source", "codex"], &env);
     stderr.push_str(&String::from_utf8_lossy(&bad.stderr));

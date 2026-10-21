@@ -66,8 +66,11 @@ GitHub API ─► GitHub worker (PRs, lines) ───────────�
 4. The parser prices each call from the vendored LiteLLM price file (see "Cost").
 5. The parser groups the calls into sessions. A session closes after 60 minutes with no calls. A subagent is its own session.
    A session that spans midnight counts on each day that has a call.
-6. A small model writes one line for each closed session, and one paragraph of 3 to 8 sentences
-   for each day, in a neutral tone. A scrubber then
+6. A small model writes one line for each closed session segment. For each session and each day
+   with a call of that session, it writes a full session summary, which covers the session up to
+   the end of that day, and a session day summary, which says what the session did on that day.
+   It reads the whole session, the conversation first. The paragraph of 3 to 8 sentences for each
+   day comes from the session day summaries of that day, in a neutral tone. A scrubber then
    removes URLs, paths, email addresses, and numbers from the line.
 7. The GitHub worker counts the pull requests and the changed lines of the day (see "GitHub").
 8. At 01:00 (Europe/Stockholm) the binary builds the previous day and publishes it on
@@ -415,8 +418,10 @@ praise; one line of at most 12 words for a session, which starts with a past-ten
 people, clients, companies, products, repositories, files, or tools; no paths, URLs, email
 addresses, or numbers; no other non-public information. Only the projects in
 `LOUPE_PUBLIC_PROJECTS` can be named. A trivial or failed session also gets a line that says what
-was tried. The day line is one paragraph of 3 to 8 sentences, built from the session lines of the
-day under the same rules.
+was tried. The full session summary is one paragraph of at most 8 sentences and the session day
+summary one paragraph of at most 4 sentences, under the same rules; both are stored for reference
+and are never published. The day line is one paragraph of 3 to 8 sentences, built from the session
+day summaries of the day under the same rules.
 
 A scrubber runs on every line before storage. It removes URLs, email addresses, paths, and every
 token with a digit, except a name in `LOUPE_PUBLIC_PROJECTS`. Raw bodies are deleted 168 hours
