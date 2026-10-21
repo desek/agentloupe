@@ -8,12 +8,12 @@
 # sessions_unchanged, claude_version, log.
 # The script builds the release binary, starts loupe serve on a free port with a temporary data dir
 # and LOUPE_IDLE_SECS=60, runs claude -p --model claude-haiku-5-5 through the proxy with a proxy token,
-# waits for the idle close, stops serve, runs loupe summarize --once with LOUPE_SUMMARY_OAUTH_TOKEN
+# waits for the idle close, stops serve, runs loupe summarize --once with CLAUDE_CODE_OAUTH_TOKEN
 # from .env at the repository root, then runs it again with LOUPE_RAW_RETENTION_HOURS=0.
 # The token is read only into the environment of loupe summarize; it is never printed or logged.
 # Full output: .agents/logs/summary.live.log.
 # Exit codes: 0 status done and line safe and no body left; 1 a check or a run failed; 2 bad usage;
-# 3 required tool missing; 4 no LOUPE_SUMMARY_OAUTH_TOKEN in .env.
+# 3 required tool missing; 4 no CLAUDE_CODE_OAUTH_TOKEN in .env.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -37,8 +37,8 @@ for tool in cargo curl perl sqlite3 claude; do
     exit 3
   fi
 done
-if ! grep -q '^LOUPE_SUMMARY_OAUTH_TOKEN=.' "$ROOT/.env" 2>/dev/null; then
-  echo "error: .env at the repository root has no LOUPE_SUMMARY_OAUTH_TOKEN. Fix 1: run claude setup-token and put the value in .env as LOUPE_SUMMARY_OAUTH_TOKEN=<value>. Fix 2: put LOUPE_SUMMARY_API_KEY in .env instead. Verify: re-run and see status: done." >&2
+if ! grep -q '^CLAUDE_CODE_OAUTH_TOKEN=.' "$ROOT/.env" 2>/dev/null; then
+  echo "error: .env at the repository root has no CLAUDE_CODE_OAUTH_TOKEN. Fix 1: run claude setup-token and put the value in .env as CLAUDE_CODE_OAUTH_TOKEN=<value>. Fix 2: put ANTHROPIC_API_KEY in .env instead. Verify: re-run and see status: done." >&2
   exit 4
 fi
 
@@ -84,8 +84,8 @@ sessions_before="$(sqlite3 "$db" "SELECT group_concat(id || state || call_count)
 (
   cd "$ROOT"
   set -a; . "$ROOT/.env"; set +a
-  env -i "${envs[@]}" LOUPE_SUMMARY_OAUTH_TOKEN="$LOUPE_SUMMARY_OAUTH_TOKEN" "$BIN" summarize --once
-  env -i "${envs[@]}" LOUPE_SUMMARY_OAUTH_TOKEN="$LOUPE_SUMMARY_OAUTH_TOKEN" LOUPE_RAW_RETENTION_HOURS=0 "$BIN" summarize --once
+  env -i "${envs[@]}" CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_CODE_OAUTH_TOKEN" "$BIN" summarize --once
+  env -i "${envs[@]}" CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_CODE_OAUTH_TOKEN" LOUPE_RAW_RETENTION_HOURS=0 "$BIN" summarize --once
 ) >>"$LOG" 2>&1 || fail "loupe summarize --once failed" "read the log"
 
 status="$(sqlite3 "$db" "SELECT coalesce(ss.status, 'none') || ':' || coalesce(ss.last_error_kind, '') FROM sessions s LEFT JOIN session_summaries ss ON ss.session_id = s.id ORDER BY s.started_at DESC LIMIT 1")"

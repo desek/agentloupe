@@ -15,7 +15,7 @@ The human sees the work of today of Claude Code and Pi on the dashboard, after o
 ### Preconditions
 
 - Docker Desktop runs. Port 8787 is free. Claude Code (record the version) and Pi 1.3.0 are installed, and Claude Code is logged in.
-- A scratch copy `E` of `.env` outside the repository, without the `LOUPE_GITHUB_TOKEN_` lines. It holds `LOUPE_DATA_KEY`, `LOUPE_ACCOUNT_KEY`, and `LOUPE_SUMMARY_OAUTH_TOKEN`. It does not set `LOUPE_SUMMARY_MODEL`, `LOUPE_SUMMARY_API_KEY`, `LOUPE_SITE_TITLE`, or `LOUPE_RAW_RETENTION_HOURS`.
+- A scratch copy `E` of `.env` outside the repository, without the `LOUPE_GITHUB_TOKEN_` lines. It holds `LOUPE_DATA_KEY`, `LOUPE_ACCOUNT_KEY`, and `CLAUDE_CODE_OAUTH_TOKEN`. It does not set `LOUPE_SUMMARY_MODEL`, `ANTHROPIC_API_KEY`, `LOUPE_SITE_TITLE`, or `LOUPE_RAW_RETENTION_HOURS`.
 - An untracked `compose.override.yaml`: `services.loupe.env_file: !override ["E"]` and `services.loupe.environment.LOUPE_IDLE_SECS: "60"`.
 - Each run uses the compose project name `loupe-acceptance` and starts with a new volume, so the volume of the human is not touched.
 - `D` is `TZ=Europe/Stockholm date +%F`. `T` is a file in the scratchpad with mode 0600.

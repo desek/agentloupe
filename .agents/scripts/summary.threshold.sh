@@ -8,7 +8,7 @@
 #   --human        Print a friendly view. Also the default when stdout is a terminal.
 #
 # For each value, the script runs the release binary of loupe backfill on a new scratch data dir, with
-# LOUPE_SUMMARY_OAUTH_TOKEN from .env, through summary.recorder.py, which forwards to the Anthropic API
+# CLAUDE_CODE_OAUTH_TOKEN from .env, through summary.recorder.py, which forwards to the Anthropic API
 # and records only the kind and the character count of each request. The runs are parallel.
 # Output (stdout, one line per value, key=value fields): value, day_rows, day_skipped, day_pending,
 # skipped_pct, pairs, full_rows, requests, line_requests, full_requests, day_requests, chars_max,
@@ -43,8 +43,8 @@ fi
 for tool in cargo python3 sqlite3; do
   command -v "$tool" >/dev/null || { echo "error: $tool is not installed. Fix: install $tool. Verify: re-run the script." >&2; exit 3; }
 done
-grep -q '^LOUPE_SUMMARY_OAUTH_TOKEN=.' "$ROOT/.env" 2>/dev/null || {
-  echo "error: .env has no LOUPE_SUMMARY_OAUTH_TOKEN. Fix: run claude setup-token and put the value in .env. Verify: re-run the script." >&2; exit 4; }
+grep -q '^CLAUDE_CODE_OAUTH_TOKEN=.' "$ROOT/.env" 2>/dev/null || {
+  echo "error: .env has no CLAUDE_CODE_OAUTH_TOKEN. Fix: run claude setup-token and put the value in .env. Verify: re-run the script." >&2; exit 4; }
 
 mkdir -p "$(dirname "$LOG")"
 : > "$LOG"
@@ -63,8 +63,8 @@ run_one() {
   sleep 1
   (
     set -a; . "$ROOT/.env"; set +a
-    unset LOUPE_SUMMARY_API_KEY
-    LOUPE_DATA_DIR="$dir" LOUPE_SUMMARY_BASE_URL="http://127.0.0.1:$port" LOUPE_SUMMARY_MIN_CONVERSATION_CHARS="$v" \
+    unset ANTHROPIC_API_KEY OPENAI_API_KEY LOUPE_SUMMARY_API_KEY LOUPE_SUMMARY_OAUTH_TOKEN LOUPE_SUMMARY_BASE_URL
+    LOUPE_DATA_DIR="$dir" ANTHROPIC_BASE_URL="http://127.0.0.1:$port" LOUPE_SUMMARY_MIN_CONVERSATION_CHARS="$v" \
       "$ROOT/target/release/loupe" backfill --source "$source" --from "$from" --to "$to"
   ) >"$dir/out.txt" 2>>"$LOG" || { kill "$rec"; echo "error: the backfill run at $v failed; see $LOG" >&2; return 1; }
   kill "$rec" 2>/dev/null || true

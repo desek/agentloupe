@@ -120,9 +120,14 @@ Configuration:
 | `LOUPE_BOOTSTRAP_TOKEN` | no | A proxy token from a secret (see "Proxy tokens"). |
 | `LOUPE_GITHUB_TOKEN_<LABEL>` | no | One or more GitHub tokens (see "GitHub"). |
 | `LOUPE_GITHUB_API_URL` | no | Base URL of the GitHub API. Default `https://api.github.com`. Must use `https`, except for `127.0.0.1` or `localhost`. |
-| `LOUPE_SUMMARY_API_KEY` | no | Console API key for the one-line summaries. Either this key or `LOUPE_SUMMARY_OAUTH_TOKEN` enables the summaries; if both are set, the key is used. Without one, no summaries. |
-| `LOUPE_SUMMARY_OAUTH_TOKEN` | no | Claude subscription token from `claude setup-token`, sent as `Authorization: Bearer`. Works with `claude-haiku-5-5` only. |
-| `LOUPE_SUMMARY_MODEL` | no | Model for the summaries. Default `claude-haiku-5-5`. A model other than `claude-haiku-5-5` needs `LOUPE_SUMMARY_API_KEY`, because a subscription token works only with Haiku. |
+| `CLAUDE_CODE_OAUTH_TOKEN` | no | Claude subscription token from `claude setup-token`, sent as `Authorization: Bearer`. Works with `claude-haiku-5-5` only. Detects the `anthropic` provider. |
+| `ANTHROPIC_API_KEY` | no | Console API key. Detects the `anthropic` provider. If both Anthropic credentials are set, the key is used. |
+| `OPENAI_API_KEY` | no | OpenAI API key, sent as `Authorization: Bearer`. Detects the `openai` provider. |
+| `ANTHROPIC_BASE_URL` | no | Base URL of the Anthropic API, without `/v1`. Default `https://api.anthropic.com`. Must use `https`, except for `127.0.0.1` or `localhost`. |
+| `OPENAI_BASE_URL` | no | Base URL of the OpenAI API, with `/v1`. Default `https://api.openai.com/v1`. Must use `https`, except for `127.0.0.1` or `localhost`. |
+| `LOUPE_SUMMARY_PROVIDER` | no | `anthropic` or `openai`. Default: `anthropic` if it is detected, else `openai`. A detected provider enables the summaries; with no detected provider, no summaries. |
+| `LOUPE_SUMMARY_MODEL` | no | Model for the summaries. Default `claude-haiku-5-5` for `anthropic`, no default for `openai`. With `CLAUDE_CODE_OAUTH_TOKEN` as the active credential, a different model needs `ANTHROPIC_API_KEY`. |
+| `LOUPE_PROVIDER_PING_SECS` | no | Seconds between two pings of the models list of each provider. Default `300`, minimum `60`. |
 | `LOUPE_TZ` | no | Time zone that cuts the days. Default `Europe/Stockholm`. |
 | `LOUPE_PUBLISH_AT` | no | Time to publish the previous day. Default `01:00`. |
 | `LOUPE_PUBLISH_INTERVAL_SECS` | no | Seconds between two checks for days to publish. Default `60`. |
@@ -133,6 +138,11 @@ Configuration:
 | `LOUPE_DAY_REVIEW` | no | `auto` publishes days with no review, `manual` waits for `loupe day approve`. Default `auto`. |
 | `LOUPE_SUBSCRIPTION_<NAME>` | no | Monthly price in USD of a subscription, shown next to the API-equivalent cost. |
 | `LOUPE_ADMIN_TOKEN` | no | Secret for the private page. Without it, the private page is off. |
+
+`LOUPE_SUMMARY_API_KEY`, `LOUPE_SUMMARY_OAUTH_TOKEN`, and `LOUPE_SUMMARY_BASE_URL` are removed
+names. If one of them is set, `loupe serve`, `loupe summarize`, and `loupe config show` stop at
+start with an error that names the new name. Rename the variable in `.env`. Then
+`loupe config show` prints the `provider.anthropic` line.
 
 A day has a record when it has agent calls or GitHub activity. A day with neither has no record,
 and the dashboard shows it as zero. The day line is published with no manual review. To change a
@@ -227,9 +237,9 @@ The connect script `.agents/scripts/agent.connect.sh` points one agent at the pr
 shell. It does not change `~/.claude`, `~/.pi/agent`, or a file in the repository. It takes the
 proxy token from a file (`--token-file`) or from `LOUPE_PROXY_TOKEN`, never as an argument value.
 
-1. Put `LOUPE_DATA_KEY`, `LOUPE_ACCOUNT_KEY`, and `LOUPE_SUMMARY_OAUTH_TOKEN` in `.env`. The
+1. Put `LOUPE_DATA_KEY`, `LOUPE_ACCOUNT_KEY`, and `CLAUDE_CODE_OAUTH_TOKEN` in `.env`. The
    summarizer uses the subscription token from `claude setup-token` and the default model
-   `claude-haiku-5-5`. Do not set `LOUPE_SUMMARY_MODEL` or `LOUPE_SUMMARY_API_KEY`.
+   `claude-haiku-5-5`. Do not set `LOUPE_SUMMARY_MODEL` or `ANTHROPIC_API_KEY`.
 2. Start the container: `docker compose up -d --build`.
 3. Make a proxy token into a file outside the repository:
    `(umask 077; docker compose exec -T loupe loupe token create --name laptop | sed -E 's/.*"token":"([^"]+)".*/\1/' > ~/.config/agentloupe-token)`.
@@ -390,6 +400,14 @@ A private page at `/private/` shows usage, cost, and sessions per proxy token an
 needs `LOUPE_ADMIN_TOKEN`, sent as a header or through a login form. Its data never appears in
 the public API.
 
+Two more routes need the same authorization:
+
+- `GET /private/api/providers` returns the provider status of each provider: `ok`,
+  `unauthorized`, `unreachable`, or `not_configured`, with `checked_at`. The status comes from a
+  cached ping of the models list. It never changes `GET /healthz`.
+- `GET /private/api/config` returns the same entries as `loupe config show`. Each secret is `set`
+  or `unset`.
+
 ## Privacy model
 
 | Data | What happens to it |
@@ -398,6 +416,7 @@ the public API.
 | Account identity | HMAC-SHA256 hash only, never in the public API |
 | Proxy tokens | SHA-256 hash, name, tags, and dates. Never the raw token, never in the public API |
 | GitHub tokens | Environment only, never stored |
+| Provider credentials (`CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) | Environment only, never stored, never logged, never in `loupe config show` or an API response |
 | Pull requests | HMAC-SHA256 hash, token label, dates, line counts. Never the repository, number, or URL |
 | Request and response bodies | Encrypted with `LOUPE_DATA_KEY`, deleted 168 hours after parse and summary |
 | Exchange metadata | Agent, upstream, method, path, status, sizes, timing |

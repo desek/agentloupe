@@ -15,7 +15,7 @@ The operator sees one non-identifying line for a finished `claude -p` session.
 ### Preconditions
 
 - Claude Code 2.1.304 is logged in.
-- `.env` at the repository root holds `LOUPE_SUMMARY_OAUTH_TOKEN`. Do not print it.
+- `.env` at the repository root holds `CLAUDE_CODE_OAUTH_TOKEN`. Do not print it.
 
 ### Steps at the user surface
 
