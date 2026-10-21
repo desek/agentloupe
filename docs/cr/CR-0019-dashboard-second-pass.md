@@ -2,7 +2,7 @@
 name: "CR-0019 Dashboard second pass"
 description: "Four changes after a look at the live page with CR-0018 in place: the lines figures move into a footer line of a wider pull request card with a horizontal legend, the cost asterisk also goes on the live cost label, and the long cost footnote becomes one short sentence in the page footer."
 id: "CR-0019"
-status: "approved"
+status: "implemented"
 date: 2026-10-21
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
