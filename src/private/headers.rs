@@ -19,9 +19,11 @@ pub fn apply(mut res: Response) -> Response {
         header::X_CONTENT_TYPE_OPTIONS,
         HeaderValue::from_static("nosniff"),
     );
+    // same-origin, not no-referrer: under no-referrer a browser sends `Origin: null` on the form
+    // posts, and the Origin check then refuses the own login form.
     h.insert(
         header::REFERRER_POLICY,
-        HeaderValue::from_static("no-referrer"),
+        HeaderValue::from_static("same-origin"),
     );
     h.remove(header::ACCESS_CONTROL_ALLOW_ORIGIN);
     res
