@@ -52,6 +52,11 @@ The flag `--env` or the variable `LOUPE_ENV` gives the name of the environment. 
 | `LOUPE_CAPTURE_QUEUE` | no | no | `256` |
 | `LOUPE_UPSTREAM_CONNECT_TIMEOUT_SECS` | no | no | `10` |
 | `LOUPE_UPSTREAM_HEADERS_TIMEOUT_SECS` | no | no | `120` |
+| `LOUPE_LIVE_ENABLED` | no | no | `true` |
+| `LOUPE_LIVE_ALLOWED_ORIGIN` | no | no | unset |
+| `LOUPE_LIVE_MAX_RATE` | no | no | `10` (1 to 50) |
+| `LOUPE_LIVE_MAX_CONNECTIONS` | no | no | `32` (1 to 1024) |
+| `LOUPE_LIVE_BUFFER` | no | no | `1024` (64 to 65536) |
 
 The loader parses and validates every value. A value that only a later product area uses does not change the behaviour of the binary until that area exists.
 
@@ -82,6 +87,7 @@ The subcommand also prints these lines:
 6. `LOUPE_TZ`, `LOUPE_PUBLISH_AT`, `LOUPE_PUBLISH_INTERVAL_SECS`, and `LOUPE_DAY_REVIEW`, each with its source.
 7. The next due publish time, in `LOUPE_TZ` and in UTC.
 8. `site_title: <value>`, the effective site title.
+9. `live_enabled`, `live_allowed_origin`, `live_max_rate`, `live_max_connections`, and `live_buffer`, each with its source.
 
 ## Summary credential
 
@@ -98,6 +104,10 @@ The subcommand also prints these lines:
 ## Site title
 
 `LOUPE_SITE_TITLE` sets the title of the dashboard page. The default is `AI agent activity`. The loader removes the white space at the start and the end of the value. A value that is empty after this, or that is longer than 80 characters, stops the start with an actionable error that names `LOUPE_SITE_TITLE`. `dashboard.md` gives the use of the title.
+
+## Live variables
+
+`LOUPE_LIVE_ENABLED` is `true` or `false`. `LOUPE_LIVE_ALLOWED_ORIGIN` is one origin. `LOUPE_LIVE_MAX_RATE` is 1 to 50, `LOUPE_LIVE_MAX_CONNECTIONS` is 1 to 1024, and `LOUPE_LIVE_BUFFER` is 64 to 65536. A value out of range stops the start with an actionable error that names the variable. `live.md` gives the full rules.
 
 ## Subscription variables
 

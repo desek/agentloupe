@@ -49,6 +49,8 @@ The `GET /` response also has these headers:
 2. `x-content-type-options: nosniff`
 3. `referrer-policy: no-referrer`
 
+The live section does not change the policy. In the browsers of the baseline, `connect-src 'self'` covers a `ws:` or `wss:` socket to the same origin. A test asserts the header.
+
 The static routes send no CORS header.
 
 ## Method rule
@@ -61,7 +63,7 @@ The static routes do not read a cookie or an `authorization` header. They do not
 
 ## Reserved names
 
-The router keeps a list of reserved first path segments. The proxy does not get a request whose first segment is on the list. The list is `healthz`, `v1`, `assets`, `favicon.ico`, and `private`. The list holds the names that the static handler and the public API serve, and one file in the router holds it. `proxy.md` gives the proxy routes.
+The router keeps a list of reserved first path segments. The proxy does not get a request whose first segment is on the list. The list is `healthz`, `v1`, `assets`, `favicon.ico`, `private`, and `live`. The list holds the names that the static handler, the public API, and the live route serve, and one file in the router holds it. `proxy.md` gives the proxy routes.
 
 ## Site title
 
@@ -78,7 +80,7 @@ At start, the binary puts the title into `index.html` one time. It escapes the c
 5. The page has no inline script, no inline style that the policy blocks, and no `eval`.
 6. The page does not use a cookie, `localStorage`, `sessionStorage`, or IndexedDB.
 7. Each chart is inline SVG that the page draws. The page uses no chart library.
-8. The page gets data only from `GET /v1/days` on the same origin. It calls no other route of the binary, except the static files.
+8. The page gets data only from `GET /v1/days` and from the live route `/live` on the same origin. It calls no other route of the binary, except the static files.
 
 ## Data request
 
@@ -120,6 +122,17 @@ The headline is directly below the header, before every other section.
 4. Below the figure, one line gives the range in words, for example "average over the last 3 months".
 5. A sparkline with no axes shows the daily `input_total + output` of the range.
 6. The headline is visible with no scroll at a width of 360 px and of 1440 px.
+
+### Live section
+
+The live section is directly below the headline. `live.md` gives the live route.
+
+1. The section shows four figures for the current day: calls, tokens (the sum of the five token counts), open segments, and API-equivalent cost. It also shows the count of exchanges in flight.
+2. The section shows a rolling chart of tokens for each 10-second bucket over the last 10 minutes. The chart is inline SVG with the design tokens of this page. The chart starts empty when the page loads.
+3. The page opens the socket with `ws://` or `wss://` at the page origin, path `/live`. The `snapshot` frame sets the figures, and each later frame adds to them.
+4. After a close, the page connects again after 1, 2, 4, 8, 16, and then 30 seconds. A `snapshot` frame resets this sequence.
+5. The page closes the socket when the document is hidden. It opens the socket again when the document is visible.
+6. The section uses no cookie, `localStorage`, `sessionStorage`, or IndexedDB.
 
 ### Header
 
@@ -191,6 +204,10 @@ When the response holds no record, the page shows the header, the headline with 
 
 1. When `prs_opened`, `prs_merged`, `lines_added`, and `lines_removed` are `null` in every record of the response, the pull request section and the lines section show "GitHub not connected" in place of the figures and the charts.
 2. When some records have `null` in these fields, a `null` counts as zero, and each of the two sections shows "Partial GitHub data".
+
+### Live feed paused
+
+When the socket is closed, the live section shows "Live feed paused, reconnecting" and keeps the last figures in a muted style. A browser cannot read the HTTP status of a failed upgrade. Thus, when 3 connects in a row fail and no `snapshot` frame came since the page load, the page hides the live section until a reload. A browser that blocks the socket shows the paused state and then hides the section.
 
 ### Error
 

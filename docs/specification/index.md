@@ -14,6 +14,7 @@ This directory describes how the `loupe` binary behaves. Each file covers one pr
 | `summaries.md` | The one-line session summaries, the day paragraph, and the retention of raw bodies. |
 | `days.md` | The day records, the aggregation queue, the publisher, `loupe aggregate`, and `loupe day`. |
 | `api.md` | The public API routes under `/v1/days`, the errors, the headers, and the version policy. |
+| `live.md` | The live route `/live`, the live hub, the live events and their allowlist, the snapshot, the rate limit, and the limits. |
 | `dashboard.md` | The dashboard page at `GET /`, the static routes and their headers, the data request, the ranges, the sections and their formulas, the states, the fonts, and the design tokens. |
 | `private-reports.md` | The private page under `/private/`, the admin token, the login, the cookie, the report and session routes, and their headers. |
 | `github.md` | The GitHub worker and the GitHub token labels. |
