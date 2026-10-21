@@ -35,7 +35,8 @@ async fn every_web_file_is_embedded() {
     let mut served = 0;
     for p in web_files() {
         let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("");
-        if !EXT.contains(&ext) {
+        if !EXT.contains(&ext) || p.starts_with(root.join("private")) {
+            // The private page files are served only behind the admin token; tests/private.*.rs cover them.
             continue;
         }
         let rel = p

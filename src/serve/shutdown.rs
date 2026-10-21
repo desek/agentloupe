@@ -26,10 +26,15 @@ async fn signal() {
     tracing::info!("shutdown signal received, draining open requests");
 }
 
-/// Serves until a signal, then waits at most DRAIN for open requests.
+/// Serves until a signal, then waits at most DRAIN for open requests. Each request carries its
+/// remote address, which the failed-login limit of the private page reads.
 pub async fn serve_until_signal(listener: TcpListener, app: Router) -> std::io::Result<()> {
     let (tx, rx) = tokio::sync::oneshot::channel::<()>();
-    let server = axum::serve(listener, app).with_graceful_shutdown(async move {
+    let server = axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .with_graceful_shutdown(async move {
         signal().await;
         let _ = tx.send(());
     });

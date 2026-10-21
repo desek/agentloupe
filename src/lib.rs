@@ -10,6 +10,7 @@ pub mod github;
 pub mod log;
 pub mod parse;
 pub mod price;
+pub mod private;
 pub mod proxy;
 pub mod publish;
 pub mod retention;

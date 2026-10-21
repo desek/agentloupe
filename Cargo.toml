@@ -222,3 +222,31 @@ path = "tests/web.embed.rs"
 [[test]]
 name = "agent_connect"
 path = "tests/agent.connect.rs"
+
+[[test]]
+name = "private_off"
+path = "tests/private.off.rs"
+
+[[test]]
+name = "private_auth"
+path = "tests/private.auth.rs"
+
+[[test]]
+name = "private_cookie"
+path = "tests/private.cookie.rs"
+
+[[test]]
+name = "private_login"
+path = "tests/private.login.rs"
+
+[[test]]
+name = "private_report"
+path = "tests/private.report.rs"
+
+[[test]]
+name = "private_separation"
+path = "tests/private.separation.rs"
+
+[[test]]
+name = "private_logs"
+path = "tests/private.logs.rs"

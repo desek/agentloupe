@@ -102,11 +102,21 @@ pub fn run(cfg: &Config, upstreams: Upstreams) -> Result<(), Box<dyn Error>> {
     });
     // The title goes into index.html once here, so each request serves the same bytes and ETag.
     let site = Arc::new(crate::web::Site::new(&cfg.site_title));
+    // The private state exists only with an admin token; it keeps a digest and a key, never the token.
+    let private = match &cfg.admin_token {
+        Some(t) => Some(Arc::new(crate::private::PrivateState::new(
+            crate::store::open::open(&cfg.data_dir)?,
+            cfg.summary.tz,
+            t.expose(),
+        ))),
+        None => None,
+    };
+    tracing::info!(private_page = private.is_some(), "private page state");
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(async {
         let listener = tokio::net::TcpListener::bind(cfg.listen).await?;
         tracing::info!(listen = %cfg.listen, "listening");
-        shutdown::serve_until_signal(listener, router::router(state, api, site)).await
+        shutdown::serve_until_signal(listener, router::router(state, api, site, private)).await
     })?;
     // The runtime drop ends every open stream, which drops the last capture handle; the writer
     // then drains the queue and stops.
