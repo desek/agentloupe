@@ -1,4 +1,4 @@
-//! @agents-index Integration test: a backfilled session gets a session day summary and no segment line, and a re-run retries it.
+//! @agents-index Integration test: a backfilled session gets a session day summary and no segment line; a re-run retries it and processes rows a rebuild reset.
 
 #[path = "common/backfill.rs"]
 mod bf;
@@ -91,4 +91,48 @@ async fn rerun_retries_pending_summary() {
     assert_eq!(loupe::count(&b, "calls_added"), 0);
     assert_eq!(loupe::count(&b, "summaries_done"), 1);
     assert_eq!(status(data.path()), "done");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn rerun_processes_rows_that_rebuild_days_reset() {
+    let fake = fake::spawn().await;
+    let (logs, data) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let root = bf::claude_tree(logs.path(), false);
+    let a = run(
+        data.path(),
+        &root,
+        &format!("http://127.0.0.1:{fake}/summary/line"),
+    );
+    assert_eq!(loupe::count(&a, "summaries_done"), 1);
+    let day: String = bf::db(data.path())
+        .query_row("SELECT day FROM session_day_summaries", [], |r| r.get(0))
+        .unwrap();
+    let range = format!("{day}..{day}");
+    let e = env(&format!("http://127.0.0.1:{fake}/summary/line"));
+    let pairs: Vec<(&str, &str)> = e.iter().map(|(k, v)| (*k, v.as_str())).collect();
+    let r = loupe::summarize(data.path(), &["--rebuild-days", &range], &pairs);
+    assert!(r.status.success(), "{}", String::from_utf8_lossy(&r.stderr));
+    let pending = |d: &std::path::Path| -> i64 {
+        bf::scalar(
+            d,
+            "SELECT (SELECT count(*) FROM session_day_summaries WHERE status = 'pending') + (SELECT count(*) FROM session_full_summaries WHERE status = 'pending')",
+        )
+    };
+    assert_eq!(pending(data.path()), 2, "the rebuild resets both rows");
+    let mode = "rec_rebuild_rerun";
+    let b = run(
+        data.path(),
+        &root,
+        &format!("http://127.0.0.1:{fake}/summary/{mode}"),
+    );
+    assert_eq!(loupe::count(&b, "summaries_done"), 1);
+    assert_eq!(
+        pending(data.path()),
+        0,
+        "the re-run processes the reset rows"
+    );
+    assert!(
+        fake::summary_hits(mode) >= 2,
+        "the fake route gets the requests"
+    );
 }
