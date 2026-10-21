@@ -28,12 +28,13 @@ diag() { echo "diagnostic: $1. The affected stages run in full. Reference: docs/
 # The tree hash of HEAD plus every tracked change and every untracked file that is not ignored. A temporary
 # index keeps the real index, the working tree, and the stash unchanged. The copy of the real index only
 # carries its stat data, so unchanged files are not hashed again; read-tree -m resets its content to HEAD.
+# cp -p keeps the mtime of the index, so git still finds a file changed in the same second as the index.
 tree_fingerprint() {
   command -v git >/dev/null || { diag "git is missing"; return 1; }
   local tmp real
   tmp="$(mktemp "${TMPDIR:-/tmp}/verdict.index.XXXXXX")" || { diag "the temporary index failed"; return 1; }
   real="$(git -C "$ROOT" rev-parse --absolute-git-dir 2>/dev/null)/index"
-  if [[ -f "$real" ]]; then cp "$real" "$tmp"; else rm -f "$tmp"; fi
+  if [[ -f "$real" ]]; then cp -p "$real" "$tmp"; else rm -f "$tmp"; fi
   if ! (cd "$ROOT" && export GIT_INDEX_FILE="$tmp" && git read-tree -m HEAD 2>/dev/null && git add -A 2>/dev/null && git write-tree); then
     rm -f "$tmp"; diag "the temporary index failed"; return 1
   fi
