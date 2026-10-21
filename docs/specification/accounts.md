@@ -27,7 +27,7 @@ The table `accounts` holds one row for each (hash, source):
 | `first_seen` | The time of the first call with this account. |
 | `last_seen` | The time of the last call with this account. |
 
-Each call stores the account id. A call with no source stores a null account id. The account id and the proxy token ID are independent.
+Each call stores the account id. A call with no source stores a null account id. A call with origin `log` has the account `none`: its account id is null, because the logs hold no account ID and no credential. See `backfill.md`. The account id and the proxy token ID are independent.
 
 ## Privacy
 

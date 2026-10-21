@@ -25,7 +25,9 @@ A log line of the summary worker holds only the segment id, the status, the atte
 
 ## Transcript
 
-The transcript comes from one request body of the segment. The builder uses the exchanges of the segment that made a call. It selects the request body with the longest message history: the most entries in `messages`, or in `input` for the OpenAI Responses format. A tie goes to the latest exchange.
+The transcript of a proxied segment comes from one request body of the segment. The transcript of a backfilled segment comes from the log entries of the segment, and the backfill run builds it. The summary worker builds no transcript for a segment with calls of origin `log`. See `backfill.md`.
+
+For a proxied segment, the transcript comes from one request body of the segment. The builder uses the exchanges of the segment that made a call. It selects the request body with the longest message history: the most entries in `messages`, or in `input` for the OpenAI Responses format. A tie goes to the latest exchange.
 
 The builder applies these rules:
 

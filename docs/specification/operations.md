@@ -8,6 +8,7 @@
 | `loupe serve` | Loads the configuration, opens the database, applies the migrations, then listens on `LOUPE_LISTEN`. |
 | `loupe gen-key` | Prints one new random 32-byte key in standard base64 with padding, then a newline. The key comes from the random source of the operating system. The subcommand stores nothing. |
 | `loupe config show` | Prints the effective configuration. See `configuration.md`. |
+| `loupe backfill` | Reads the session logs of Claude Code or Pi into the calls and the sessions. See `backfill.md`. |
 
 Each subcommand has a complete `--help`.
 
@@ -135,5 +136,8 @@ To see a day before the nightly publish, run the aggregate subcommand for that d
 | Secret leak count | grep for `lpt_[A-Za-z0-9_-]{5,}` and `sk-ant-` over the scenario files and the container logs | not measured; 0 on 2026-10-21, over the scenario files and the container logs of three runs; 0 again after the independent fourth run | 0 |
 | Private acceptance criteria | `.agents/scripts/pipeline.verdict.sh` and the private browser scenario under `.agents/scenarios/` | no private route exists; on 2026-10-21 the verdict passed in 110.8 seconds and the browser scenario passed 1 of 1 | every criterion passes |
 | Private report time, 400 days | `.agents/scripts/private.bench.sh` seeds 100 000 calls over 400 days, then prints the `time_total` of the report request with the bearer header | no private route exists; 0.088 seconds on 2026-10-21 | below 1.0 seconds |
+| Backfill time, 10000 entries | `.agents/scripts/backfill.bench.sh --entries 10000 --dry-run` prints `backfill_secs` | none, a new measurement, added before the backfill | `backfill_secs` at most 15 |
+| Backfill idempotence | run `loupe backfill --source claude-code` two times on the fixtures | none | `calls_added: 0` on the second run |
+| Backfill of real logs | `loupe backfill --source claude-code --dry-run` and `--source pi --dry-run` on this machine | 0 calls with origin `log` | `calls_added` above 0 for each source, `entries_skipped` at most 1 percent of `entries_read` |
 | Size of the private page files | the size of the files under `web/private/`, without the shared fonts | no private page exists; 12.9 KiB on 2026-10-21 | at most 200 KiB |
 The time to a full verdict is the time of the local loop. The first measured value at the end of the foundation change is the baseline. A later change that makes it longer must state the reason.

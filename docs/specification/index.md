@@ -9,6 +9,7 @@ This directory describes how the `loupe` binary behaves. Each file covers one pr
 | `proxy.tokens.md` | The proxy tokens, the `loupe token` subcommands, the bootstrap token, and the token gate. |
 | `accounts.md` | The hash of the provider account, the order of its sources, and the accounts table. |
 | `parser.md` | The parser that finds calls in exchanges, the token columns, and the sessions and segments that group the calls. |
+| `backfill.md` | The backfill of calls and sessions from the session logs of Claude Code and Pi, and the summaries of backfilled segments. |
 | `cost.md` | The API-equivalent cost of each call from the vendored price file. |
 | `summaries.md` | The one-line session summaries, the day paragraph, and the retention of raw bodies. |
 | `days.md` | The day records, the aggregation queue, the publisher, `loupe aggregate`, and `loupe day`. |

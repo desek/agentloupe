@@ -55,7 +55,7 @@ Each row of `calls` holds these columns:
 | Column | Value |
 |---|---|
 | `id` | A unique id. |
-| `exchange_id` | The id of the exchange. |
+| `exchange_id` | The id of the exchange, or null for a call of origin `log`. |
 | `call_index` | The position of the call in the exchange, from 0. |
 | `started_at` | The start time of the exchange. |
 | `agent_label` | The agent label. |
@@ -74,6 +74,8 @@ Each row of `calls` holds these columns:
 | `cost_usd` | The API-equivalent cost as decimal text, or null. See `cost.md`. |
 | `price_commit` | The price commit that priced the call, or null. See `cost.md`. |
 | `unpriced_reason` | The reason that the call has no price, or null. See `cost.md`. |
+| `origin` | `proxy` or `log`. See `backfill.md`. |
+| `log_key` | The log key of a call of origin `log`, else null. See `backfill.md`. |
 
 The proxy token ID and the account id are independent columns. Thus an analysis can group by token, by account, or by both.
 
@@ -122,7 +124,7 @@ Each row of `sessions` is one segment. A segment is a run of calls in one scope 
 | `agent_label` | The agent label. |
 | `proxy_token_id` | The ID of the proxy token, or null. |
 | `key_hash` | The HMAC of the session key. |
-| `key_source` | `header`, `metadata`, `cache_key`, or `opening`. |
+| `key_source` | `header`, `metadata`, `cache_key`, `opening`, or `log`. The value `log` is for a segment of the backfill. See `backfill.md`. |
 | `segment` | The number of the segment in its scope, 1 for the first. |
 | `started_at` | The start time of the first call. |
 | `last_call_at` | The start time of the last call. |
