@@ -70,13 +70,48 @@ The pipeline entry points are in `.agents/scripts/`. Each entry point does one s
 |---|---|
 | `pipeline.format.sh` | `cargo fmt --check` |
 | `pipeline.lint.sh` | `cargo clippy` with warnings as errors |
-| `pipeline.test.sh` | `cargo test` |
+| `pipeline.test.sh` | `cargo nextest run`, and `cargo test --doc` if nextest does not run the doc tests |
 | `pipeline.web.sh` | Checks that `node --version` equals the pin in `.tool-versions`, runs `node --test` on the calculation modules of the page, and checks the size of `web/` with `web.size.sh`. `--check-toolchain` does only the check of the pin. |
 | `pipeline.image.sh` | Builds the container image. `--dry-run` prints the build command and does not run it. |
 
 Each entry point has `--help`, a machine output by default, and `--human` for the friendly view. It writes actionable errors to stderr and returns documented exit codes. The entry points read the toolchain version from `rust-toolchain.toml` and state no version of their own.
 
 `pipeline.verdict.sh` runs the stages in the order format, lint, test, web, image. It only calls the stage entry points. It prints one line for each stage with `status: passed` or `status: failed`, and the time of the stage. It also prints the total time. It returns a non-zero exit code if a stage fails. The entry point `pipeline.web.sh` reads the Node version from `.tool-versions`. If `node` is missing or its version differs from the pin, it stops with a non-zero exit code and an actionable error. The thin caller installs Node from `.tool-versions` and states no Node version. The stages format, lint, test, and web are hermetic: they use no network after the dependencies are fetched, and no assertion reads the wall clock.
+
+### Test runner
+
+The test stage runs the tests with the parallel runner `cargo nextest`. The minimum version of the runner is pinned in `.tool-versions`, on the line `cargo-nextest`. The test stage reads the pin from that file and states no version of its own. If the runner is missing or its version is below the pin, the test stage stops with exit code 3 and an actionable error. The error names the install command `cargo install cargo-nextest --locked --version <pin>`, the pin file, and the verify command. The test stage does not fall back to `cargo test`, so the measured loop stays one runner. The image stage does not change, because the Dockerfile runs no tests.
+
+### Stage inputs and toolchain
+
+Each stage entry point has the flag `--inputs`. It prints the paths that the stage reads, one path per line, and exits 0 with no run. The declared inputs are:
+
+| Stage | Declared inputs |
+|---|---|
+| format, lint | `src`, `tests`, `Cargo.toml`, `Cargo.lock`, `build.rs`, `migrations`, `vendor`, `rust-toolchain.toml`, `examples`, `.cargo`, `rustfmt.toml`, `.rustfmt.toml`, `clippy.toml`, `.clippy.toml`, and the script of the stage |
+| test | the inputs of format and lint with the script of the test stage, and also `.tool-versions` (the pin of the runner), any configuration file of the runner, `upstreams.toml`, `config`, `.agents/scripts`, and each file under `docs/` that a test reads, today `docs/specification/accounts.md` |
+| web | `web`, `.tool-versions`, `.agents/scripts/pipeline.web.sh` |
+| image | `Dockerfile`, `.dockerignore`, each source path of a `COPY` instruction in the Dockerfile (`rust-toolchain.toml`, `Cargo.toml`, `Cargo.lock`, `build.rs`, `web`, `vendor/litellm`, `src`, `migrations`, `tests`), `.agents/scripts/pipeline.image.sh` |
+
+Some declared paths do not exist today, for example the configuration files of the format and lint tools. A declared path that does not exist is part of the fingerprint as absent, so its later creation changes the fingerprint. A test finds each repository path that a test file reads, and fails if that path is not a declared input of the test stage.
+
+Each stage entry point also has the flag `--toolchain`. It prints the versions of the tools outside the tree that the stage uses: the Rust compiler and cargo for format and lint, also the runner for test, Node and the package manager for web, and the Docker server version and the local digest of each base image for image. The image stage reads the digests from the local image store with no network call.
+
+### Fingerprints and the verdict cache
+
+The tree fingerprint is the git tree hash of the working tree. The verdict makes it in a temporary index: it reads `HEAD`, adds every tracked change and every untracked file that `.gitignore` does not exclude, and writes the tree. Thus a dirty tree gets a fingerprint by its content, and the ignored files stay out. The verdict does not change the real index, the working tree, or the stash. Two trees with equal content give the same fingerprint, whatever their commits.
+
+The stage fingerprint is the hash of the sorted path and object entries of the declared inputs of the stage in that temporary tree, plus the name of the stage, plus the `--toolchain` output of the stage. A change outside the inputs of a stage does not change its fingerprint.
+
+The verdict cache is stored under `.agents/logs/`, which git does not track. The verdict writes the fingerprint of a stage only after the stage passed in a run of the verdict. A failed stage writes nothing. A write is atomic: the verdict writes a temporary file and then renames it. The cache keeps at most 200 tree entries and drops the oldest.
+
+The verdict first compares the tree fingerprint plus the `--toolchain` output of every stage with the cache. If that key equals a key for which every stage passed, the verdict prints each stage with `status: cached` and exits 0. A match of the tree fingerprint alone does not skip a stage. Else the verdict compares each stage fingerprint with the last passed fingerprint of that stage. A stage with an equal fingerprint prints `status: cached` and does not run. Any other stage runs. A stage line has the form `stage: <name> status: passed|failed|cached seconds: <n>`, and the last line has the form `verdict: passed|failed seconds: <total>`. A cached stage counts as passed for the exit code.
+
+The flag `--no-cache` runs every stage, and still writes the fingerprints of the stages that passed.
+
+The verdict fails closed. If git is missing, the temporary index fails, a hash fails, the cache is absent or unreadable, a `--inputs` or a `--toolchain` fails, or a base image is absent from the local image store, the verdict runs the affected stages in full. It prints one diagnostic line on stderr that names the cause. Only a positive match skips a stage. The fingerprint and cache logic is in a separate script under `.agents/scripts/` that the verdict calls, and the verdict stays a caller of the stage entry points.
+
+Only the hermetic stages format, lint, test, web, and image enter the verdict. The image stage is in the default verdict. The live scenarios and the benches stay outside the verdict, because they use the network or the wall clock.
 
 ## Connect the agents
 
@@ -154,6 +189,11 @@ To see a day before the nightly publish, run the aggregate subcommand for that d
 | Backfill time, 10000 entries | `.agents/scripts/backfill.bench.sh --entries 10000 --dry-run` prints `backfill_secs` | none, a new measurement, added before the backfill; 0.46 seconds with `--dry-run` (re-measured), earlier 0.48 seconds with `--dry-run` and 0.39 seconds for a real run on 2026-10-21, release binary on this machine | `backfill_secs` at most 15 |
 | Backfill idempotence | run `loupe backfill --source claude-code` two times on the fixtures | none; `calls_added: 0` on the second run on 2026-10-21, also for `--source pi` | `calls_added: 0` on the second run |
 | Backfill of real logs | `loupe backfill --source claude-code --dry-run` and `--source pi --dry-run` on this machine | 0 calls with origin `log`; with the backfill the full verdict passed in 85.9 seconds (warm) on 2026-10-21; on 2026-10-21 the dry run gave `calls_added` 38088 of 274673 entries (re-measured; earlier 38070 of 274434) for `claude-code` and 10450 of 23282 entries for `pi`, `entries_skipped` 0 for each | `calls_added` above 0 for each source, `entries_skipped` at most 1 percent of `entries_read` |
+| Warm full verdict | `.agents/scripts/pipeline.verdict.sh --no-cache`, second run, total seconds, with the image stage | about 104 seconds on 2026-10-21 (format 0.5, lint 0.6, test 99, web 0.5, image 1, up to 70 when the Docker layer cache misses); after: not yet measured | at most 40 seconds, every stage `status: passed` |
+| Test stage | the seconds of the `test` line in the run above | 99 seconds on 2026-10-21 with `cargo test`; 24 seconds with `cargo nextest run --no-fail-fast` (394 tests) on 2026-10-21; after: not yet measured | at most 30 seconds |
+| Docs-only change | change `docs/specification/operations.md`, then `.agents/scripts/pipeline.verdict.sh`, total seconds | about 104 seconds on 2026-10-21; after: not yet measured | at most 3 seconds, every stage `status: cached`, exit code 0 |
+| Web-only change | change a file under `web/`, then `.agents/scripts/pipeline.verdict.sh` | about 104 seconds on 2026-10-21; after: not yet measured | format, lint, and test `status: cached`; web and image `status: passed`, because the Dockerfile copies `web` |
+| Fingerprint cost | the timing line on stderr of the fingerprint script | none, a new measurement | at most 1 second |
 | Size of the private page files | the size of the files under `web/private/`, without the shared fonts | no private page exists; 12.9 KiB on 2026-10-21 | at most 200 KiB |
 The time to a full verdict is the time of the local loop. The first measured value at the end of the foundation change is the baseline. A later change that makes it longer must state the reason.
 | Time of the local loop with the live feed | `.agents/scripts/pipeline.verdict.sh` | 85.9 seconds (warm) after the backfill | the full verdict passed in 86.1 seconds (warm) on 2026-10-21; the live tests add a heartbeat test of 15 seconds that runs in parallel |
