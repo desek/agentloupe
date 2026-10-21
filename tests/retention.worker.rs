@@ -15,8 +15,8 @@ fn run(l: &Loupe, url: &str, hours: &str) -> std::process::Output {
         l.data.path(),
         &["--once"],
         &[
-            ("LOUPE_SUMMARY_API_KEY", "k"),
-            ("LOUPE_SUMMARY_BASE_URL", url),
+            ("ANTHROPIC_API_KEY", "k"),
+            ("ANTHROPIC_BASE_URL", url),
             ("LOUPE_RAW_RETENTION_HOURS", hours),
         ],
     );

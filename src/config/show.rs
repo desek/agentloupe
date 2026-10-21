@@ -1,11 +1,22 @@
-//! @agents-index Renders the effective configuration as NDJSON or a table, with every secret shown only as set or unset.
+//! @agents-index The one render of the effective configuration for config show and the private config route; secrets only as set or unset.
 
 use super::loader::{Entry, Loaded};
 
-/// The printable value: secrets become set or unset, a missing plain value becomes unset.
+/// One printed entry. `value` is already masked, so a surface that prints it cannot leak a secret.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Line {
+    pub name: String,
+    pub value: String,
+    pub source: String,
+    pub secret: bool,
+}
+
+/// The printable value: secrets become set or unset, a missing plain value becomes unset. A secret
+/// of only white space counts as unset, as the provider detection reads it.
 fn shown(e: &Entry) -> String {
     match (&e.value, e.secret) {
         (None, _) => "unset".into(),
+        (Some(v), true) if v.expose().trim().is_empty() => "unset".into(),
         (Some(_), true) => "set".into(),
         (Some(v), false) => v.expose().to_string(),
     }
@@ -31,14 +42,15 @@ fn derived(cfg: &Loaded) -> Vec<(String, String, &'static str)> {
             .and_then(|e| e.value.as_ref())
             .map(|v| v.expose())
     };
-    // An invalid model rule still prints the kind; the start error names the fix.
-    let kind = crate::summary::credential::select(
-        get("LOUPE_SUMMARY_API_KEY"),
-        get("LOUPE_SUMMARY_OAUTH_TOKEN"),
-        crate::summary::credential::HAIKU,
+    let providers = crate::provider::detect::detect(cfg);
+    // An invalid selection still prints a line; the start error names the fix.
+    let summary = crate::summary::credential::select_provider(
+        get("LOUPE_SUMMARY_PROVIDER"),
+        &crate::provider::detect::names(&providers),
     )
-    .ok()
-    .flatten();
+    .map_or("invalid: LOUPE_SUMMARY_PROVIDER".to_string(), |p| {
+        p.map_or("none".to_string(), |p| p.name().to_string())
+    });
     let tz = get("LOUPE_TZ").and_then(|v| v.parse::<chrono_tz::Tz>().ok());
     let at = get("LOUPE_PUBLISH_AT").and_then(super::publish_at);
     let (local, utc) = match (tz, at) {
@@ -61,11 +73,20 @@ fn derived(cfg: &Loaded) -> Vec<(String, String, &'static str)> {
         "derived",
     ));
     out.push(("publish_next_due_utc".into(), utc, "derived"));
-    out.push((
-        "summary_credential".into(),
-        crate::summary::credential::kind(kind.as_ref()).to_string(),
-        "derived",
-    ));
+    // One line per known provider; the line names the kind, never the credential.
+    for d in &providers {
+        let source = source_name(&d.source.to_string());
+        out.push((
+            format!("provider.{}", d.provider.name()),
+            format!(
+                "credential={} base_url={} source={source}",
+                crate::summary::credential::kind(d.credential.as_ref()),
+                d.base_url
+            ),
+            source,
+        ));
+    }
+    out.push(("summary_provider".into(), summary, "derived"));
     // The live lines carry the source of their variable, so an override is visible.
     for (line, var) in [
         ("live_enabled", "LOUPE_LIVE_ENABLED"),
@@ -120,42 +141,38 @@ fn source_name(s: &str) -> &'static str {
     }
 }
 
+/// Every entry in print order: each variable with its source, then the derived lines.
+pub fn lines(cfg: &Loaded) -> Vec<Line> {
+    let vars = cfg.entries.iter().map(|e| Line {
+        name: e.name.clone(),
+        value: shown(e),
+        source: e.source.to_string(),
+        secret: e.secret,
+    });
+    let more = derived(cfg).into_iter().map(|(name, value, source)| Line {
+        name,
+        value,
+        source: source.to_string(),
+        secret: false,
+    });
+    vars.chain(more).collect()
+}
+
+/// The JSON object of one entry, as both surfaces print it.
+pub fn json(l: &Line) -> serde_json::Value {
+    serde_json::json!({"name": l.name, "value": l.value, "source": l.source, "secret": l.secret})
+}
+
 /// One JSON object per line when `table` is false, else an aligned table for a human.
 pub fn render(cfg: &Loaded, table: bool) -> String {
-    let extra = derived(cfg);
+    let all = lines(cfg);
     if !table {
-        let vars = cfg.entries.iter().map(|e| {
-            serde_json::json!({"name": e.name, "value": shown(e), "source": e.source.to_string(), "secret": e.secret})
-        });
-        let more = extra.iter().map(
-            |(n, v, s)| serde_json::json!({"name": n, "value": v, "source": s, "secret": false}),
-        );
-        return vars.chain(more).map(|l| format!("{l}\n")).collect();
+        return all.iter().map(|l| format!("{}\n", json(l))).collect();
     }
-    let width = cfg
-        .entries
-        .iter()
-        .map(|e| e.name.len())
-        .max()
-        .unwrap_or(4)
-        .max(4);
-    let width = extra
-        .iter()
-        .map(|(n, _, _)| n.len())
-        .max()
-        .unwrap_or(0)
-        .max(width);
+    let width = all.iter().map(|l| l.name.len()).max().unwrap_or(4).max(4);
     let mut out = format!("{:width$}  {:8}  VALUE\n", "NAME", "SOURCE");
-    for e in &cfg.entries {
-        out.push_str(&format!(
-            "{:width$}  {:8}  {}\n",
-            e.name,
-            e.source.to_string(),
-            shown(e)
-        ));
-    }
-    for (n, v, s) in &extra {
-        out.push_str(&format!("{n:width$}  {s:8}  {v}\n"));
+    for l in &all {
+        out.push_str(&format!("{:width$}  {:8}  {}\n", l.name, l.source, l.value));
     }
     out
 }
@@ -173,8 +190,9 @@ mod tests {
             ("LOUPE_ACCOUNT_KEY", "h8Jd2LqP0sYv4Rx"),
             ("LOUPE_BOOTSTRAP_TOKEN", "Zt5Nw3Kb7Hc1Gm9"),
             ("LOUPE_GITHUB_TOKEN_PERSONAL", "p2Vx8Qr4Lk6Dj0F"),
-            ("LOUPE_SUMMARY_API_KEY", "Mw9Ty3Bn5Hq7Cz1"),
-            ("LOUPE_SUMMARY_OAUTH_TOKEN", "r6Fk2Jp8Xs4Wd0L"),
+            ("ANTHROPIC_API_KEY", "Mw9Ty3Bn5Hq7Cz1"),
+            ("CLAUDE_CODE_OAUTH_TOKEN", "r6Fk2Jp8Xs4Wd0L"),
+            ("OPENAI_API_KEY", "c4Hs8Nv2Rt6Kx0B"),
             ("LOUPE_ADMIN_TOKEN", "Yb3Gn7Qt1Kv5Pm9"),
         ];
         let env: BTreeMap<String, String> = secrets
@@ -203,8 +221,16 @@ mod tests {
         assert_eq!(value("price_commit"), crate::price::embed::PRICE_COMMIT);
         assert!(value("price_entries").parse::<usize>().unwrap() > 4000);
         assert_eq!(value("subscription_total_per_month"), "0");
-        assert_eq!(value("summary_credential"), "api_key");
-        assert_eq!(value("LOUPE_SUMMARY_BASE_URL"), "https://api.anthropic.com");
+        assert_eq!(value("summary_provider"), "anthropic");
+        assert_eq!(
+            value("provider.anthropic"),
+            "credential=api_key base_url=https://api.anthropic.com source=default"
+        );
+        assert_eq!(
+            value("provider.openai"),
+            "credential=api_key base_url=https://api.openai.com/v1 source=default"
+        );
+        assert!(!json.contains("summary_credential"));
         assert_eq!(value("LOUPE_GITHUB_API_URL"), "https://api.github.com");
         assert_eq!(value("LOUPE_SUMMARY_INTERVAL_SECS"), "30");
         assert_eq!(value("LOUPE_SUMMARY_MAX_ATTEMPTS"), "5");

@@ -31,8 +31,8 @@ fn run(l: &Loupe, url: &str) -> std::process::Output {
         l.data.path(),
         &["--once"],
         &[
-            ("LOUPE_SUMMARY_API_KEY", KEY_VALUE),
-            ("LOUPE_SUMMARY_BASE_URL", url),
+            ("ANTHROPIC_API_KEY", KEY_VALUE),
+            ("ANTHROPIC_BASE_URL", url),
         ],
     );
     assert!(
@@ -82,7 +82,7 @@ async fn skip_and_failures() {
     assert_eq!(loupe::count(&out, "failed"), 1);
     assert_eq!(text(&l, row).unwrap(), "failed:unauthorized:1");
     let log = l.log();
-    assert!(log.contains("LOUPE_SUMMARY_API_KEY") && log.contains("loupe summarize --once"));
+    assert!(log.contains("ANTHROPIC_API_KEY") && log.contains("loupe summarize --once"));
     assert!(!log.contains(KEY_VALUE));
 
     let l = one_closed(fake, 1).await;
@@ -118,7 +118,7 @@ async fn no_credential_is_disabled() {
     let out = loupe::summarize(
         l.data.path(),
         &["--once"],
-        &[("LOUPE_SUMMARY_BASE_URL", &base(fake, "line_nocred"))],
+        &[("ANTHROPIC_BASE_URL", &base(fake, "line_nocred"))],
     );
     assert_eq!(
         text(&l, "SELECT reason FROM agg_queue").unwrap(),
@@ -173,8 +173,8 @@ fn worker_skips_log_segment_transcript() {
         data.path(),
         &["--once"],
         &[
-            ("LOUPE_SUMMARY_API_KEY", KEY_VALUE),
-            ("LOUPE_SUMMARY_BASE_URL", "http://127.0.0.1:9/summary/line"),
+            ("ANTHROPIC_API_KEY", KEY_VALUE),
+            ("ANTHROPIC_BASE_URL", "http://127.0.0.1:9/summary/line"),
         ],
     );
     assert!(

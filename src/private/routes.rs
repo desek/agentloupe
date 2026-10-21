@@ -1,4 +1,4 @@
-//! @agents-index Dispatches a path under /private/: login, logout, page files, and the report and session API, behind authorization.
+//! @agents-index Dispatches a path under /private/: login, logout, page files, and the report, session, providers, and config API, behind authorization.
 
 use super::{PrivateState, headers, login, query};
 use crate::web::Site;
@@ -100,6 +100,8 @@ async fn route(state: &PrivateState, site: &Site, req: Request<Body>) -> Respons
         "/private" => login::see_other("/private/", None),
         "/private/" => file(site, "index.html"),
         "/private/api/v1/report" | "/private/api/v1/sessions" => api_get(state, &req, &path),
+        "/private/api/providers" => super::api_providers::get(state),
+        "/private/api/config" => super::api_config::get(state),
         _ => not_found(&path),
     }
 }

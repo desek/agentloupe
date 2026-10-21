@@ -95,3 +95,37 @@ pub fn start(
         }
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::config::loader::resolve;
+    use std::collections::BTreeMap;
+
+    fn settings(pairs: &[(&str, &str)]) -> super::Settings {
+        let key = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=";
+        let mut env: BTreeMap<String, String> = pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        env.insert("LOUPE_DATA_KEY".into(), key.into());
+        env.insert("LOUPE_ACCOUNT_KEY".into(), key.into());
+        let cfg = resolve(&[], &env, &BTreeMap::new()).validate().unwrap();
+        super::super::settings(&cfg)
+    }
+
+    #[test]
+    fn summary_opt_in_rule() {
+        assert!(settings(&[]).client.is_none(), "no provider, no client");
+        let a = settings(&[("CLAUDE_CODE_OAUTH_TOKEN", "t")])
+            .client
+            .unwrap();
+        assert_eq!(a.url(), "https://api.anthropic.com/v1/messages");
+        let o = settings(&[
+            ("OPENAI_API_KEY", "o"),
+            ("LOUPE_SUMMARY_MODEL", "gpt-5-mini"),
+        ])
+        .client
+        .unwrap();
+        assert_eq!(o.url(), "https://api.openai.com/v1/chat/completions");
+    }
+}

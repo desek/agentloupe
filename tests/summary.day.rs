@@ -15,8 +15,8 @@ fn day_run(l: &Loupe, day: &str, url: &str, attempts: &str) -> std::process::Out
         l.data.path(),
         &["--day", day, "--show-line"],
         &[
-            ("LOUPE_SUMMARY_API_KEY", "k"),
-            ("LOUPE_SUMMARY_BASE_URL", url),
+            ("ANTHROPIC_API_KEY", "k"),
+            ("ANTHROPIC_BASE_URL", url),
             ("LOUPE_SUMMARY_MAX_ATTEMPTS", attempts),
             ("LOUPE_TZ", "UTC"),
         ],
@@ -47,8 +47,8 @@ async fn with_lines(fake: u16, n: usize) -> (Loupe, String) {
         l.data.path(),
         &["--once"],
         &[
-            ("LOUPE_SUMMARY_API_KEY", "k"),
-            ("LOUPE_SUMMARY_BASE_URL", &base(fake, "line")),
+            ("ANTHROPIC_API_KEY", "k"),
+            ("ANTHROPIC_BASE_URL", &base(fake, "line")),
         ],
     );
     assert_eq!(loupe::count(&out, "done"), n as i64);

@@ -66,10 +66,10 @@ pub fn backfill(data: &Path, root: &Path, fake: u16, mode: Option<&str>) -> std:
     let url = format!("http://127.0.0.1:{fake}/summary/{}", mode.unwrap_or("none"));
     let mut env = vec![
         ("LOUPE_TZ", "UTC"),
-        ("LOUPE_SUMMARY_BASE_URL", url.as_str()),
+        ("ANTHROPIC_BASE_URL", url.as_str()),
     ];
     if mode.is_some() {
-        env.push(("LOUPE_SUMMARY_API_KEY", "sk-test-Sd4Qr7"));
+        env.push(("ANTHROPIC_API_KEY", "sk-test-Sd4Qr7"));
     }
     super::bf::ok(
         data,

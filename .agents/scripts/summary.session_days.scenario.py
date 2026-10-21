@@ -66,8 +66,8 @@ def main():
         data = t / "data"
         data.mkdir()
         env = {"PATH": os.environ["PATH"], "HOME": tmp, "LOUPE_DATA_DIR": str(data), "LOUPE_DATA_KEY": KEY,
-               "LOUPE_ACCOUNT_KEY": KEY, "LOUPE_TZ": "UTC", "LOUPE_SUMMARY_API_KEY": "sk-test-scn",
-               "LOUPE_SUMMARY_BASE_URL": f"http://127.0.0.1:{srv.server_port}"}
+               "LOUPE_ACCOUNT_KEY": KEY, "LOUPE_TZ": "UTC", "ANTHROPIC_API_KEY": "sk-test-scn",
+               "ANTHROPIC_BASE_URL": f"http://127.0.0.1:{srv.server_port}"}
         run = lambda *args: subprocess.run([a.binary, *args], env=env, cwd=ROOT, capture_output=True, text=True)
         bf = run("backfill", "--source", "claude-code", "--path", str(t / "logs"))
         if bf.returncode != 0:

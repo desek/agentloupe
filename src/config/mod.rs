@@ -6,7 +6,7 @@ pub mod loader;
 pub mod secret;
 pub mod show;
 mod validate;
-mod vars;
+pub mod vars;
 
 /// The validated values that the running binary reads. Values for later product areas are
 /// validated by the loader but not kept, so they cannot change behaviour yet.
@@ -39,6 +39,12 @@ pub struct Config {
     /// The trimmed site title of the dashboard, 1 to 80 characters.
     pub site_title: String,
     pub summary: SummaryConfig,
+    /// Every known provider with its credential and base URL, in the order of the output lines.
+    pub providers: Vec<crate::provider::Detected>,
+    /// The interval of the provider ping, 60 seconds or more.
+    pub provider_ping: std::time::Duration,
+    /// The entries of `loupe config show` at start, for `GET /private/api/config`.
+    pub shown: Vec<show::Line>,
     pub days: DayConfig,
     pub github: GithubConfig,
 }
@@ -71,10 +77,12 @@ pub fn publish_at(v: &str) -> Option<chrono::NaiveTime> {
 
 /// The values of the summary worker, the day line, and the raw-body retention.
 pub struct SummaryConfig {
-    /// The active credential; None means every closed segment gets the status disabled.
+    /// The summary provider; None means no detected provider.
+    pub provider: Option<crate::provider::Provider>,
+    /// The credential of the summary provider; None means every closed segment gets the status disabled.
     pub credential: Option<crate::summary::credential::Credential>,
     pub model: String,
-    /// The target of the summary client; never a proxy route of loupe serve.
+    /// The base URL of the summary provider; never a proxy route of loupe serve.
     pub base_url: String,
     pub interval: std::time::Duration,
     pub max_attempts: u32,

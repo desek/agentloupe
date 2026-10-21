@@ -1,4 +1,4 @@
-//! @agents-index Resolves each LOUPE_ value by precedence flag, env, file, default, and records the source of each value.
+//! @agents-index Resolves each known value by precedence flag, env, file, default, and records the source of each value.
 
 use super::error::ConfigError;
 use super::secret::Secret;
@@ -156,7 +156,7 @@ pub fn read_file(dir: &Path, env_name: &str) -> Result<BTreeMap<String, String>,
 /// Loads from the real process: flags as given, the environment, and config/<env>.toml in the working directory.
 pub fn load_from_process(flags: &[(String, String)]) -> Result<Loaded, ConfigError> {
     let env: BTreeMap<String, String> = std::env::vars()
-        .filter(|(k, _)| k.starts_with("LOUPE_"))
+        .filter(|(k, _)| super::vars::known(k))
         .collect();
     let probe = resolve(flags, &env, &BTreeMap::new());
     let env_name = probe

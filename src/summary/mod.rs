@@ -1,7 +1,9 @@
-//! @agents-index Session summaries: the transcript, the rule text, the credential, the client, the scrubber, the worker, the session texts, and the day line.
+//! @agents-index Session summaries: the transcript, the rule text, the provider credentials, the clients, the scrubber, the worker, the session texts, and the day line.
 
 pub mod body;
 pub mod client;
+#[path = "client.openai.rs"]
+pub mod client_openai;
 pub mod credential;
 pub mod day;
 pub mod headers;
@@ -17,7 +19,7 @@ pub mod transcript;
 pub mod transcript_proxied;
 pub mod worker;
 
-/// The worker settings from the configuration: a client only when a credential is set.
+/// The worker settings from the configuration: a client only when a summary provider is detected.
 pub fn settings(cfg: &crate::config::Config) -> worker::Settings {
     let s = &cfg.summary;
     worker::Settings {

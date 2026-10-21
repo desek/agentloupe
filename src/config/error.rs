@@ -7,6 +7,8 @@ pub struct ConfigError {
     pub variable: String,
     pub problem: String,
     pub fixes: Vec<String>,
+    /// The check after the fix, when the default check (the value in `loupe config show`) does not fit.
+    pub verify: Option<String>,
 }
 
 impl ConfigError {
@@ -15,7 +17,14 @@ impl ConfigError {
             variable: variable.to_string(),
             problem: problem.into(),
             fixes,
+            verify: None,
         }
+    }
+
+    /// The same error with a check of its own in place of the default check.
+    pub fn verify(mut self, check: impl Into<String>) -> Self {
+        self.verify = Some(check.into());
+        self
     }
 
     /// The error for a required key that is missing or not valid; the fix is always a new key.
@@ -45,11 +54,14 @@ impl fmt::Display for ConfigError {
             f,
             "reference: .env.example lists every variable; docs/specification/configuration.md describes each value."
         )?;
-        write!(
-            f,
-            "verify: run `loupe config show` and see `set` or the expected value for {}.",
-            self.variable
-        )
+        match &self.verify {
+            Some(check) => write!(f, "verify: {check}."),
+            None => write!(
+                f,
+                "verify: run `loupe config show` and see `set` or the expected value for {}.",
+                self.variable
+            ),
+        }
     }
 }
 

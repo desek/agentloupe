@@ -1,4 +1,4 @@
-//! @agents-index The OAuth path of the summary client: the header set and the billing block that Claude Code sends.
+//! @agents-index The header sets of the summary client: the OAuth set with its billing block, and the OpenAI Bearer set.
 
 /// The Messages API version that both credential kinds send.
 pub const VERSION: &str = "2023-06-01";
@@ -19,4 +19,22 @@ pub fn oauth(token: &str) -> Vec<(&'static str, String)> {
         ("anthropic-beta", OAUTH_BETA.to_string()),
         ("x-app", "cli".to_string()),
     ]
+}
+
+/// The headers of an OpenAI request: Bearer only.
+pub fn openai(key: &str) -> Vec<(&'static str, String)> {
+    vec![("authorization", format!("Bearer {key}"))]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn openai_bearer_headers() {
+        assert_eq!(
+            openai("sk-o1"),
+            vec![("authorization", "Bearer sk-o1".to_string())]
+        );
+    }
 }

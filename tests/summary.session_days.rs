@@ -227,8 +227,8 @@ fn summarize(l: &loupe::Loupe, fake: u16, mode: &str) {
         &["--once"],
         &[
             ("LOUPE_TZ", "UTC"),
-            ("LOUPE_SUMMARY_API_KEY", "sk-test-Pr0x"),
-            ("LOUPE_SUMMARY_BASE_URL", &url),
+            ("ANTHROPIC_API_KEY", "sk-test-Pr0x"),
+            ("ANTHROPIC_BASE_URL", &url),
         ],
     );
     assert!(

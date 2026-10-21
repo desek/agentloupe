@@ -1,4 +1,4 @@
-//! @agents-index Runs the HTTP server: migrates the store, bootstrap token, starts capture, parser, summary, publisher, retention workers, binds, serves.
+//! @agents-index Runs the HTTP server: migrates the store, bootstrap token, starts capture, parser, summary, ping, publisher, retention workers, binds, serves.
 
 mod health;
 pub mod router;
@@ -63,7 +63,18 @@ pub fn run(cfg: &Config, upstreams: Upstreams) -> Result<(), Box<dyn Error>> {
         },
         cfg.parse_interval,
     );
-    // The summary client sends to LOUPE_SUMMARY_BASE_URL directly, never through the proxy routes.
+    // One line with the detected providers and the summary provider; it holds no credential.
+    let detected: Vec<&str> = crate::provider::detect::names(&cfg.providers)
+        .iter()
+        .map(|p| p.name())
+        .collect();
+    tracing::info!(
+        detected = %detected.join(","),
+        summary_provider = cfg.summary.provider.map_or("none", |p| p.name()),
+        "providers detected"
+    );
+    let provider_status = crate::provider::status::Cache::new(&cfg.providers);
+    // The summary client sends to the base URL of the summary provider, never through the proxy routes.
     let _summary = crate::summary::worker::start(
         crate::store::open::open(&cfg.data_dir)?,
         crate::summary::settings(cfg),
@@ -126,11 +137,20 @@ pub fn run(cfg: &Config, upstreams: Upstreams) -> Result<(), Box<dyn Error>> {
             crate::store::open::open(&cfg.data_dir)?,
             cfg.summary.tz,
             t.expose(),
+            provider_status.clone(),
+            cfg.shown.clone(),
         ))),
         None => None,
     };
     tracing::info!(private_page = private.is_some(), "private page state");
     let rt = tokio::runtime::Runtime::new()?;
+    // The ping runs in its own task, so a provider that hangs never delays the listener.
+    let _ping = crate::provider::worker::spawn(
+        &rt,
+        cfg.providers.clone(),
+        provider_status,
+        cfg.provider_ping,
+    );
     rt.block_on(async {
         let listener = tokio::net::TcpListener::bind(cfg.listen).await?;
         // The bound address, not the configured one: a configured port 0 gets a free port from the kernel.

@@ -49,7 +49,10 @@ pub fn run(
     {
         return fail(EXIT_CONFIG, super::summarize_rebuild::bad_range(text));
     }
-    let cfg = match loader::load_from_process(&args.as_flags()).and_then(|c| c.validate()) {
+    let cfg = match crate::provider::legacy::check_process()
+        .and_then(|()| loader::load_from_process(&args.as_flags()))
+        .and_then(|c| c.validate())
+    {
         Ok(c) => c,
         Err(e) => return fail(EXIT_CONFIG, e.to_string()),
     };

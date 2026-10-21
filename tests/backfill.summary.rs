@@ -9,8 +9,8 @@ mod loupe;
 
 fn env(url: &str) -> Vec<(&'static str, String)> {
     vec![
-        ("LOUPE_SUMMARY_API_KEY", "sk-test-Bf7Kq2".into()),
-        ("LOUPE_SUMMARY_BASE_URL", url.into()),
+        ("ANTHROPIC_API_KEY", "sk-test-Bf7Kq2".into()),
+        ("ANTHROPIC_BASE_URL", url.into()),
     ]
 }
 

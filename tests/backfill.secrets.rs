@@ -39,8 +39,8 @@ async fn no_prompt_path_or_raw_id_stored() {
     let (logs, data) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
     let url = format!("http://127.0.0.1:{fake}/summary/line");
     let env = [
-        ("LOUPE_SUMMARY_API_KEY", "sk-test-Sx9Pw4"),
-        ("LOUPE_SUMMARY_BASE_URL", url.as_str()),
+        ("ANTHROPIC_API_KEY", "sk-test-Sx9Pw4"),
+        ("ANTHROPIC_BASE_URL", url.as_str()),
     ];
     let claude = bf::claude_tree(logs.path(), true);
     let pi = bf::pi_tree(logs.path());

@@ -10,7 +10,10 @@ const EXIT_CONFIG: u8 = 2;
 const EXIT_RUNTIME: u8 = 1;
 
 pub fn run(args: &ConfigArgs) -> ExitCode {
-    let cfg = match loader::load_from_process(&args.as_flags()).and_then(|c| c.validate()) {
+    let cfg = match crate::provider::legacy::check_process()
+        .and_then(|()| loader::load_from_process(&args.as_flags()))
+        .and_then(|c| c.validate())
+    {
         Ok(c) => c,
         Err(e) => {
             eprintln!("{e}");

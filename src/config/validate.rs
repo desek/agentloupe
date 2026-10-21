@@ -21,13 +21,7 @@ fn text(e: &Entry) -> Option<&str> {
     e.value.as_ref().map(|v| v.expose())
 }
 
-/// The rule of the summary and GitHub base URLs: https, or http only for a loopback host that the tests use.
-fn https_or_loopback(url: &str) -> bool {
-    reqwest::Url::parse(url).is_ok_and(|u| {
-        u.scheme() == "https"
-            || (u.scheme() == "http" && matches!(u.host_str(), Some("127.0.0.1" | "localhost")))
-    })
-}
+use crate::provider::endpoint::allowed as https_or_loopback;
 
 /// Checks one entry; secrets never appear in the problem text.
 fn check(e: &Entry) -> Result<(), ConfigError> {
@@ -69,11 +63,23 @@ fn check(e: &Entry) -> Result<(), ConfigError> {
             "is not a whole number of 0 or more",
             "a whole number of characters, 0 or more, such as 200",
         )),
-        ("LOUPE_SUMMARY_BASE_URL", Some(v)) if !https_or_loopback(v) => Err(bad(
+        ("ANTHROPIC_BASE_URL", Some(v)) if !https_or_loopback(v) => Err(bad(
             n,
             "is not an https URL or an http URL of 127.0.0.1 or localhost",
             "an https URL such as https://api.anthropic.com",
         )),
+        ("OPENAI_BASE_URL", Some(v)) if !https_or_loopback(v) => Err(bad(
+            n,
+            "is not an https URL or an http URL of 127.0.0.1 or localhost",
+            "an https URL such as https://api.openai.com/v1",
+        )),
+        ("LOUPE_PROVIDER_PING_SECS", Some(v)) if v.parse::<u64>().map_or(true, |x| x < 60) => {
+            Err(bad(
+                n,
+                "is not a whole number of 60 or more",
+                "a whole number of seconds, 60 or more, such as 300",
+            ))
+        }
         ("LOUPE_GITHUB_API_URL", Some(v)) if !https_or_loopback(v) => Err(bad(
             n,
             "is not an https URL or an http URL of 127.0.0.1 or localhost",
@@ -171,10 +177,15 @@ impl Loaded {
         let key = |n: &str| parse_key(&get(n)).expect("checked above");
         let opt = |n: &str| self.get(n).and_then(text);
         let model = get("LOUPE_SUMMARY_MODEL");
-        let credential = crate::summary::credential::select(
-            opt("LOUPE_SUMMARY_API_KEY"),
-            opt("LOUPE_SUMMARY_OAUTH_TOKEN"),
+        let model_set = self
+            .get("LOUPE_SUMMARY_MODEL")
+            .is_some_and(|e| e.source != super::loader::Source::Default);
+        let providers = crate::provider::detect::detect(self);
+        let chosen = crate::summary::credential::select(
+            &providers,
+            opt("LOUPE_SUMMARY_PROVIDER"),
             &model,
+            model_set,
         )?;
         Ok(Config {
             listen: get("LOUPE_LISTEN").parse().expect("checked above"),
@@ -207,6 +218,7 @@ impl Loaded {
                 max_connections: num("LOUPE_LIVE_MAX_CONNECTIONS") as usize,
                 buffer: num("LOUPE_LIVE_BUFFER") as usize,
             },
+            providers,
             days: super::DayConfig {
                 publish_at: super::publish_at(&get("LOUPE_PUBLISH_AT")).expect("checked above"),
                 publish_interval: std::time::Duration::from_secs(num(
@@ -232,10 +244,13 @@ impl Loaded {
                     })
                     .collect(),
             },
+            provider_ping: std::time::Duration::from_secs(num("LOUPE_PROVIDER_PING_SECS")),
+            shown: super::show::lines(self),
             summary: super::SummaryConfig {
-                credential,
+                provider: chosen.as_ref().map(|d| d.provider),
+                credential: chosen.as_ref().and_then(|d| d.credential.clone()),
+                base_url: chosen.map(|d| d.base_url).unwrap_or_default(),
                 model,
-                base_url: get("LOUPE_SUMMARY_BASE_URL"),
                 interval: std::time::Duration::from_secs(num("LOUPE_SUMMARY_INTERVAL_SECS")),
                 max_attempts: num("LOUPE_SUMMARY_MAX_ATTEMPTS").min(u32::MAX as u64) as u32,
                 raw_retention_hours: num("LOUPE_RAW_RETENTION_HOURS"),

@@ -1,5 +1,9 @@
 //! @agents-index The private page: the state built from the admin token, and the handler of every path under /private/.
 
+#[path = "api.config.rs"]
+pub mod api_config;
+#[path = "api.providers.rs"]
+pub mod api_providers;
 pub mod auth;
 pub mod cookie;
 pub mod headers;
@@ -24,17 +28,29 @@ pub struct PrivateState {
     /// The HMAC key of the admin session cookie; a new admin token gives a new key.
     pub cookie_key: [u8; 32],
     pub limit: limit::Limiter,
+    /// The provider status cache that the ping worker writes; a read never starts a ping.
+    pub providers: crate::provider::status::Cache,
+    /// The masked entries of `loupe config show` from the start of the process.
+    pub config: Vec<crate::config::show::Line>,
 }
 
 impl PrivateState {
     /// Derives the digest and the cookie key from `admin_token`; the value is not stored.
-    pub fn new(conn: Connection, tz: chrono_tz::Tz, admin_token: &str) -> PrivateState {
+    pub fn new(
+        conn: Connection,
+        tz: chrono_tz::Tz,
+        admin_token: &str,
+        providers: crate::provider::status::Cache,
+        config: Vec<crate::config::show::Line>,
+    ) -> PrivateState {
         PrivateState {
             conn: Mutex::new(conn),
             tz,
             digest: Sha256::digest(admin_token.as_bytes()).into(),
             cookie_key: cookie_key(admin_token),
             limit: limit::Limiter::default(),
+            providers,
+            config,
         }
     }
 }
