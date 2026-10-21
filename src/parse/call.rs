@@ -4,7 +4,7 @@ use super::exchange::Row;
 use super::usage::Usage;
 use crate::account::{source, store as accounts};
 use crate::session::store::Scope;
-use crate::session::{key, segment, time};
+use crate::session::{append, key, time};
 use rusqlite::{Connection, OptionalExtension, params};
 
 /// The changes that one call made.
@@ -56,7 +56,7 @@ pub fn store(
         key_hash: k.hash,
     };
     let at_ms = time::ms(&row.started_at);
-    let seg = segment::assign(conn, &scope, k.source, at_ms, idle_secs, account_id)?;
+    let seg = append::append(conn, &scope, k.source, at_ms, idle_secs, account_id, s.tz)?;
     let priced = super::cost::price(&s.providers, &row.upstream, u);
     conn.execute(
         "INSERT INTO calls (exchange_id, call_index, started_at, agent_label, upstream, proxy_token_id, session_id, account_id, model, service_tier, status, input, cache_read, cache_write_5m, cache_write_1h, output, cost_usd, price_commit, unpriced_reason) \
@@ -67,18 +67,6 @@ pub fn store(
             priced.cost_usd, priced.price_commit, priced.unpriced_reason
         ],
     )?;
-    let now = time::text(chrono::Utc::now().timestamp_millis());
-    let day = crate::day::boundary::day_of(at_ms, s.tz).to_string();
-    crate::day::queue::put(conn, &day, crate::day::queue::CALL, &now)?;
-    if let Some(closed) = seg.closed_id {
-        crate::day::queue::put_session_days(
-            conn,
-            closed,
-            s.tz,
-            crate::day::queue::SESSION_CLOSED,
-            &now,
-        )?;
-    }
     if let Some(reason) = &priced.unpriced_reason {
         super::cost::warn(
             conn.last_insert_rowid(),

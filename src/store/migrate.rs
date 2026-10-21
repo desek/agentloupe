@@ -33,9 +33,11 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (15, include_str!("../../migrations/0015_agg_queue.sql")),
     (16, include_str!("../../migrations/0016_day_overrides.sql")),
     (17, include_str!("../../migrations/0017_github.sql")),
+    (18, include_str!("../../migrations/0018_calls_origin.sql")),
 ];
 
 /// Applies each migration not yet recorded; returns how many it applied.
+/// Each migration runs in a savepoint, so a dry run can apply them inside its own outer transaction and roll back.
 pub fn migrate(conn: &mut Connection) -> rusqlite::Result<usize> {
     // The first migration makes the version table, so its absence means nothing is applied.
     let has_table: bool = conn.query_row(
@@ -54,7 +56,7 @@ pub fn migrate(conn: &mut Connection) -> rusqlite::Result<usize> {
         if done {
             continue;
         }
-        let tx = conn.transaction()?;
+        let tx = conn.savepoint()?;
         tx.execute_batch(sql)?;
         tx.execute(
             "INSERT INTO schema_version (version, applied_at) VALUES (?1, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))",
@@ -80,7 +82,7 @@ mod tests {
             .query_row("SELECT count(*) FROM schema_version", [], |r| r.get(0))
             .unwrap();
         assert_eq!(rows as usize, super::MIGRATIONS.len());
-        assert_eq!(rows, 17);
+        assert_eq!(rows, 18);
         let tokens: i64 = conn
             .query_row("SELECT count(*) FROM proxy_tokens", [], |r| r.get(0))
             .unwrap();
