@@ -218,3 +218,7 @@ path = "tests/web.serve.rs"
 [[test]]
 name = "web_embed"
 path = "tests/web.embed.rs"
+
+[[test]]
+name = "agent_connect"
+path = "tests/agent.connect.rs"
