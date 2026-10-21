@@ -13,6 +13,8 @@ pub struct Added {
     pub calls: u64,
     pub opened: u64,
     pub closed: u64,
+    /// The counts and the cost of the stored call, for the live hub after the commit.
+    pub live: Option<(crate::live::event::Tokens, Option<rust_decimal::Decimal>)>,
 }
 
 /// A call that exists for (exchange, index) adds nothing, so a repeated parse is a no-op.
@@ -79,5 +81,15 @@ pub fn store(
         calls: 1,
         opened: seg.opened,
         closed: seg.closed,
+        live: Some((
+            crate::live::event::Tokens {
+                input: u.input,
+                output: u.output,
+                cache_read: u.cache_read,
+                cache_write: u.cache_write_5m + u.cache_write_1h,
+                reasoning: 0,
+            },
+            priced.cost_usd.as_deref().and_then(|c| c.parse().ok()),
+        )),
     })
 }

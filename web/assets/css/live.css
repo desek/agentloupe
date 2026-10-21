@@ -1,0 +1,7 @@
+/* @agents-index Styles of the live section: the figure grid, the muted paused state, and the rolling chart. */
+.live-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.live-figs { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px 24px; }
+.live-value { font-family: var(--font-mono); font-size: var(--size-figure-small); font-weight: 500; }
+.live-paused .live-value, .live-paused .live-box { color: var(--color-text-faint); opacity: 0.5; }
+.live-chart { display: block; width: 100%; height: 80px; }
+.live[hidden] { display: none; }

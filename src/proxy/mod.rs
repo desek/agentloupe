@@ -26,6 +26,8 @@ pub struct ProxyState {
     pub capture_max_bytes: usize,
     pub headers_timeout: Duration,
     pub gate: crate::token::gate::Gate,
+    /// The live hub; the forward sends exchange.start and exchange.end without a wait.
+    pub hub: crate::live::hub::Hub,
 }
 
 /// Makes the upstream client: no redirects followed, no decompression, the connect timeout covers TLS.

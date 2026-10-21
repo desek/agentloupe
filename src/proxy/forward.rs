@@ -47,6 +47,7 @@ pub async fn forward(
     req: Request<Body>,
 ) -> Response {
     let t0 = Instant::now();
+    state.hub.exchange_start();
     let (parts, body) = req.into_parts();
     let mut h = parts.headers;
     let cred = credential::credential(&state.account_key, &h);
@@ -128,6 +129,7 @@ pub async fn forward(
                 request_tap,
                 capture: state.capture.clone(),
                 token_name,
+                hub: state.hub.clone(),
             };
             pending.finish(Tap::new(0), "upstream_unreachable", Some(why.clone()));
             return error::json(
@@ -157,6 +159,7 @@ pub async fn forward(
         request_tap,
         capture: state.capture.clone(),
         token_name,
+        hub: state.hub.clone(),
     };
     let stream = CaptureStream::new(
         Box::pin(resp.bytes_stream()),

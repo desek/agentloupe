@@ -15,12 +15,15 @@ import * as log from './section.log.js';
 import * as footer from './section.footer.js';
 import * as states from './section.state.js';
 import { el } from './dom.el.js';
+import { mount } from './live.section.js';
 
 const doc = document;
 const main = doc.getElementById('main');
 const client = createClient((u, o) => fetch(u, o), localDay(new Date()));
 let resp = null;
 let heatNode = null;
+// The live section is built once, so its socket and figures survive each redraw.
+const liveNode = mount(doc, window);
 
 /** Draws every section of the selected range; the heatmap is drawn once and kept. */
 function draw() {
@@ -28,14 +31,14 @@ function draw() {
   header.render(doc, resp.updated_at, key);
   const view = build(resp, key);
   if (view.empty) {
-    main.replaceChildren(headline.render(doc, view), states.empty(doc));
+    main.replaceChildren(headline.render(doc, view), liveNode, states.empty(doc));
     return Promise.resolve();
   }
   const totals = cost.render(doc, view, client.subscription(key, resp.to));
   const pair = el(doc, 'div', 'row');
   pair.append(prs.render(doc, view), lines.render(doc, view), tokens.render(doc, view));
   heatNode = heatNode || heat.render(doc, heatmap(resp));
-  main.replaceChildren(headline.render(doc, view), totals.node, pair, heatNode, log.render(doc, view));
+  main.replaceChildren(headline.render(doc, view), liveNode, totals.node, pair, heatNode, log.render(doc, view));
   return totals.done;
 }
 

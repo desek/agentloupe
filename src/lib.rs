@@ -8,6 +8,7 @@ pub mod cli;
 pub mod config;
 pub mod day;
 pub mod github;
+pub mod live;
 pub mod log;
 pub mod parse;
 pub mod price;

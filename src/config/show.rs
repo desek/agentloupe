@@ -66,6 +66,21 @@ fn derived(cfg: &Loaded) -> Vec<(String, String, &'static str)> {
         crate::summary::credential::kind(kind.as_ref()).to_string(),
         "derived",
     ));
+    // The live lines carry the source of their variable, so an override is visible.
+    for (line, var) in [
+        ("live_enabled", "LOUPE_LIVE_ENABLED"),
+        ("live_allowed_origin", "LOUPE_LIVE_ALLOWED_ORIGIN"),
+        ("live_max_rate", "LOUPE_LIVE_MAX_RATE"),
+        ("live_max_connections", "LOUPE_LIVE_MAX_CONNECTIONS"),
+        ("live_buffer", "LOUPE_LIVE_BUFFER"),
+    ] {
+        let e = cfg.get(var);
+        out.push((
+            line.into(),
+            e.map_or("unset".into(), shown),
+            e.map_or("default", |e| source_name(&e.source.to_string())),
+        ));
+    }
     let pairs = cfg
         .entries
         .iter()
@@ -93,6 +108,16 @@ fn derived(cfg: &Loaded) -> Vec<(String, String, &'static str)> {
         )),
     }
     out
+}
+
+/// The static name of a source, so a derived line can carry it.
+fn source_name(s: &str) -> &'static str {
+    match s {
+        "flag" => "flag",
+        "env" => "env",
+        "file" => "file",
+        _ => "default",
+    }
 }
 
 /// One JSON object per line when `table` is false, else an aligned table for a human.

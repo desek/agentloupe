@@ -36,6 +36,12 @@ pub fn run(cfg: &Config, upstreams: Upstreams) -> Result<(), Box<dyn Error>> {
         load_ms = t0.elapsed().as_millis() as u64,
         "price index loaded"
     );
+    // The hub starts only when the live feed is enabled; an off hub drops every event.
+    let hub = if cfg.live.enabled {
+        crate::live::hub::Hub::new(cfg.live.buffer)
+    } else {
+        crate::live::hub::Hub::off()
+    };
     let spill_dir = cfg.data_dir.join("spill");
     let (capture, rx) = Capture::new(cfg.capture_queue, spill_dir.clone(), cfg.data_key);
     let writer = writer::start(
@@ -53,6 +59,7 @@ pub fn run(cfg: &Config, upstreams: Upstreams) -> Result<(), Box<dyn Error>> {
             idle_secs: cfg.idle_secs,
             providers: proxy::upstreams::providers(&upstreams),
             tz: cfg.summary.tz,
+            hub: hub.clone(),
         },
         cfg.parse_interval,
     );
@@ -93,7 +100,18 @@ pub fn run(cfg: &Config, upstreams: Upstreams) -> Result<(), Box<dyn Error>> {
         capture_max_bytes: cfg.capture_max_bytes,
         headers_timeout: cfg.headers_timeout,
         gate,
+        hub: hub.clone(),
     });
+    let live = match cfg.live.enabled {
+        true => Some(crate::live::route::LiveState::new(
+            hub,
+            cfg.live.clone(),
+            cfg.summary.tz,
+            crate::store::open::open(&cfg.data_dir)?,
+        )),
+        false => None,
+    };
+    tracing::info!(live_enabled = live.is_some(), "live route state");
     // The API connection reads only the days table.
     let api = Arc::new(crate::api::ApiState {
         conn: std::sync::Mutex::new(crate::store::open::open(&cfg.data_dir)?),
@@ -116,7 +134,8 @@ pub fn run(cfg: &Config, upstreams: Upstreams) -> Result<(), Box<dyn Error>> {
     rt.block_on(async {
         let listener = tokio::net::TcpListener::bind(cfg.listen).await?;
         tracing::info!(listen = %cfg.listen, "listening");
-        shutdown::serve_until_signal(listener, router::router(state, api, site, private)).await
+        shutdown::serve_until_signal(listener, router::router(state, api, site, private, live))
+            .await
     })?;
     // The runtime drop ends every open stream, which drops the last capture handle; the writer
     // then drains the queue and stops.

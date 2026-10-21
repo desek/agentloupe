@@ -53,6 +53,11 @@ pub const VARS: &[Var] = &[
     var("LOUPE_CAPTURE_QUEUE", Some("256"), false),
     var("LOUPE_UPSTREAM_CONNECT_TIMEOUT_SECS", Some("10"), false),
     var("LOUPE_UPSTREAM_HEADERS_TIMEOUT_SECS", Some("120"), false),
+    var("LOUPE_LIVE_ENABLED", Some("true"), false),
+    var("LOUPE_LIVE_ALLOWED_ORIGIN", None, false),
+    var("LOUPE_LIVE_MAX_RATE", Some("10"), false),
+    var("LOUPE_LIVE_MAX_CONNECTIONS", Some("32"), false),
+    var("LOUPE_LIVE_BUFFER", Some("1024"), false),
 ];
 
 /// Prefix of the GitHub token variables; the rest of the name is the label. Secret, env only.

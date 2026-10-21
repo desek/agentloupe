@@ -18,6 +18,8 @@ pub struct Pending {
     pub capture: Capture,
     /// The name of the proxy token for the log line, or `none`; never the raw token or its hash.
     pub token_name: String,
+    /// Gets exchange.end with the status when the record is complete.
+    pub hub: crate::live::hub::Hub,
 }
 
 impl Pending {
@@ -40,6 +42,7 @@ impl Pending {
             ttfb_ms = r.ttfb_ms, duration_ms = r.ended_ms - r.started_ms, outcome = %r.outcome,
             token = %self.token_name, "exchange"
         );
+        self.hub.exchange_end(self.record.status);
         self.capture.submit(self.record);
     }
 }

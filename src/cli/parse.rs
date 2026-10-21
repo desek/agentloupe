@@ -59,6 +59,7 @@ pub fn run(args: &ConfigArgs, once: bool, dry_run: bool, human: bool) -> ExitCod
         idle_secs: cfg.idle_secs,
         providers: crate::proxy::upstreams::providers(&upstreams),
         tz: cfg.summary.tz,
+        hub: crate::live::hub::Hub::off(),
     };
     let c = match worker::pass(&conn, &s, chrono::Utc::now().timestamp_millis(), dry_run) {
         Ok(c) => c,

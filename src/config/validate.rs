@@ -110,6 +110,24 @@ fn check(e: &Entry) -> Result<(), ConfigError> {
                 "a title of 1 to 80 characters such as AI agent activity",
             ))
         }
+        ("LOUPE_LIVE_ENABLED", Some(v)) if v != "true" && v != "false" => {
+            Err(bad(n, "is not true or false", "true or false"))
+        }
+        ("LOUPE_LIVE_ALLOWED_ORIGIN", Some(v)) if !crate::live::origin::is_origin(v) => Err(bad(
+            n,
+            "is not one origin of the form scheme://host or scheme://host:port",
+            "an origin such as https://loupe.example.com",
+        )),
+        ("LOUPE_LIVE_MAX_RATE" | "LOUPE_LIVE_MAX_CONNECTIONS" | "LOUPE_LIVE_BUFFER", Some(v))
+            if !crate::live::config::in_range(n, v) =>
+        {
+            let (lo, hi) = crate::live::config::range(n);
+            Err(bad(
+                n,
+                &format!("is not a whole number from {lo} to {hi}"),
+                &format!("a whole number from {lo} to {hi}"),
+            ))
+        }
         ("LOUPE_DAY_REVIEW", Some(v)) if v != "auto" && v != "manual" => {
             Err(bad(n, "is not auto or manual", "auto or manual"))
         }
@@ -177,6 +195,13 @@ impl Loaded {
             idle_secs: num("LOUPE_IDLE_SECS"),
             site_title: get("LOUPE_SITE_TITLE").trim().to_string(),
             parse_interval: std::time::Duration::from_secs(num("LOUPE_PARSE_INTERVAL_SECS")),
+            live: crate::live::config::LiveConfig {
+                enabled: get("LOUPE_LIVE_ENABLED") == "true",
+                allowed_origin: opt("LOUPE_LIVE_ALLOWED_ORIGIN").map(str::to_string),
+                max_rate: num("LOUPE_LIVE_MAX_RATE") as u32,
+                max_connections: num("LOUPE_LIVE_MAX_CONNECTIONS") as usize,
+                buffer: num("LOUPE_LIVE_BUFFER") as usize,
+            },
             days: super::DayConfig {
                 publish_at: super::publish_at(&get("LOUPE_PUBLISH_AT")).expect("checked above"),
                 publish_interval: std::time::Duration::from_secs(num(

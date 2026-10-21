@@ -20,6 +20,8 @@ pub struct Settings {
     pub providers: std::collections::BTreeMap<String, String>,
     /// The time zone that cuts the days of the aggregation queue.
     pub tz: chrono_tz::Tz,
+    /// The live hub; off outside serve. It gets call.stored after each commit and segments.open after a pass.
+    pub hub: crate::live::hub::Hub,
 }
 
 /// The counts that `loupe parse` prints.
@@ -74,6 +76,7 @@ fn one(
     nested: bool,
     c: &mut Counts,
 ) -> rusqlite::Result<()> {
+    let mut stored = None;
     atomic(conn, nested, || {
         if cursor::get(conn, PARSER)? >= rowid {
             return Ok(());
@@ -125,8 +128,14 @@ fn one(
         c.calls_added += added.calls;
         c.sessions_opened += added.opened;
         c.sessions_closed += added.closed;
+        stored = added.live;
         Ok(())
-    })
+    })?;
+    // The send comes after the commit, so a client never sees a call that a rollback removed.
+    if let (false, Some((tokens, cost))) = (nested, stored) {
+        s.hub.call_stored(tokens, cost);
+    }
+    Ok(())
 }
 
 fn batch(conn: &Connection) -> rusqlite::Result<Vec<i64>> {
@@ -151,6 +160,10 @@ fn run(conn: &Connection, s: &Settings, now_ms: i64, nested: bool) -> rusqlite::
         let w = idle::watermark(conn, cursor::get(conn, PARSER)?, now_ms)?;
         idle::close_idle(conn, s.idle_secs, w, s.tz)
     })?;
+    if s.hub.is_on() && !nested {
+        s.hub
+            .segments_open(crate::live::snapshot::open_segments(conn)?);
+    }
     Ok(c)
 }
 
