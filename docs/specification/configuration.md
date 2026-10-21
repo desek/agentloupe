@@ -30,10 +30,14 @@ The flag `--env` or the variable `LOUPE_ENV` gives the name of the environment. 
 | `LOUPE_BOOTSTRAP_TOKEN` | no | yes | none |
 | `LOUPE_GITHUB_TOKEN_<LABEL>` | no | yes | none |
 | `LOUPE_GITHUB_API_URL` | no | no | `https://api.github.com`, `https` or a loopback host only |
-| `LOUPE_SUMMARY_API_KEY` | no | yes | none |
-| `LOUPE_SUMMARY_OAUTH_TOKEN` | no | yes | none |
-| `LOUPE_SUMMARY_MODEL` | no | no | `claude-haiku-5-5` |
-| `LOUPE_SUMMARY_BASE_URL` | no | no | `https://api.anthropic.com` |
+| `CLAUDE_CODE_OAUTH_TOKEN` | no | yes | none |
+| `ANTHROPIC_API_KEY` | no | yes | none |
+| `OPENAI_API_KEY` | no | yes | none |
+| `ANTHROPIC_BASE_URL` | no | no | `https://api.anthropic.com`, `https` or a loopback host only |
+| `OPENAI_BASE_URL` | no | no | `https://api.openai.com/v1`, `https` or a loopback host only |
+| `LOUPE_SUMMARY_PROVIDER` | no | no | selected from the detected providers |
+| `LOUPE_PROVIDER_PING_SECS` | no | no | `300` (60 or more) |
+| `LOUPE_SUMMARY_MODEL` | no | no | `claude-haiku-5-5` for `anthropic`, none for `openai` |
 | `LOUPE_SUMMARY_INTERVAL_SECS` | no | no | `30` |
 | `LOUPE_SUMMARY_MAX_ATTEMPTS` | no | no | `5` |
 | `LOUPE_SUMMARY_MIN_CONVERSATION_CHARS` | no | no | `200` |
@@ -86,15 +90,62 @@ The subcommand also prints these lines:
 2. The number of entries in the price index.
 3. One line `subscription.<name>: <USD per month>` for each subscription.
 4. `subscription_total_per_month: <sum>`.
-5. `summary_credential`, the active credential kind of the summarizer: `api_key`, `oauth_token`, or `none`.
-6. `LOUPE_TZ`, `LOUPE_PUBLISH_AT`, `LOUPE_PUBLISH_INTERVAL_SECS`, and `LOUPE_DAY_REVIEW`, each with its source.
-7. The next due publish time, in `LOUPE_TZ` and in UTC.
-8. `site_title: <value>`, the effective site title.
-9. `live_enabled`, `live_allowed_origin`, `live_max_rate`, `live_max_connections`, and `live_buffer`, each with its source.
+5. One line for each known provider: `provider.<name>: credential=<kind or none> base_url=<url> source=<source>`. The line never prints the credential.
+6. `summary_provider: <name or none>`, the provider of the summarizer.
+7. `LOUPE_TZ`, `LOUPE_PUBLISH_AT`, `LOUPE_PUBLISH_INTERVAL_SECS`, and `LOUPE_DAY_REVIEW`, each with its source.
+8. The next due publish time, in `LOUPE_TZ` and in UTC.
+9. `site_title: <value>`, the effective site title.
+10. `live_enabled`, `live_allowed_origin`, `live_max_rate`, `live_max_connections`, and `live_buffer`, each with its source.
 
-## Summary credential
+`GET /private/api/config` returns the same entries as `loupe config show`, from the same render. `private-reports.md` gives the rules.
 
-`LOUPE_SUMMARY_API_KEY` and `LOUPE_SUMMARY_OAUTH_TOKEN` are the two credentials of the summarizer. Either one enables the summaries. If both are set, `api_key` is active. A model other than `claude-haiku-5-5` needs `LOUPE_SUMMARY_API_KEY`. `LOUPE_SUMMARY_BASE_URL` must use `https`, except for a loopback host. `summaries.md` gives the full rules.
+## Provider credentials
+
+The binary reads three provider credentials:
+
+| Variable | Provider | Kind | Auth header |
+|---|---|---|---|
+| `CLAUDE_CODE_OAUTH_TOKEN` | `anthropic` | `oauth_token` | `Authorization: Bearer`, with the OAuth header set and the billing block of `summaries.md` |
+| `ANTHROPIC_API_KEY` | `anthropic` | `api_key` | `x-api-key` and `anthropic-version` |
+| `OPENAI_API_KEY` | `openai` | `api_key` | `Authorization: Bearer` |
+
+1. A variable that is empty or that holds only white space counts as not set.
+2. If `ANTHROPIC_API_KEY` and `CLAUDE_CODE_OAUTH_TOKEN` are both set, the `anthropic` provider uses `api_key`.
+3. A subscription OAuth token works with Haiku only. If the active `anthropic` kind is `oauth_token` and the summary provider is `anthropic`, a summary model other than `claude-haiku-5-5` stops `loupe serve` and `loupe summarize` at start. The actionable error names `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, and `LOUPE_SUMMARY_MODEL`.
+4. A log line, the `loupe config show` output, and an API response never hold a credential value or a part of it.
+
+## Provider base URLs
+
+`ANTHROPIC_BASE_URL` (default `https://api.anthropic.com`) and `OPENAI_BASE_URL` (default `https://api.openai.com/v1`) set the base URL of each provider. The vendor SDKs read the same names. The OpenAI base URL includes `/v1`, and the Anthropic base URL does not. Each base URL must use `https`, except for a host of `127.0.0.1` or `localhost`. A different value stops the start with an actionable error that names the variable. This is the rule of `proxy.md` for an upstream.
+
+## Provider detection and the summary provider
+
+At start, the binary finds the detected providers. A provider is detected when at least one of its credentials is set. `loupe serve` writes one log line at start with the detected providers and the summary provider. The line holds no credential.
+
+The summary provider is selected from the detected providers in this order:
+
+1. `LOUPE_SUMMARY_PROVIDER` (`anthropic` or `openai`), if it is set.
+2. `anthropic`, if it is detected.
+3. `openai`, if it is detected.
+4. Else none.
+
+A `LOUPE_SUMMARY_PROVIDER` that names a provider that is not detected, or a value that is not known, stops the start. The actionable error names `LOUPE_SUMMARY_PROVIDER` and the detected providers. A detected provider enables the summaries with no other step. With no detected provider, the summaries are disabled. `LOUPE_SUMMARY_MODEL` has no default for `openai`. If the summary provider is `openai` and the model is not set, the start stops with an actionable error that names `LOUPE_SUMMARY_MODEL`. `summaries.md` gives the full rules.
+
+## Provider ping interval
+
+`LOUPE_PROVIDER_PING_SECS` is the interval of the provider ping in seconds. The default is `300` and the minimum is `60`. A value under `60`, or a value that is not an integer, stops the start with an actionable error that names `LOUPE_PROVIDER_PING_SECS`. `operations.md` gives the ping rules.
+
+## Removed names
+
+The binary does not read `LOUPE_SUMMARY_API_KEY`, `LOUPE_SUMMARY_OAUTH_TOKEN`, or `LOUPE_SUMMARY_BASE_URL`. If one of them is set and not empty, `loupe serve`, `loupe summarize`, and `loupe config show` stop at start with an actionable error. The error:
+
+1. Names the set legacy variable and its new name: `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, or `ANTHROPIC_BASE_URL`.
+2. Gives the fix: rename the variable in `.env`.
+3. States what to verify: `loupe config show` prints the provider line.
+
+The error never prints the value. `LOUPE_SUMMARY_MODEL`, `LOUPE_SUMMARY_INTERVAL_SECS`, and `LOUPE_SUMMARY_MAX_ATTEMPTS` keep their names, because they configure the summarizer and not a provider. A set value of one of these names does not stop the start.
+
+## Summary variables
 
 `LOUPE_SUMMARY_MIN_CONVERSATION_CHARS` is the minimum count of characters of the conversation transcript. Below it, the transcript also holds the clipped tool inputs and tool results. The value is an integer of 0 or more. A bad value stops the start of `loupe serve` and of `loupe backfill` with exit code 2 and an actionable error that names the variable and the valid range.
 

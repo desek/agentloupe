@@ -64,6 +64,25 @@ The private page shows the usage, the cost, and the sessions per proxy token and
 2. The route returns at most 200 rows.
 3. If more rows exist, the response has a `next` cursor. A request with that cursor returns the next rows.
 
+## Providers route
+
+`GET /private/api/providers` returns the provider status of each known provider.
+
+1. The route exists only when `LOUPE_ADMIN_TOKEN` is set. It uses the authorization of this file. A request without valid authorization returns `401`.
+2. Each entry has `name`, `status`, and `checked_at`. The status is `ok`, `unauthorized`, `unreachable`, or `not_configured`. `checked_at` is UTC, RFC 3339.
+3. The response never holds a credential or a base URL.
+4. A read uses the cached status. It never starts a ping. `operations.md` gives the ping rules.
+
+## Configuration route
+
+`GET /private/api/config` returns the configuration that the process loaded at start.
+
+1. The route exists only when `LOUPE_ADMIN_TOKEN` is set. It uses the authorization of this file. A request without valid authorization returns `401`, as the other private API routes do.
+2. The response is JSON, with one object for each entry: `name`, `value`, and `source`. It holds the same content as `loupe config show`: each effective value with its source, the provider lines, `summary_provider`, and the derived lines of `configuration.md`.
+3. The endpoint and `loupe config show` use one shared render of the entries, so the masking is the same on the two surfaces. Each secret is `set` or `unset`.
+4. The response never holds a credential value, the admin token, a proxy token, or a part of one.
+5. A read never starts a ping and never reloads the configuration.
+
 ## Page
 
 1. The page shows the range selector (3M, 6M, 1Y).

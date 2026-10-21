@@ -53,11 +53,13 @@ For a backfilled session, the source is the log entries of the session. The back
 
 ## Summary client
 
-The client sends one `POST /v1/messages` request to `LOUPE_SUMMARY_BASE_URL` (default `https://api.anthropic.com`). The request uses the model `LOUPE_SUMMARY_MODEL` (default `claude-haiku-5-5`). The request has no `temperature` field, because the API refuses `temperature` for `claude-haiku-5-5` with a `400` ("`temperature` is deprecated for this model", observed on 2026-10-20). `max_tokens` is 64 for a session line and 600 for a day paragraph. The timeout of a request is 30 seconds.
+The client sends one request to the summary provider (`configuration.md`). For `anthropic`, the request is `POST /v1/messages` to `ANTHROPIC_BASE_URL` (default `https://api.anthropic.com`). The request uses the model `LOUPE_SUMMARY_MODEL` (default `claude-haiku-5-5`). The request has no `temperature` field, because the API refuses `temperature` for `claude-haiku-5-5` with a `400` ("`temperature` is deprecated for this model", observed on 2026-10-20). `max_tokens` is 64 for a session line and 600 for a day paragraph. The timeout of a request is 30 seconds.
 
 The client never sends the request through the proxy routes of `loupe serve`. A summary request makes no row in `exchanges` or `calls`. It does not count in a session, a day record, or a cost.
 
-`LOUPE_SUMMARY_BASE_URL` must use `https`. The only exception is a host of `127.0.0.1` or `localhost`, for the fake upstream of the tests. This is the same rule as the rule for an upstream in `proxy.md`.
+For `openai`, the request is `POST {OPENAI_BASE_URL}/chat/completions` (default base `https://api.openai.com/v1`) with `Authorization: Bearer`. It sends the same rule text and the same limits as `max_completion_tokens`: 64 for a session line and 600 for a day paragraph. The timeout is 30 seconds. `LOUPE_SUMMARY_MODEL` has no default for `openai`, and a missing value stops the start.
+
+Each base URL must use `https`. The only exception is a host of `127.0.0.1` or `localhost`, for the fake upstream of the tests. This is the same rule as the rule for an upstream in `proxy.md`.
 
 ### Rule text
 
@@ -109,16 +111,17 @@ A log line of the pass that writes the two texts holds only the session key, the
 
 ## Credentials
 
-The summarizer accepts two credentials:
+The summarizer uses the provider credentials of `configuration.md`:
 
-| Kind | Variable | Header |
-|---|---|---|
-| `api_key` | `LOUPE_SUMMARY_API_KEY`, a Console API key | `x-api-key` |
-| `oauth_token` | `LOUPE_SUMMARY_OAUTH_TOKEN`, a Claude subscription OAuth token | `Authorization: Bearer`, never `x-api-key` |
+| Provider | Kind | Variable | Header |
+|---|---|---|---|
+| `anthropic` | `api_key` | `ANTHROPIC_API_KEY`, a Console API key | `x-api-key` and `anthropic-version` |
+| `anthropic` | `oauth_token` | `CLAUDE_CODE_OAUTH_TOKEN`, a Claude subscription OAuth token | `Authorization: Bearer`, never `x-api-key` |
+| `openai` | `api_key` | `OPENAI_API_KEY` | `Authorization: Bearer` |
 
-If both are set, the client uses `api_key`. The kind is `none` when no credential is set.
+If both `anthropic` credentials are set, the client uses `api_key`. The kind is `none` when the provider has no credential set. The summary provider is selected as `configuration.md` states.
 
-A subscription token works on the raw Messages API for Haiku models only. Thus `LOUPE_SUMMARY_MODEL` must be `claude-haiku-5-5` when the active kind is `oauth_token`. A different model with no `LOUPE_SUMMARY_API_KEY` stops `loupe serve` and `loupe summarize` at start with an actionable error. The error names both variables and two fixes: remove `LOUPE_SUMMARY_MODEL`, or set `LOUPE_SUMMARY_API_KEY`.
+A subscription token works on the raw Messages API for Haiku models only. Thus `LOUPE_SUMMARY_MODEL` must be `claude-haiku-5-5` when the summary provider is `anthropic` and the active kind is `oauth_token`. A different model stops `loupe serve` and `loupe summarize` at start with an actionable error. The error names `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, and `LOUPE_SUMMARY_MODEL`, and two fixes: remove `LOUPE_SUMMARY_MODEL`, or set `ANTHROPIC_API_KEY`.
 
 ### Headers of the OAuth path
 
@@ -138,13 +141,23 @@ The OAuth request also puts one text block first in `system`, before the rule te
 
 Without this block, a request with the rule text gets a `429` with the message `Error` and no `retry-after` header. With the block, the same request gets a `200`. The `api_key` path sends `x-api-key` and `anthropic-version` only, and no billing block.
 
+### Headers of the provider ping
+
+The provider ping (`operations.md`) sends a body of no bytes and exactly these headers. The billing block is part of a Messages body, so the ping never sends it.
+
+| Provider and kind | Ping headers |
+|---|---|
+| `anthropic`, `api_key` | `x-api-key`, `anthropic-version: 2023-06-01` |
+| `anthropic`, `oauth_token` | `Authorization: Bearer`, `anthropic-version: 2023-06-01`, `anthropic-beta: oauth-2025-04-20,claude-code-20250219` |
+| `openai`, `api_key` | `Authorization: Bearer` |
+
 ### Credential errors
 
-A `401` or a `403` response, or a `429` with no `retry-after` header on the OAuth path, writes one actionable error to the log. The error names the credential variable and two fixes: use a Haiku model with the OAuth token, or set `LOUPE_SUMMARY_API_KEY`. It names the check `loupe summarize --once`. The log line never holds the credential.
+A `401` or a `403` response, or a `429` with no `retry-after` header on the OAuth path, writes one actionable error to the log. The error names the credential variable and two fixes: use a Haiku model with the OAuth token, or set `ANTHROPIC_API_KEY`. It names the check `loupe summarize --once`. The log line never holds the credential.
 
 ### No credential
 
-With no credential, the worker gives each closed segment the status `disabled` and sends no request. Without a credential, no summaries exist.
+With no detected provider, the worker gives each closed segment the status `disabled` and sends no request. Without a credential, no summaries exist.
 
 ## Response handling
 
@@ -245,4 +258,4 @@ A missing or bad value of `--rebuild-days` fails with exit code 2 and an actiona
 
 ## Configuration lines
 
-`loupe config show` prints `LOUPE_SUMMARY_MODEL`, `LOUPE_SUMMARY_BASE_URL`, `LOUPE_SUMMARY_INTERVAL_SECS`, `LOUPE_SUMMARY_MAX_ATTEMPTS`, `LOUPE_SUMMARY_MIN_CONVERSATION_CHARS`, `LOUPE_RAW_RETENTION_HOURS`, and `LOUPE_PUBLIC_PROJECTS`, each with its source. It also prints the line `summary_credential` with the active kind: `api_key`, `oauth_token`, or `none`. It never prints a credential value.
+`loupe config show` prints `LOUPE_SUMMARY_MODEL`, `LOUPE_SUMMARY_INTERVAL_SECS`, `LOUPE_SUMMARY_MAX_ATTEMPTS`, `LOUPE_SUMMARY_MIN_CONVERSATION_CHARS`, `LOUPE_RAW_RETENTION_HOURS`, and `LOUPE_PUBLIC_PROJECTS`, each with its source. It also prints one provider line for each known provider and the line `summary_provider`, as `configuration.md` states. It never prints a credential value.

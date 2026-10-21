@@ -26,7 +26,18 @@ At start, the binary applies the versioned migrations from `migrations/` in orde
 
 ## Health
 
-`GET /healthz` returns status 200 and the body `{"status":"ok"}`. The route answers only after the database is open and migrated. The route has no CORS header.
+`GET /healthz` returns status 200 and the body `{"status":"ok"}`. The route answers only after the database is open and migrated. The route carries `access-control-allow-origin: *`, as `api.md` states. The provider status never changes the status or the body of `GET /healthz`. A provider that is down does not make the container unhealthy, because the proxy works without the summarizer.
+
+## Provider ping
+
+The ping worker keeps a provider status for each known provider. It runs in its own task and does not delay the proxy, the parser, or the start of the HTTP listener.
+
+1. The worker pings once at start, then every `LOUPE_PROVIDER_PING_SECS` seconds (default `300`, minimum `60`). It sends at most one request for each provider in each interval.
+2. The ping is `GET {base_url}/v1/models` for `anthropic` and `GET {base_url}/models` for `openai`. It never calls a model and spends no tokens. `summaries.md` gives the ping headers.
+3. The timeout of a ping is 5 seconds.
+4. A `2xx` gives `ok`. A `401` or a `403` gives `unauthorized`. A network error, a timeout, or a different status gives `unreachable`. A provider with no credential gives `not_configured` and the worker sends no request.
+5. Each status has the time `checked_at`, in UTC, RFC 3339.
+6. The worker keeps the status in a cache. A read of the status uses the cache and never starts a ping. `GET /private/api/providers` (`private-reports.md`) shows the status.
 
 ## Shutdown
 
@@ -97,6 +108,10 @@ To see a day before the nightly publish, run the aggregate subcommand for that d
 | Metric | Method | Baseline | Threshold |
 |---|---|---|---|
 | Verdict result | `.agents/scripts/pipeline.verdict.sh; echo $?` | exit code 0, every stage `status: passed`, measured on 2026-10-20, re-measured on 2026-10-20 (18.5 seconds total) | exit code 0, every stage `status: passed` |
+| Provider ping requests to a model | `cargo test provider_ping_never_calls_a_model` | none (new) | 0 requests to `/v1/messages` or `/chat/completions` |
+| Credential leak | `cargo test config_show_never_prints_a_credential`, `cargo test provider_log_never_holds_a_credential`, and `cargo test private_config_never_holds_a_credential` | none (new) | 0 occurrences of the test secret |
+| Read time of the provider status and of the private configuration, 95th percentile | `cargo test read_is_cached -- --nocapture` (1000 reads each) | none (new) | under 5 ms |
+| Ping timeout | `cargo test provider_ping_times_out_unreachable` | none (new) | status `unreachable` in at most 5.5 seconds |
 | Time to a full verdict, warm cache | total time that `pipeline.verdict.sh` prints, second run | 1.9 seconds, measured on 2026-10-20 on Apple silicon | at most 180 seconds |
 | Time from container start to healthy | `docker compose up -d && time sh -c 'until curl -sf http://127.0.0.1:8787/healthz; do sleep 0.2; done'` | 0.02 seconds to the first 200 from `/healthz`, and 1.3 seconds to the `healthy` status of Docker, measured on 2026-10-20 on Apple silicon | at most 5 seconds |
 | Added time to the first byte through the proxy, 95th percentile | `.agents/scripts/proxy.latency.sh --requests 200`, which starts the fake upstream, sends 200 server-sent events requests direct and through the proxy, and prints `p95_added_ms` | `p95_added_ms` 0.33 (0.74 direct, 1.07 through the proxy), measured on 2026-10-20 on Apple silicon; re-measured 0.36 (0.80 direct, 1.16 through the proxy) on 2026-10-20 | `p95_added_ms` at most 20 |
