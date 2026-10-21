@@ -1,0 +1,54 @@
+== step1
+== step2
+ Container loupe-acceptance-loupe-1 Started 
+ Container loupe-acceptance-loupe-1 Waiting 
+ Container loupe-acceptance-loupe-1 Healthy 
+60
+loupe Up 1 second (healthy)
+{"status":"ok"}
+== step3
+{"name":"acceptance","tags":{},"created_at":"2026-10-21T05:13:35.116Z","last_used_at":null,"revoked_at":null,"status":"active"}
+== step4
+ok
+exit 0
+== step5
+provider   model                      context  max-out  thinking  images
+anthropic  claude-haiku-4-5-20251001  200K     64K      yes       yes   
+anthropic  claude-haiku-5-5           1M       128K     yes       yes   
+ok
+exit 0
+== step6
+exchanges_read: 0
+calls_added: 0
+sessions_opened: 0
+sessions_closed: 0
+{"fields":{"attempts":1,"duration_ms":939,"error_kind":"","session_id":1,"status":"done"},"file":"src/summary/worker.rs:126","level":"INFO","message":"session summary","time":"2026-10-21T05:14:55.454Z"}
+{"fields":{"attempts":1,"duration_ms":728,"error_kind":"","session_id":2,"status":"done"},"file":"src/summary/worker.rs:126","level":"INFO","message":"session summary","time":"2026-10-21T05:14:56.182Z"}
+segments_read: 2
+done: 2
+skipped: 0
+failed: 0
+disabled: 0
+retry_later: 0
+bodies_deleted: 0
+bodies_kept_decrypt_failed: 0
+{"fields":{"day":"2026-10-21","session_lines":2,"status":"done"},"file":"src/summary/day.rs:151","level":"INFO","message":"day line built","time":"2026-10-21T05:14:57.659Z"}
+{"fields":{"calls":2,"day":"2026-10-21","reason":"aggregate","revision":1,"sessions":2,"unpriced_calls":0},"file":"src/cli/aggregate.rs:35","level":"INFO","message":"day aggregated","time":"2026-10-21T05:14:57.660Z"}
+day: 2026-10-21
+calls: 2
+sessions: 2
+cost_usd: 0.0089
+unpriced_calls: 0
+summary: present
+revision: 1
+written: true
+seconds_to_record 73
+http 200
+by_agent {'claude-code': 1, 'pi': 1}
+cost_usd 0.0089
+unpriced_calls 0
+pr {'unpriced_calls': 0, 'prs_opened': None, 'prs_merged': None}
+sentences 4 paragraphs 1
+== step9
+settings_checksum same
+pi_agent_files_changed        0
