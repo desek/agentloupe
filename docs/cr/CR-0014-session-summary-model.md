@@ -257,31 +257,32 @@ flowchart LR
 
 | Test File | Test Name | Description | Inputs | Expected Output |
 |---|---|---|---|---|
-| `src/summary/transcript.rs` (unit) | `conversation_only_when_above_threshold` | Conversation first | 2000 characters of conversation and tool results | no tool part in the transcript |
-| `src/summary/transcript.rs` (unit) | `tool_parts_added_below_threshold` | Secondary source | 100 characters of conversation and a tool result of 1000 characters | the tool result clipped to 300 with `[clipped]` |
-| `src/summary/transcript.rs` (unit) | `long_session_keeps_first_and_last_parts` | Clip | 60000 characters | 6000 first, marker, 18000 last |
-| `src/backfill/transcript.rs` (unit) | `transcript_ends_at_end_of_day` | Day bound | session with entries on days 1 to 3, day 2 | entries of days 1 and 2 only |
-| `src/backfill/transcript.rs` (unit) | `subagent_entries_stay_out_of_main_transcript` | Subagent | main file and subagent file | no subagent text |
-| `tests/summary.session_days.rs` | `five_day_session_gets_five_of_each` | Counts | fake upstream, one session with calls on 5 days | 5 rows in each new table |
-| `tests/summary.session_days.rs` | `day_summary_request_holds_full_summary` | Context | fake upstream that records requests | the day request holds the full summary text of the same day |
-| `tests/summary.session_days.rs` | `skipped_full_summary_skips_day_summary` | Status chain | fake upstream that returns one word | both rows `skipped`, one request |
-| `tests/summary.day_line.rs` | `day_line_reads_session_day_summaries` | Day line | two `done` session day summaries on one day | `session_lines` is 2, the request holds both texts |
-| `tests/summary.session_days.rs` | `tool_only_segment_gets_day_text` | AC-1 | session with a user text turn on day 1 and a tool-only segment on day 1 | session day summary of day 1 `done` |
-| `tests/summary.session_days.rs` | `failed_and_disabled_full_summary_chain` | Status chain | fake upstream with a non-retryable error; no credential | day row `failed`, then `disabled`, no day request |
+| `src/summary/transcript.rs` (unit) | `conversation_only_when_above_threshold` | Requirements 2 and 3 | 2000 characters of conversation and tool results | no tool part in the transcript |
+| `src/summary/transcript.rs` (unit) | `tool_parts_added_below_threshold` | Requirement 3 | 100 characters of conversation and a tool result of 1000 characters | the tool result clipped to 300 with `[clipped]` |
+| `src/summary/transcript.rs` (unit) | `long_session_keeps_first_and_last_parts` | Requirement 5 | 60000 characters | 6000 first, marker, 18000 last |
+| `src/backfill/transcript.rs` (unit) | `transcript_ends_at_end_of_day` | Requirement 1 | session with entries on days 1 to 3, day 2 | entries of days 1 and 2 only |
+| `src/backfill/transcript.rs` (unit) | `subagent_entries_stay_out_of_main_transcript` | Requirement 7 | main file and subagent file | no subagent text |
+| `tests/summary.session_days.rs` | `five_day_session_gets_five_of_each` | Requirements 9, 12, 16, and 17 | fake upstream, one session with calls on 5 days | 5 rows in each new table |
+| `tests/summary.session_days.rs` | `day_summary_request_holds_full_summary` | Requirement 13 | fake upstream that records requests | the day request holds the full summary text of the same day |
+| `tests/summary.session_days.rs` | `skipped_full_summary_skips_day_summary` | Requirements 15 and 21 | fake upstream that returns one word | both rows `skipped`, one request |
+| `tests/summary.day_line.rs` | `day_line_reads_session_day_summaries` | Requirements 23 and 26 | two `done` session day summaries on one day | `session_lines` is 2, the request holds both texts |
+| `tests/summary.session_days.rs` | `tool_only_segment_gets_day_text` | Requirement 12, AC-1 | session with a user text turn on day 1 and a tool-only segment on day 1 | session day summary of day 1 `done` |
+| `tests/summary.session_days.rs` | `failed_and_disabled_full_summary_chain` | Requirement 15 | fake upstream with a non-retryable error; no credential | day row `failed`, then `disabled`, no day request |
 | `tests/summary.session_days.rs` | `open_segment_blocks_full_summary` | Requirement 11 | open segment with a call on day D | no request, no final row for day D |
-| `tests/summary.session_days.rs` | `proxied_session_reads_all_segments` | Proxied source | proxied session with segments on days 1 and 2 | the day 2 full request holds text of day 1 |
+| `tests/summary.session_days.rs` | `proxied_session_reads_all_segments` | Requirement 8a | proxied session with segments on days 1 and 2 | the day 2 full request holds text of day 1 |
+| `tests/summary.session_days.rs` | `missing_bodies_use_remaining_and_log` | Requirement 8b | proxied session on days 1 and 2, one day 1 request body deleted before the build | the full request of day 2 holds the remaining bodies; one log line with `bodies_missing`, the session key, and the day only |
 | `tests/summary.session_days.rs` | `proxied_day_transcript_holds_new_messages` | Requirement 13a | proxied session with calls on days 1 and 2, the day 2 bodies repeat the day 1 history | the day 2 day request holds the day 2 messages only |
 | `tests/retention.session_days.rs` | `bodies_held_counter_logged` | Requirement 27b | exchange held under requirement 27a | the log line holds `bodies_held` 1 |
 | `tests/summary.session_days.rs` | `full_request_holds_transcript_to_day` | Requirement 9a | session on days 1 to 3, day 2 | full request holds days 1 and 2, day request holds day 2 only |
-| `tests/retention.session_days.rs` | `bodies_wait_for_session_day_summaries` | Retention | exchange past the retention hours, session day summary `pending` | bodies kept; deleted after `done` |
+| `tests/retention.session_days.rs` | `bodies_wait_for_session_day_summaries` | Requirement 27a | exchange past the retention hours, session day summary `pending` | bodies kept; deleted after `done` |
 | `tests/api.public.rs` | `public_api_hides_session_texts` | Requirement 22 | done rows with a marker | no marker in any public response |
 | `tests/summary.day_line.rs` | `day_line_not_ready_while_pending_or_open` | Requirement 24 | a `pending` day row; an open segment | `not_ready` in each case |
 | `tests/summary.day_line.rs` | `fallback_orders_by_calls_at_most_eight` | Requirement 25 | 10 done day rows with different call counts | 8 sentences, most calls first |
 | `tests/migrations.rs` | `migration_keeps_session_summaries` | Requirement 19 | database with `session_summaries` rows | the same rows after the migration |
-| `tests/summary.cli.rs` | `bad_conversation_threshold_fails` | Error | `LOUPE_SUMMARY_MIN_CONVERSATION_CHARS=abc` | exit 2, the variable and range on stderr |
+| `tests/summary.cli.rs` | `bad_conversation_threshold_fails` | Requirement 4 | `LOUPE_SUMMARY_MIN_CONVERSATION_CHARS=abc` | exit 2, the variable and range on stderr |
 | `tests/summary.cli.rs` | `negative_conversation_threshold_fails_backfill` | Requirement 4 | `loupe backfill` with `LOUPE_SUMMARY_MIN_CONVERSATION_CHARS=-1` | exit 2, the variable and range on stderr |
-| `tests/summary.cli.rs` | `rebuild_days_dry_run_changes_nothing` | Dry run | database with rows | `summaries_reset` printed, database unchanged |
-| `tests/summary.cli.rs` | `rebuild_days_bad_range_names_form` | Error | `--rebuild-days yesterday` | exit 2, the form on stderr |
+| `tests/summary.cli.rs` | `rebuild_days_dry_run_changes_nothing` | Requirement 29 | database with rows | `summaries_reset` printed, database unchanged |
+| `tests/summary.cli.rs` | `rebuild_days_bad_range_names_form` | Requirement 30 | `--rebuild-days yesterday` | exit 2, the form on stderr |
 
 The tests of the rebuild flag apply only if the answer to Open Question 1 adds the flag.
 
@@ -458,6 +459,16 @@ Then the bodies of the exchange stay
   And they are deleted after that row has a final status
 ```
 
+### AC-19: Missing request bodies do not stop the build
+
+```gherkin
+Given a proxied session with calls on days 1 and 2
+  And one request body of day 1 is deleted before the build
+When the builder makes the full session summary of day 2
+Then the request holds the text of the remaining bodies
+  And the log holds the error kind bodies_missing with only the session key and the day
+```
+
 ## Quality Standards Compliance
 
 ### Build & Compilation
@@ -504,7 +515,7 @@ Mitigation: the scrubber, the in-memory rule, and a privacy test with a marker o
 
 ### Risk 4: A proxied session has no whole history
 
-If retention deletes the bodies before the session day summaries of the session have a final status, the full session summary of a later day misses the earlier history and can be wrong. Mitigation: requirement 27a holds the bodies; requirement 8b uses the remaining bodies and logs `bodies_missing`; AC-18 tests the rule. Bodies stay longer, and the bodies of a session with an open segment stay with no time limit, so the database grows until the summaries are final. The counter `bodies_held` of requirement 27b measures this hold.
+If retention deletes the bodies before the session day summaries of the session have a final status, the full session summary of a later day misses the earlier history and can be wrong. Mitigation: requirement 27a holds the bodies; requirement 8b uses the remaining bodies and logs `bodies_missing`; AC-18 and AC-19 test the rules. Bodies stay longer, and the bodies of a session with an open segment stay with no time limit, so the database grows until the summaries are final. The counter `bodies_held` of requirement 27b measures this hold.
 
 ## Dependencies
 
