@@ -2,7 +2,7 @@
 name: "CR-0014 session summary model: whole-session transcript, full session summary, and session day summaries"
 description: "Reads the whole session, conversation first, and stores one full session summary and one session day summary per day of a session, and builds the day line of a day from the session day summaries of that day."
 id: "CR-0014"
-status: "approved"
+status: "implemented"
 date: 2026-10-21
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)

@@ -28,7 +28,7 @@ An error can print the value of `--path` or the default directory. It never prin
 
 ### Counters
 
-When stdout is not a terminal, the command prints one `key: value` line per counter on stdout, in this order: `files_read`, `entries_read`, `calls_added`, `calls_existing`, `calls_already_captured`, `sessions_already_captured`, `calls_out_of_range`, `entries_skipped`, `sessions_opened`, `days_queued`, `summaries_done`, `summaries_skipped`, `summaries_retry_later`, `summaries_failed`, `summaries_disabled`. Errors go to stderr.
+When stdout is not a terminal, the command prints one `key: value` line per counter on stdout, in this order: `files_read`, `entries_read`, `calls_added`, `calls_existing`, `calls_already_captured`, `sessions_already_captured`, `calls_out_of_range`, `entries_skipped`, `sessions_opened`, `days_queued`, `summaries_done` (the status counters count the session day summary rows that the run wrote), `summaries_skipped`, `summaries_retry_later`, `summaries_failed`, `summaries_disabled`. Errors go to stderr.
 
 In a dry run, `calls_added` counts the calls that a real run would add, and each summary counter is 0.
 

@@ -234,7 +234,7 @@ With `LOUPE_RAW_RETENTION_HOURS=0`, the worker deletes the bodies at the next ru
 
 | Mode | Work | Output |
 |---|---|---|
-| `--once` | One summary pass and one retention pass. | One `key: value` line for each count: `segments_read`, `done`, `skipped`, `failed`, `disabled`, `retry_later`, `bodies_deleted`, `bodies_kept_decrypt_failed`. Exit code 0. |
+| `--once` | One summary pass and one retention pass. | One `key: value` line for each count: `segments_read`, `done`, `skipped`, `failed`, `disabled`, `retry_later`, `bodies_deleted`, `bodies_kept_decrypt_failed`. Exit code 0. `segments_read` counts the session and day pairs that the pass read, and the status keys count the session day summary rows that the pass wrote. |
 | `--day YYYY-MM-DD` | Runs `build_day_line` for that day. | `day`, `status`, and `session_lines`. The line only with `--show-line`. |
 | `--retry` | Sets `failed` and `disabled` rows back to `pending`. | The count of rows. |
 | `--rebuild-days FROM..TO` | Makes or resets the rows of `session_full_summaries` and `session_day_summaries` for each day from `FROM` to `TO` (`YYYY-MM-DD`) to `pending`. Then it rebuilds the day line of each day in the range. It changes no row of `session_summaries` and no row outside the range. | `summaries_reset`, the count of rows made or reset. |
