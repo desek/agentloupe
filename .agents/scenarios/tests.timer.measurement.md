@@ -16,3 +16,9 @@
 - 2026-10-21 (verification), load average 19 to 40 on 10 cores from other processes: verdict test 16.7 then 18.1 seconds, `verdict: passed`. `pipeline.test.sh` alone: 14.5, 19.6, 16.8, 16.4, 17.4 seconds. Outcome: failed, 0 of 2 second runs under 15 seconds.
 - Flake: 15 of 20 `cargo nextest run` passed. All 5 failures are `private_config_read_is_cached` (`tests/private_config.rs:144`, p95 8.4 ms against a 5 ms bound), a latency test outside the timer change. Slowest test 5.4 seconds (`whole_tree_hit_refreshes_stage_fingerprints`).
 - Next: re-run on an idle machine to separate the load from the code.
+
+### Run 2026-10-21 19:29, second verification
+
+- Two runs of `.agents/scripts/pipeline.test.sh`: 21.7 s and 21.5 s, `status: passed`.
+- Load average 14 to 23 on 10 cores. Chrome and other processes used the cores.
+- Outcome: blocked. The success condition (under 15 s) cannot be measured on a contended machine. Re-run on an idle machine.
