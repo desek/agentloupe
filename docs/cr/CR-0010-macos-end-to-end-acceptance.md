@@ -418,6 +418,7 @@ curl -s http://127.0.0.1:8787/v1/days/$(TZ=Europe/Stockholm date +%F)
 ## Decisions
 
 * D6: Pi gets its credential from the variable `ANTHROPIC_OAUTH_TOKEN`, which holds the subscription token that the human makes one time with `claude setup-token`. Nothing is copied or linked from `~/.pi/agent` (requirement 7). Decided by the human on 2026-10-19.
+* D6a: decided by the human on 2026-10-20, after the CR-0004 verification: the acceptance run on this Mac loads the pi-cc-auth extension (`-e /Users/desek/Repo/desek/experiments/pi-cc-auth/src/index.ts`) in the isolated agent directory, so Pi reads the Claude Code login from the keychain and no `ANTHROPIC_OAUTH_TOKEN` is set. The README section states both routes: the variable of D6 as the plain route, and an extension that supplies the credential as the alternative. Requirement 7 and AC-2 read with this decision.
 * D7: the summarizer uses the same subscription token, set in `.env` as `LOUPE_SUMMARY_OAUTH_TOKEN` (requirement 22, CR-0006 requirement 17). Decided by the human on 2026-10-19.
 
 * D8: the product name does not show on the public page by default. `LOUPE_SITE_TITLE` sets the page title, with the default `AI agent activity` (requirement 24, AC-6). Decided by the human on 2026-10-20.
