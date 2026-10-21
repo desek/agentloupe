@@ -217,9 +217,9 @@ async fn no_cookie_set() {
     }
 }
 
-/// The cost footnote names LiteLLM, the price file, and the short commit from vendor/litellm/SOURCE.md.
+/// The asterisk sentence of the footer links LiteLLM, says list price, and names the short commit from vendor/litellm/SOURCE.md.
 #[tokio::test(flavor = "multi_thread")]
-async fn cost_footnote_has_price_commit() {
+async fn footer_sentence_has_price_commit() {
     let source = std::fs::read_to_string(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/vendor/litellm/SOURCE.md"
@@ -237,11 +237,11 @@ async fn cost_footnote_has_price_commit() {
         .text()
         .await
         .unwrap();
-    assert!(body.contains("LiteLLM"), "{body}");
-    assert!(body.contains("model_prices_and_context_window.json"));
-    assert!(body.contains(&format!("<code>{}</code>", &commit[..7])));
-    assert!(
-        body.contains(r#"href="https://github.com/BerriAI/litellm" rel="noopener noreferrer""#)
+    let sentence = format!(
+        r#"* <a href="https://github.com/BerriAI/litellm" rel="noopener noreferrer">LiteLLM</a> list prices at <code>{}</code>, not money paid."#,
+        &commit[..7]
     );
+    assert!(body.contains(&sentence), "{body}");
+    assert!(body.contains(r#"<template id="price-note">"#));
     assert!(!body.contains("{{price_commit}}"));
 }

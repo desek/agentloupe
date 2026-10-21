@@ -10,7 +10,7 @@ const FIGS = [
   ['calls', 'Calls today', grouped],
   ['tokens', 'Tokens today', short],
   ['segments', 'Open segments', grouped],
-  ['cost', 'API-equivalent cost', usd],
+  ['cost', 'API-equivalent cost*', usd],
 ];
 
 /** Builds the section once and starts the socket; the node keeps its state across redraws. */

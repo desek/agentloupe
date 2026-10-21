@@ -1,4 +1,4 @@
-//! @agents-index Puts the short price commit into the cost footnote of index.html at start, so the page code holds no literal commit.
+//! @agents-index Puts the short price commit into the asterisk sentence of the footer template in index.html at start, so the page code holds no literal commit.
 
 use crate::price::embed::PRICE_COMMIT;
 

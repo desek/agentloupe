@@ -8,7 +8,6 @@ import * as header from './section.header.js';
 import * as headline from './section.headline.js';
 import * as cost from './section.cost.js';
 import * as prs from './section.prs.js';
-import * as lines from './section.lines.js';
 import * as tokens from './section.tokens.js';
 import * as heat from './section.heatmap.js';
 import * as log from './section.log.js';
@@ -36,7 +35,7 @@ function draw() {
   }
   const totals = cost.render(doc, view, client.subscription(key, resp.to));
   const pair = el(doc, 'div', 'row');
-  pair.append(prs.render(doc, view), lines.render(doc, view), tokens.render(doc, view));
+  pair.append(prs.render(doc, view), tokens.render(doc, view));
   heatNode = heatNode || heat.render(doc, heatmap(resp));
   main.replaceChildren(headline.render(doc, view), liveNode, totals.node, pair, heatNode, log.render(doc, view));
   return totals.done;

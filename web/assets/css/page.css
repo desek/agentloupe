@@ -66,7 +66,11 @@ a:hover { color: var(--color-link-hover); }
 .state { padding: 32px 20px; text-align: center; }
 .button { font-family: var(--font-mono); font-size: var(--size-text); min-height: 44px; padding: 0 16px; border-radius: var(--radius-pill); background: var(--color-text); color: var(--color-ink-inverse); border: none; cursor: pointer; align-self: center; }
 .footer { font-size: var(--size-text); color: var(--color-text-muted); }
+.footer { display: flex; flex-wrap: wrap; gap: 4px 16px; }
 .footer p { margin: 0; }
+.pr-legend { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: center; }
+.pr-footer { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.pr-lines { white-space: nowrap; }
 @media (max-width: 600px) {
   .wrap { padding-top: 20px; }
   .title { font-size: 30px; }

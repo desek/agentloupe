@@ -1,4 +1,4 @@
-// @agents-index The totals row: the tokens card with the share bar, the API-equivalent cost card with its footnote, and the subscription card.
+// @agents-index The totals row: the tokens card with the share bar, the API-equivalent cost card, and the subscription card.
 
 import { card, el } from './dom.el.js';
 import { grouped, percent, short, usd } from './format.number.js';
@@ -28,12 +28,6 @@ function tokens(doc, totals) {
   return tok;
 }
 
-/** The footnote from the template in index.html, where the server put the short price commit. */
-function footnote(doc) {
-  const t = doc.getElementById && doc.getElementById('cost-footnote');
-  return t && t.content ? t.content.cloneNode(true) : el(doc, 'p', 'note', '* Prices from LiteLLM model_prices_and_context_window.json.');
-}
-
 /** The totals row; `subscription` is a promise of the subscription_cost_usd of the range. */
 export function render(doc, view, subscription) {
   const row = el(doc, 'div', 'row');
@@ -42,9 +36,9 @@ export function render(doc, view, subscription) {
   const cost = card(doc, 'Cost (API-equivalent)*');
   const fig = el(doc, 'div', 'figure', usd(view.totals.cost));
   fig.id = 'totals-figure';
-  cost.append(fig, el(doc, 'p', 'text', 'List price of the tokens, not money paid.'));
+  cost.append(fig);
   if (view.totals.unpriced > 0) cost.append(el(doc, 'p', 'note', `${grouped(view.totals.unpriced)} calls not priced`));
-  cost.append(line(doc, view.cost, 'output', 'Cost per day in US dollars'), footnote(doc));
+  cost.append(line(doc, view.cost, 'output', 'Cost per day in US dollars'));
 
   const sub = card(doc, 'Subscription cost');
   const value = el(doc, 'div', 'figure', '...');
