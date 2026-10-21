@@ -55,6 +55,6 @@ Versions: Claude Code 2.1.306, Pi 1.3.0. The Pi credential came from the extensi
 | 2 | same | exit 0, ok | exit 0, ok | claude-code 1, pi 1 | 0.0006 | 0 | null | 5 | 73 | same checks passed | 0 | same |
 | 3 | same | exit 0, ok | exit 0, ok | claude-code 1, pi 1 | 0.0006 | 0 | null | 5 | 73 | same checks passed | 0 | same |
 
-Result: 3 of 3 runs passed. Evidence: `acceptance.macos.end-to-end.run1.log`, `.run2.log`, `.run3.log` (command output, tokens masked), `acceptance.macos.end-to-end.dashboard.png` (run 3), and `acceptance.macos.end-to-end.day.json` (`/v1/days/2026-10-21` of run 3). The secret leak grep over these files and over `docker compose logs` of each run counted 0. Each run used a new volume of the project `loupe-acceptance`, removed with `docker compose -p loupe-acceptance down -v`.
+Result: 3 of 3 runs passed. Evidence: `acceptance.macos.end-to-end.run1.log`, `.run2.log`, `.run3.log` (command output, tokens masked), `acceptance.macos.end-to-end.dashboard.png` (run 1), and `acceptance.macos.end-to-end.day.json` (`/v1/days/2026-10-21` of run 3). The secret leak grep over these files and over `docker compose logs` of each run counted 0. Each run used a new volume of the project `loupe-acceptance`, removed with `docker compose -p loupe-acceptance down -v`.
 
 Observation: the daily log row shows `0 PRs` while the four PR fields are null. The success condition does not grade it.
