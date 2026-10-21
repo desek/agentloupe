@@ -2,7 +2,7 @@
 name: "CR-0015 Provider credentials with industry names and a health status per provider"
 description: "Renames the credentials that the binary itself uses to the industry names CLAUDE_CODE_OAUTH_TOKEN, ANTHROPIC_API_KEY, and OPENAI_API_KEY, adds an endpoint override per provider, detects the available providers from the set variables, prints them in loupe config show, adds a health status per provider from a ping that spends no tokens, and adds a private endpoint for the effective configuration."
 id: "CR-0015"
-status: "draft"
+status: "approved"
 date: 2026-10-21
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
