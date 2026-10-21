@@ -1,5 +1,7 @@
 //! @agents-index Integration test: the summary worker writes a scrubbed line, handles SKIP and failures, disables without a credential.
 
+#[path = "common/backfill.rs"]
+mod bf;
 #[path = "common/fake_upstream.rs"]
 mod fake;
 #[path = "common/loupe.rs"]
@@ -146,4 +148,34 @@ async fn summary_call_not_counted() {
     assert_eq!(fake::summary_hits("line_counted"), 1);
     loupe::parse_and_close(l.data.path());
     assert_eq!(counts(&l), before);
+}
+
+#[test]
+fn worker_skips_log_segment_transcript() {
+    let (logs, data) = (tempfile::tempdir().unwrap(), tempfile::tempdir().unwrap());
+    let root = bf::claude_tree(logs.path(), false);
+    bf::ok(
+        data.path(),
+        &["--source", "claude-code", "--path", root.to_str().unwrap()],
+        &[],
+    );
+    let pending = "SELECT count(*) FROM session_summaries WHERE status = 'pending'";
+    let retry = loupe::summarize(data.path(), &["--retry"], &[]);
+    assert!(retry.status.success());
+    assert_eq!(bf::scalar(data.path(), pending), 1);
+    let out = loupe::summarize(
+        data.path(),
+        &["--once"],
+        &[
+            ("LOUPE_SUMMARY_API_KEY", KEY_VALUE),
+            ("LOUPE_SUMMARY_BASE_URL", "http://127.0.0.1:9/summary/line"),
+        ],
+    );
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(loupe::count(&out, "segments_read"), 0);
+    assert_eq!(bf::scalar(data.path(), pending), 1);
 }

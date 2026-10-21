@@ -250,3 +250,23 @@ path = "tests/private.separation.rs"
 [[test]]
 name = "private_logs"
 path = "tests/private.logs.rs"
+
+[[test]]
+name = "backfill_cli"
+path = "tests/backfill.cli.rs"
+
+[[test]]
+name = "backfill_summary"
+path = "tests/backfill.summary.rs"
+
+[[test]]
+name = "backfill_secrets"
+path = "tests/backfill.secrets.rs"
+
+[[test]]
+name = "calls_schema"
+path = "tests/calls.schema.rs"
+
+[[test]]
+name = "calls_readers"
+path = "tests/calls.readers.rs"
