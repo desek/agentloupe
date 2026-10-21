@@ -214,8 +214,15 @@ async fn connection_limit_is_503() {
     assert_eq!(req.status(), 503);
     assert_eq!(req.headers()["retry-after"], "30");
     drop(open_ones);
-    tokio::time::sleep(Duration::from_millis(500)).await;
-    assert_eq!(status(l.port, "/live", &[]).await.0, 101);
+    // The route frees the places when the sockets close; poll with the cap of the old fixed wait.
+    let port = l.port;
+    loupe::poll_async(Duration::from_millis(500), "status 101", || async move {
+        match status(port, "/live", &[]).await.0 {
+            101 => Ok(()),
+            s => Err(format!("status {s}")),
+        }
+    })
+    .await;
 }
 
 #[tokio::test(flavor = "multi_thread")]

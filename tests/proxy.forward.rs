@@ -64,6 +64,11 @@ async fn unknown_upstream_is_404() {
             .unwrap()
             .ends_with("upstreams.toml")
     );
-    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
-    assert_eq!(l.rows(), 0);
+    // A known upstream after the refusal: its row is the end state, and it must be the only row.
+    assert_eq!(
+        reqwest::get(l.url("/pi/fake/json")).await.unwrap().status(),
+        200
+    );
+    l.wait_rows(1);
+    assert_eq!(l.rows(), 1);
 }
