@@ -89,7 +89,7 @@ After the upgrade, the route sends one `snapshot` frame first. The frame holds t
 
 ## Heartbeat
 
-The route sends a `heartbeat` frame when it sent no other frame for 15 seconds.
+The route sends a `heartbeat` frame when it sent no other frame for 15 seconds. The route reads the interval of the heartbeat and the timeout of a write through an injected clock. The binary uses the system clock, so the values do not change. A test uses a set clock, so it can assert the heartbeat without a wait of 15 seconds.
 
 ## Connection limit
 

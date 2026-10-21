@@ -72,7 +72,7 @@ A proxied path can start with an optional token segment: `/<token>/<agent>/<upst
 
 ## Token gate
 
-The token gate runs after the route parser and before the forwarder. It reads the token state from the database for each request, so a `create` or a `revoke` from another process takes effect on the next request with no restart. A cache of the state is at most 5 seconds old.
+The token gate runs after the route parser and before the forwarder. It reads the token state from the database for each request, so a `create` or a `revoke` from another process takes effect on the next request with no restart. A cache of the state is at most 5 seconds old. The gate reads the age of the cache through an injected clock. The binary uses the system clock; a test uses a set clock, so it can make the cache expire without a wait.
 
 The gate has three states:
 
@@ -106,7 +106,7 @@ The body of `token_missing`, `token_unknown`, and `token_revoked` states what fa
 
 ## Last use
 
-After a request passes the gate, the binary updates `last_used_at` of its token. The update happens at most one time per minute for each token. It does not delay or fail the forwarded request.
+After a request passes the gate, the binary updates `last_used_at` of its token. The update happens at most one time per minute for each token. It does not delay or fail the forwarded request. The gate reads the interval of one minute through the same injected clock as the cache.
 
 ## Exchanges
 
