@@ -1,0 +1,20 @@
+/* @agents-index Styles of the private page and its login form that the dashboard styles do not cover: controls, table, list. */
+.controls { display: flex; align-items: center; gap: 12px; }
+.select { font-family: var(--font-mono); font-size: var(--size-text); min-height: 44px; padding: 0 12px; border-radius: var(--radius-pill); background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border); }
+.scroll { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: var(--size-text); color: var(--color-text-body); }
+.table th { text-align: left; font-weight: 500; color: var(--color-text-muted); padding: 8px; border-bottom: 1px solid var(--color-rule); }
+.table td { padding: 8px; border-top: 1px solid var(--color-rule); }
+.table td.num, .table th.num { text-align: right; font-family: var(--font-mono); white-space: nowrap; }
+.table tr.pick { cursor: pointer; }
+.table tr[aria-selected="true"] td { background: var(--color-ink-inverse); color: var(--color-text); }
+.bar { fill: var(--color-input); }
+.sessions { list-style: none; margin: 0; padding: 0; }
+.sessions li { display: grid; grid-template-columns: 11em 8em 1fr auto auto; gap: 4px 16px; padding: 8px 0; border-top: 1px solid var(--color-rule); font-size: var(--size-text); }
+.sessions .num { font-family: var(--font-mono); white-space: nowrap; }
+.login { max-width: 420px; margin: 80px auto; padding: 0 16px; display: flex; flex-direction: column; gap: 16px; }
+.login form { display: flex; flex-direction: column; gap: 12px; }
+.login label { font-size: var(--size-text); color: var(--color-text-muted); }
+.login input { font-family: var(--font-mono); min-height: 44px; padding: 0 12px; border-radius: 8px; background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border); }
+.login-msg { color: var(--color-highlight); font-size: var(--size-text); margin: 0; }
+@media (max-width: 600px) { .sessions li { grid-template-columns: 1fr 1fr; } }

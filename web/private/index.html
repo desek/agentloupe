@@ -1,0 +1,39 @@
+<!doctype html>
+<!-- @agents-index The private page shell: range and group selectors, the group table, tokens per day, and the session list. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Private reports</title>
+<link rel="icon" href="/favicon.ico">
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<link rel="stylesheet" href="/assets/css/page.css">
+<link rel="stylesheet" href="/private/assets/css/private.css">
+<script type="module" src="/private/assets/js/app.js"></script>
+</head>
+<body>
+<div class="wrap">
+<header class="header">
+<div class="header-text">
+<h1 class="title">Private reports</h1>
+<p class="updated" id="status">Loading</p>
+</div>
+<div class="ranges" role="group" aria-label="Range" id="ranges">
+<button type="button" class="pill" data-range="3M" aria-pressed="true">3M</button>
+<button type="button" class="pill" data-range="6M" aria-pressed="false">6M</button>
+<button type="button" class="pill" data-range="1Y" aria-pressed="false">1Y</button>
+</div>
+<form method="post" action="/private/logout"><button type="submit" class="pill">Log out</button></form>
+</header>
+<div class="controls">
+<label class="label" for="group">Group by</label>
+<select id="group" class="select"><option value="token">token</option></select>
+</div>
+<main id="main" aria-live="polite">
+<section class="card full"><h2 class="label">Groups</h2><div class="scroll" id="groups"></div></section>
+<section class="card full"><h2 class="label" id="chart-label">Tokens per day</h2><div id="chart"></div></section>
+<section class="card full"><h2 class="label" id="sessions-label">Sessions</h2><div id="sessions"><p class="note">Select a proxy token in the table.</p></div></section>
+</main>
+</div>
+</body>
+</html>
