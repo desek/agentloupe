@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # @agents-index Pipeline entry point for the image stage: builds the container image from the Dockerfile; --dry-run prints the build command only.
 #
-# Usage: pipeline.image.sh [--human] [--dry-run]
-#   --human    Print a friendly view for a person. Also the default when stdout is a terminal.
-#   --dry-run  Print the build command and do not run it.
+# Usage: pipeline.image.sh [--human] [--dry-run] [--inputs] [--toolchain]
+#   --human      Print a friendly view for a person. Also the default when stdout is a terminal.
+#   --inputs     Print the paths that the stage reads, one per line, and exit 0 with no run.
+#   --toolchain  Print the Docker server version and the local digest of each FROM image, and exit 0 with no run.
+#   --dry-run    Print the build command and do not run it.
 #
 # Output (stdout, key: value): stage, status (passed or failed), seconds, toolchain, log.
 # The toolchain version comes from rust-toolchain.toml; this script states no version.
@@ -18,9 +20,23 @@ human=0; dry_run=0
 
 usage() { awk 'NR>=4 && /^#/ {sub(/^# ?/, ""); print; next} NR>=4 {exit}' "$0"; }
 
+# The declared inputs: the Dockerfile, .dockerignore, every COPY source of the Dockerfile, and this script.
+inputs() { printf '%s\n' Dockerfile .dockerignore rust-toolchain.toml Cargo.toml Cargo.lock build.rs web vendor/litellm src migrations tests examples config upstreams.toml .agents/scripts/pipeline.image.sh; }
+toolchain() {
+  docker version --format 'docker-server {{.Server.Version}}'
+  local img id
+  for img in $(awk 'toupper($1) == "FROM" {print $2}' "$ROOT/Dockerfile"); do
+    # An absent base image fails here, so the verdict runs the stage in full; no pull, no network.
+    id="$(docker image inspect --format '{{.Id}}' "$img")" || return 1
+    printf 'base %s %s\n' "$img" "$id"
+  done
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --human) human=1; shift ;;
+    --inputs) inputs; exit 0 ;;
+    --toolchain) toolchain; exit 0 ;;
     --dry-run) dry_run=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "error: unknown argument $1. Fix: run --help for the flags. Verify: the script prints a stage line." >&2; exit 2 ;;

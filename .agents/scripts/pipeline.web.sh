@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # @agents-index Pipeline entry point for the web stage: checks the Node pin, runs node --test on the page modules, checks the web/ size.
 #
-# Usage: pipeline.web.sh [--check-toolchain] [--human]
+# Usage: pipeline.web.sh [--check-toolchain] [--human] [--inputs] [--toolchain]
 #   --check-toolchain  Only check that node --version equals the pin in .tool-versions.
 #   --human            Print a friendly view for a person. Also the default when stdout is a terminal.
+#   --inputs           Print the paths that the stage reads, one per line, and exit 0 with no run.
+#   --toolchain        Print the versions of node and npm, and exit 0 with no run.
 #
 # Output (stdout, key: value): stage, status (passed or failed), seconds, node, log.
 # The Node version comes from .tool-versions; this script states no version.
@@ -16,10 +18,18 @@ LOG="$ROOT/.agents/logs/pipeline.web.log"
 human=0; only_toolchain=0
 [[ -t 1 ]] && human=1
 usage() { awk 'NR>=4 && /^#/ {sub(/^# ?/, ""); print; next} NR>=4 {exit}' "$0"; }
+# The declared inputs: a change outside them cannot change the result of this stage.
+inputs() { printf '%s\n' web .tool-versions .agents/scripts/pipeline.web.sh; }
+toolchain() {
+  (cd "$ROOT" && if command -v mise >/dev/null; then mise exec -- node --version 2>/dev/null && echo "npm $(mise exec -- npm --version 2>/dev/null)"; else node --version && echo "npm $(npm --version)"; fi)
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --check-toolchain) only_toolchain=1; shift ;;
     --human) human=1; shift ;;
+    --inputs) inputs; exit 0 ;;
+    --toolchain) toolchain; exit 0 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "error: unknown argument $1. Fix: run --help for the flags. Verify: the script prints a stage line." >&2; exit 2 ;;
   esac

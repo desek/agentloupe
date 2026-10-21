@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # @agents-index Pipeline entry point for the lint stage: runs cargo clippy on every target with warnings as errors.
 #
-# Usage: pipeline.lint.sh [--human]
-#   --human    Print a friendly view for a person. Also the default when stdout is a terminal.
+# Usage: pipeline.lint.sh [--human] [--inputs] [--toolchain]
+#   --human      Print a friendly view for a person. Also the default when stdout is a terminal.
+#   --inputs     Print the paths that the stage reads, one per line, and exit 0 with no run.
+#   --toolchain  Print the versions of rustc and cargo, and exit 0 with no run.
 #
 # Output (stdout, key: value): stage, status (passed or failed), seconds, toolchain, log.
 # The toolchain version comes from rust-toolchain.toml; this script states no version.
@@ -17,9 +19,18 @@ human=0; dry_run=0
 
 usage() { awk 'NR>=4 && /^#/ {sub(/^# ?/, ""); print; next} NR>=4 {exit}' "$0"; }
 
+# The declared inputs: a change outside them cannot change the result of this stage. web is declared
+# because build.rs reads web/ when clippy builds the crate.
+inputs() { printf '%s\n' src tests Cargo.toml Cargo.lock build.rs migrations vendor rust-toolchain.toml examples .cargo rustfmt.toml .rustfmt.toml clippy.toml .clippy.toml .agents/scripts/pipeline.lint.sh web; }
+toolchain() {
+  (cd "$ROOT" && rustc -V && cargo -V)
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --human) human=1; shift ;;
+    --inputs) inputs; exit 0 ;;
+    --toolchain) toolchain; exit 0 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "error: unknown argument $1. Fix: run --help for the flags. Verify: the script prints a stage line." >&2; exit 2 ;;
   esac
