@@ -66,6 +66,31 @@ Each entry point has `--help`, a machine output by default, and `--human` for th
 
 `pipeline.verdict.sh` runs the stages in the order format, lint, test, web, image. It only calls the stage entry points. It prints one line for each stage with `status: passed` or `status: failed`, and the time of the stage. It also prints the total time. It returns a non-zero exit code if a stage fails. The entry point `pipeline.web.sh` reads the Node version from `.tool-versions`. If `node` is missing or its version differs from the pin, it stops with a non-zero exit code and an actionable error. The thin caller installs Node from `.tool-versions` and states no Node version. The stages format, lint, test, and web are hermetic: they use no network after the dependencies are fetched, and no assertion reads the wall clock.
 
+## Connect the agents
+
+The connect script `.agents/scripts/agent.connect.sh` points one agent at the proxy for one shell. It changes no global setting of the agent.
+
+Inputs:
+
+- The agent: Claude Code or Pi.
+- The proxy token: a file that holds the token, or an environment variable. The script does not accept the token as an argument value, because the shell history and the process list keep arguments.
+- The base of the proxy. The default is `http://127.0.0.1:8787`.
+
+If no token is given, the script stops with a non-zero exit code. The error names the missing input, the command that makes a token, and the command that lists the tokens.
+
+Output:
+
+- For Claude Code, the script prints one export line that sets the base URL of Anthropic to the Claude Code route of the proxy with the token. It also prints the hint for the model `claude-haiku-5-5`.
+- For Pi, the script makes the isolated agent directory under the state directory of the user, with mode 0700. It writes one file of model settings into it, with mode 0600. That file sets only the base URL of the Anthropic provider to the Pi route of the proxy with the token. The script prints one export line that points Pi at this directory.
+
+The isolated agent directory holds no credential file. Pi gets its credential from the environment of the user. The plain route is a subscription token that the user makes one time with `claude setup-token` and exports in the shell. The alternative route is a Pi extension that supplies the credential, for example an extension that reads the Claude Code login from the keychain.
+
+The script never writes to the global settings directory of Claude Code or of Pi, and never writes to a file in the repository. It never reads, copies, or prints a provider credential.
+
+The script is idempotent. A second run with the same inputs writes the same bytes and prints the same output. With `--dry-run`, it prints the planned file path and content with the token masked as `lpt_…`, and writes nothing. With `--check`, it sends one request to the health route of the proxy, and stops with an actionable error if the container does not answer. The script runs with the bash 3.2 of macOS, the default tools of macOS, and curl. It does not need jq.
+
+To see a day before the nightly publish, run the aggregate subcommand for that date in the container. A short idle time in an untracked compose override closes the sessions sooner than the default of 3600 seconds.
+
 ## Measurable targets
 
 | Metric | Method | Baseline | Threshold |
@@ -105,4 +130,7 @@ Each entry point has `--help`, a machine output by default, and `--human` for th
 | Privacy of the GitHub tables | `cargo test --test github_privacy` | passed on 2026-10-20; passed again on 2026-10-20 at verification | passes |
 | Proxy time to first byte with the GitHub worker, 95th percentile | `.agents/scripts/proxy.latency.sh --requests 200 --with-token` | the value after the dashboard: `p95_added_ms` 0.31; with the GitHub worker `p95_added_ms` 0.28 on 2026-10-20; re-measured 0.29 on 2026-10-20 at verification, a difference of -0.02 | at most 2 ms above the baseline |
 
+| Acceptance pass rate | Run the acceptance scenario `.agents/scenarios/acceptance.macos.end-to-end.md` three times, and count the runs that meet the success condition | 0 of 0, no run exists; to be measured | 3 of 3 |
+| Time from the last agent call to the day record | `date +%s` after the last agent call returns, then the aggregate subcommand, then poll `/v1/days/<today>` until the agent breakdown holds both agents; report the difference | not measured; to be measured | at most 300 seconds with an idle time of 60 seconds |
+| Secret leak count | grep for `lpt_[A-Za-z0-9_-]{5,}` and `sk-ant-` over the scenario files and the container logs | not measured; to be measured | 0 |
 The time to a full verdict is the time of the local loop. The first measured value at the end of the foundation change is the baseline. A later change that makes it longer must state the reason.
