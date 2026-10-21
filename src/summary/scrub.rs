@@ -122,6 +122,11 @@ fn sentences(text: &str) -> Vec<String> {
 
 /// The scrubbed day paragraph: at most 8 sentences of 2 or more words, each with a final period.
 pub fn paragraph(text: &str, public: &[String]) -> String {
+    paragraph_max(text, public, MAX_SENTENCES)
+}
+
+/// The scrubbed paragraph with at most `max` sentences, for the full session and session day texts.
+pub fn paragraph_max(text: &str, public: &[String], max: usize) -> String {
     sentences(text)
         .iter()
         .filter_map(|s| {
@@ -129,7 +134,7 @@ pub fn paragraph(text: &str, public: &[String]) -> String {
             trim_tail(&mut words);
             (words.len() >= 2).then(|| format!("{}.", words.join(" ")))
         })
-        .take(MAX_SENTENCES)
+        .take(max)
         .collect::<Vec<_>>()
         .join(" ")
 }

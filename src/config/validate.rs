@@ -64,6 +64,11 @@ fn check(e: &Entry) -> Result<(), ConfigError> {
             "is not a whole number",
             "a whole number of hours, 0 or more",
         )),
+        ("LOUPE_SUMMARY_MIN_CONVERSATION_CHARS", Some(v)) if v.parse::<u64>().is_err() => Err(bad(
+            n,
+            "is not a whole number of 0 or more",
+            "a whole number of characters, 0 or more, such as 400",
+        )),
         ("LOUPE_SUMMARY_BASE_URL", Some(v)) if !https_or_loopback(v) => Err(bad(
             n,
             "is not an https URL or an http URL of 127.0.0.1 or localhost",
@@ -234,6 +239,7 @@ impl Loaded {
                 interval: std::time::Duration::from_secs(num("LOUPE_SUMMARY_INTERVAL_SECS")),
                 max_attempts: num("LOUPE_SUMMARY_MAX_ATTEMPTS").min(u32::MAX as u64) as u32,
                 raw_retention_hours: num("LOUPE_RAW_RETENTION_HOURS"),
+                min_conversation_chars: num("LOUPE_SUMMARY_MIN_CONVERSATION_CHARS") as usize,
                 public_projects: crate::summary::scrub::public_projects(&get(
                     "LOUPE_PUBLIC_PROJECTS",
                 )),

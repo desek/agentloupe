@@ -80,6 +80,8 @@ pub struct SummaryConfig {
     pub max_attempts: u32,
     /// Hours after the later of the parse and the summary before the bodies go; 0 is the next pass.
     pub raw_retention_hours: u64,
+    /// Below this count of conversation characters, the transcript also holds the clipped tool parts.
+    pub min_conversation_chars: usize,
     pub public_projects: Vec<String>,
     /// The time zone that cuts the days.
     pub tz: chrono_tz::Tz,

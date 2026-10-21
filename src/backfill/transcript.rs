@@ -1,11 +1,13 @@
-//! @agents-index Builds the transcript of a backfilled segment from its log entries, in memory only, with the summary transcript rules.
+//! @agents-index Reads the log entries of a backfilled session in a time window as messages, in memory only, for the one transcript builder.
 
 use super::discover::LogFile;
 use super::entry::ms;
 use super::{Source, claude};
 use serde_json::{Value, json};
 
-/// True when the entry time is inside the window of the segment: after the previous segment, up to the last call.
+/// True when the entry time is inside the window: after `after` (exclusive), up to `until` (inclusive).
+/// A segment line uses the segment window; a session text uses the whole session up to the end of a day,
+/// or the day only.
 fn inside(e: &Value, after: Option<i64>, until: i64) -> bool {
     ms(&e["timestamp"]).is_some_and(|t| after.is_none_or(|a| t > a) && t <= until)
 }
@@ -86,15 +88,15 @@ pub fn pi_messages(lines: &[(usize, Value)], after: Option<i64>, until: i64) -> 
     out
 }
 
-/// The transcript of one segment from the files that hold its session key. Empty when no turn has text.
-pub fn segment(
+/// The messages of one session in the window from the files that hold its session key, in line order.
+pub fn messages(
     source: Source,
     k: &[u8; 32],
     files: &[&LogFile],
     key_hash: &str,
     after: Option<i64>,
     until: i64,
-) -> String {
+) -> Vec<Value> {
     let mut messages = vec![];
     for f in files {
         let Ok(lines) = super::read::file(&f.path, source.name(), 0, false) else {
@@ -105,7 +107,7 @@ pub fn segment(
             Source::Pi => pi_messages(&lines.entries, after, until),
         });
     }
-    crate::summary::transcript::build_messages(&messages)
+    messages
 }
 
 #[cfg(test)]
@@ -141,7 +143,7 @@ mod tests {
             None,
             until,
         );
-        let t = crate::summary::transcript::build_messages(&msgs);
+        let t = crate::summary::transcript::build_messages(&msgs, 400);
         let rows: Vec<&str> = t.lines().collect();
         assert_eq!(rows.len(), 4, "{t}");
         assert_eq!(rows[0], "user: fix the parser");
@@ -158,8 +160,67 @@ mod tests {
             json!({"type":"message","timestamp":ts,"message":{"role":"toolResult","content":[{"type":"image"}]}}),
         )];
         assert_eq!(
-            crate::summary::transcript::build_messages(&pi_messages(&pi, None, until)),
+            crate::summary::transcript::build_messages(&pi_messages(&pi, None, until), 400),
             "user: [tool result] [attachment]"
+        );
+    }
+
+    fn at(day: u32) -> String {
+        format!("2026-01-0{day}T10:00:00Z")
+    }
+
+    #[test]
+    fn transcript_ends_at_end_of_day() {
+        let k = [4u8; 32];
+        let f = LogFile {
+            path: "/p/s.jsonl".into(),
+            subagent_of: None,
+        };
+        let lines: Vec<(usize, Value)> = (1..=3)
+            .map(|d| json!({"type":"user","sessionId":"s","timestamp":at(d),"message":{"role":"user","content":format!("work of day {d}")}}))
+            .enumerate()
+            .collect();
+        let key = super::super::key::session(&k, "s");
+        let end_day2 = ms(&json!("2026-01-03T00:00:00Z")).unwrap() - 1;
+        let full = claude_messages(&k, &f, &lines, &key, None, end_day2);
+        let t = crate::summary::transcript::build_messages(&full, 400);
+        assert_eq!(t, "user: work of day 1\nuser: work of day 2");
+        let start_day2 = ms(&json!("2026-01-02T00:00:00Z")).unwrap() - 1;
+        let day = claude_messages(&k, &f, &lines, &key, Some(start_day2), end_day2);
+        assert_eq!(
+            crate::summary::transcript::build_messages(&day, 400),
+            "user: work of day 2"
+        );
+    }
+
+    #[test]
+    fn subagent_entries_stay_out_of_main_transcript() {
+        let k = [4u8; 32];
+        let main = LogFile {
+            path: "/p/s.jsonl".into(),
+            subagent_of: None,
+        };
+        let sub = LogFile {
+            path: "/p/s/subagents/agent-1.jsonl".into(),
+            subagent_of: Some("s".into()),
+        };
+        let line = |text: &str| {
+            vec![(
+                0,
+                json!({"type":"user","sessionId":"s","timestamp":at(1),"message":{"role":"user","content":text}}),
+            )]
+        };
+        let key = super::super::key::session(&k, "s");
+        let until = ms(&json!(at(2))).unwrap();
+        assert!(claude_messages(&k, &sub, &line("SUBAGENT TEXT"), &key, None, until).is_empty());
+        let sub_key = super::super::key::session(&k, "agent-1");
+        assert_eq!(
+            claude_messages(&k, &sub, &line("SUBAGENT TEXT"), &sub_key, None, until).len(),
+            1
+        );
+        assert_eq!(
+            claude_messages(&k, &main, &line("MAIN"), &key, None, until).len(),
+            1
         );
     }
 }

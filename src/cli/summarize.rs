@@ -1,4 +1,4 @@
-//! @agents-index The summarize subcommand: --once (summary and retention pass), --day (build_day_line), --retry, each with --dry-run.
+//! @agents-index The summarize subcommand: --once, --day (build_day_line), --retry, --rebuild-days, each with --dry-run.
 
 use super::ConfigArgs;
 use crate::config::loader;
@@ -9,11 +9,13 @@ use std::process::ExitCode;
 const EXIT_CONFIG: u8 = 2;
 const EXIT_RUNTIME: u8 = 1;
 
-/// The selected mode; exactly one of the three flags.
+/// The selected mode; exactly one of the four flags.
 pub enum Mode {
     Once,
     Day(String),
     Retry,
+    /// The FROM..TO text of --rebuild-days.
+    Rebuild(String),
 }
 
 fn fail(code: u8, message: String) -> ExitCode {
@@ -40,8 +42,13 @@ pub fn run(
     human: bool,
 ) -> ExitCode {
     let Some(mode) = mode else {
-        return fail(EXIT_CONFIG, "error: loupe summarize needs one mode. Fix 1: run loupe summarize --once. Fix 2: run loupe summarize --day YYYY-MM-DD. Fix 3: run loupe summarize --retry. Verify: the command prints key: value lines.".into());
+        return fail(EXIT_CONFIG, "error: loupe summarize needs one mode. Fix 1: run loupe summarize --once. Fix 2: run loupe summarize --day YYYY-MM-DD. Fix 3: run loupe summarize --retry. Fix 4: run loupe summarize --rebuild-days YYYY-MM-DD..YYYY-MM-DD. Verify: the command prints key: value lines.".into());
     };
+    if let Mode::Rebuild(text) = &mode
+        && super::summarize_rebuild::parse(text).is_none()
+    {
+        return fail(EXIT_CONFIG, super::summarize_rebuild::bad_range(text));
+    }
     let cfg = match loader::load_from_process(&args.as_flags()).and_then(|c| c.validate()) {
         Ok(c) => c,
         Err(e) => return fail(EXIT_CONFIG, e.to_string()),
@@ -105,10 +112,22 @@ pub fn run(
                 human,
             );
         }
-        Mode::Retry => match store::retry(&conn, &crate::session::time::text(now), dry_run) {
-            Ok(n) => print(&[("rows", n.to_string())], human),
-            Err(e) => return db_fail(e.to_string()),
-        },
+        Mode::Retry => {
+            let t = crate::session::time::text(now);
+            match store::retry(&conn, &t, dry_run).and_then(|a| {
+                crate::summary::store_session_day::retry(&conn, &t, dry_run).map(|b| a + b)
+            }) {
+                Ok(n) => print(&[("rows", n.to_string())], human),
+                Err(e) => return db_fail(e.to_string()),
+            }
+        }
+        Mode::Rebuild(text) => {
+            let range = super::summarize_rebuild::parse(&text).expect("checked above");
+            match super::summarize_rebuild::run(&conn, &s, range, dry_run) {
+                Ok(n) => print(&[("summaries_reset", n.to_string())], human),
+                Err(e) => return db_fail(e.to_string()),
+            }
+        }
         Mode::Day(text) => {
             let Ok(date) = chrono::NaiveDate::parse_from_str(&text, "%Y-%m-%d") else {
                 return fail(

@@ -18,6 +18,8 @@ mod parse;
 mod price;
 mod serve;
 mod summarize;
+#[path = "summarize.rebuild.rs"]
+mod summarize_rebuild;
 mod token;
 
 use clap::{Args, Parser, Subcommand};
@@ -65,17 +67,22 @@ enum Command {
     ///
     /// --once prints segments_read, done, skipped, failed, disabled, retry_later, bodies_deleted,
     /// bodies_kept_decrypt_failed as key: value lines. --day prints day, status, session_lines.
-    /// --retry prints rows. Exit codes: 0 done, 1 a database or runtime failure, 2 bad input or configuration.
+    /// --retry prints rows. --rebuild-days prints summaries_reset.
+    /// Exit codes: 0 done, 1 a database or runtime failure, 2 bad input or configuration.
     Summarize {
         /// Run one summary pass and one retention pass, then exit.
-        #[arg(long, conflicts_with_all = ["day", "retry"])]
+        #[arg(long, conflicts_with_all = ["day", "retry", "rebuild_days"])]
         once: bool,
         /// Build the day line of this day, YYYY-MM-DD in LOUPE_TZ.
-        #[arg(long, value_name = "YYYY-MM-DD", conflicts_with = "retry")]
+        #[arg(long, value_name = "YYYY-MM-DD", conflicts_with_all = ["retry", "rebuild_days"])]
         day: Option<String>,
         /// Set failed and disabled summaries back to pending with 0 attempts.
-        #[arg(long)]
+        #[arg(long, conflicts_with = "rebuild_days")]
         retry: bool,
+        /// Reset the full session and session day summaries of each day in the range to pending,
+        /// then rebuild them and the day line of each day. Days in LOUPE_TZ.
+        #[arg(long, value_name = "YYYY-MM-DD..YYYY-MM-DD")]
+        rebuild_days: Option<String>,
         /// Print the stored day line too (with --day).
         #[arg(long)]
         show_line: bool,
@@ -313,15 +320,17 @@ pub fn run() -> ExitCode {
             once,
             day,
             retry,
+            rebuild_days,
             show_line,
             dry_run,
             human,
             args,
         } => {
-            let mode = match (once, day, retry) {
-                (true, _, _) => Some(summarize::Mode::Once),
-                (_, Some(d), _) => Some(summarize::Mode::Day(d)),
-                (_, _, true) => Some(summarize::Mode::Retry),
+            let mode = match (once, day, retry, rebuild_days) {
+                (true, _, _, _) => Some(summarize::Mode::Once),
+                (_, Some(d), _, _) => Some(summarize::Mode::Day(d)),
+                (_, _, true, _) => Some(summarize::Mode::Retry),
+                (_, _, _, Some(r)) => Some(summarize::Mode::Rebuild(r)),
                 _ => None,
             };
             summarize::run(&args, mode, dry_run, show_line, human)

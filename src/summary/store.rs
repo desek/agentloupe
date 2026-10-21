@@ -96,28 +96,6 @@ pub fn retry(conn: &Connection, now: &str, dry_run: bool) -> rusqlite::Result<us
     )
 }
 
-/// The segments that started in [from, to), most calls first: state, summary status, and line.
-pub struct DaySeg {
-    pub state: String,
-    pub status: Option<String>,
-    pub line: Option<String>,
-}
-
-pub fn day_segments(conn: &Connection, from: &str, to: &str) -> rusqlite::Result<Vec<DaySeg>> {
-    conn.prepare(
-        "SELECT s.state, ss.status, ss.line FROM sessions s LEFT JOIN session_summaries ss ON ss.session_id = s.id \
-         WHERE s.started_at >= ?1 AND s.started_at < ?2 ORDER BY s.call_count DESC, s.id",
-    )?
-    .query_map(params![from, to], |r| {
-        Ok(DaySeg {
-            state: r.get(0)?,
-            status: r.get(1)?,
-            line: r.get(2)?,
-        })
-    })?
-    .collect()
-}
-
 /// Replaces the row of a day, so a new run keeps the newest result.
 pub fn put_day(
     conn: &Connection,

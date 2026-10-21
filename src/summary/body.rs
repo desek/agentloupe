@@ -37,7 +37,12 @@ fn body(
 
 /// The transcript of the segment; empty when no body has a turn with text.
 /// The first pass keeps only the history length of each body, so at most one body is decrypted at a time.
-pub fn load(conn: &Connection, key: &[u8; 32], session_id: i64) -> rusqlite::Result<String> {
+pub fn load(
+    conn: &Connection,
+    key: &[u8; 32],
+    session_id: i64,
+    min_conversation: usize,
+) -> rusqlite::Result<String> {
     let list = exchanges(conn, session_id)?;
     let mut lens = Vec::with_capacity(list.len());
     for (rowid, id) in &list {
@@ -52,6 +57,6 @@ pub fn load(conn: &Connection, key: &[u8; 32], session_id: i64) -> rusqlite::Res
     };
     let (rowid, id) = &list[i];
     Ok(body(conn, key, *rowid, id)?
-        .map(|b| transcript::build(&b))
+        .map(|b| transcript::build(&b, min_conversation))
         .unwrap_or_default())
 }

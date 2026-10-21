@@ -1,7 +1,7 @@
-//! @agents-index build_day_line: combines the done session lines of one day into a scrubbed paragraph, or a fallback, in day_summaries.
+//! @agents-index build_day_line: combines the done session day summaries of one day into a scrubbed paragraph, or a fallback, in day_summaries.
 
 use super::client::{self, Client, Outcome};
-use super::{retry, rules, scrub, store};
+use super::{retry, rules, scrub, store, store_session_day};
 use crate::session::time;
 use chrono::{NaiveDate, TimeZone};
 use chrono_tz::Tz;
@@ -40,7 +40,7 @@ fn bounds(day: NaiveDate, tz: Tz) -> (String, String) {
     (time::text(at(day)), time::text(at(next)))
 }
 
-/// The session lines as sentences, most calls first, at most 8.
+/// The session day summaries as sentences, most calls first, at most 8.
 fn fallback(lines: &[String]) -> String {
     lines
         .iter()
@@ -94,8 +94,9 @@ fn combine(c: &Client, s: &Settings, lines: &[String]) -> Option<String> {
     None
 }
 
-/// Builds the line of `day`. Returns `not_ready` and writes nothing while a segment of the day is open
-/// or pending. A dry run sends no request and writes nothing; its status is `ready` for a buildable day.
+/// Builds the line of `day` from its done session day summaries. Returns `not_ready` and writes nothing
+/// while a segment with a call on the day is open or a session day summary of the day is pending.
+/// A dry run sends no request and writes nothing; its status is `ready` for a buildable day.
 pub fn build_day_line(
     conn: &Connection,
     s: &Settings,
@@ -103,14 +104,13 @@ pub fn build_day_line(
     dry_run: bool,
 ) -> rusqlite::Result<DayResult> {
     let (from, to) = bounds(day, s.tz);
-    let segs = store::day_segments(conn, &from, &to)?;
-    let blocked = segs
+    let rows = store_session_day::day_texts(conn, &day.to_string(), &from, &to)?;
+    let blocked = store_session_day::any_open(conn, &from, &to)?
+        || rows.iter().any(|r| r.status == "pending");
+    let lines: Vec<String> = rows
         .iter()
-        .any(|g| g.state == "open" || g.status.as_deref() == Some("pending"));
-    let lines: Vec<String> = segs
-        .iter()
-        .filter(|g| g.status.as_deref() == Some("done"))
-        .filter_map(|g| g.line.clone())
+        .filter(|r| r.status == "done")
+        .filter_map(|r| r.text.clone())
         .collect();
     let n = lines.len();
     let result = |status, line| DayResult {

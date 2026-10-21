@@ -79,6 +79,7 @@ pub fn ctx(review: Review, subscriptions: Vec<Subscription>) -> Ctx {
             public: vec![],
             max_attempts: 1,
             tz: chrono_tz::UTC,
+            min_conversation: 400,
         },
         github_labels: vec![],
     }

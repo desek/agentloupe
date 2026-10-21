@@ -145,7 +145,8 @@ async fn summary_call_not_counted() {
     };
     let before = counts(&l);
     run(&l, &base(fake, "line_counted"));
-    assert_eq!(fake::summary_hits("line_counted"), 1);
+    // One session line, one full session summary, and one session day summary.
+    assert_eq!(fake::summary_hits("line_counted"), 3);
     loupe::parse_and_close(l.data.path());
     assert_eq!(counts(&l), before);
 }

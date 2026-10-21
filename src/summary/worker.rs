@@ -13,6 +13,8 @@ pub struct Settings {
     pub max_attempts: u32,
     /// The time zone that cuts the days of the aggregation queue.
     pub tz: chrono_tz::Tz,
+    /// Below this count of conversation characters, the transcript also holds the clipped tool parts.
+    pub min_conversation: usize,
 }
 
 /// The counts that `loupe summarize --once` prints.
@@ -76,7 +78,7 @@ fn one(
     dry_run: bool,
 ) -> rusqlite::Result<String> {
     summarize(conn, s, rt, id, dry_run, || {
-        body::load(conn, &s.data_key, id)
+        body::load(conn, &s.data_key, id, s.min_conversation)
     })
 }
 
@@ -153,6 +155,25 @@ pub fn summarize(
 /// One pass over every due segment, in batches of 20. A dry run reads all due segments once and writes nothing.
 pub fn pass(conn: &Connection, s: &Settings, dry_run: bool) -> rusqlite::Result<Counts> {
     let rt = runtime()?;
+    if !dry_run {
+        // The session texts come first: their discovery reads the segments that have no final line yet.
+        let src = super::session_day::Proxied {
+            conn,
+            data_key: s.data_key,
+        };
+        let t = super::session_day::pass(conn, s, &rt, &src, None)?;
+        if t.pairs_read > 0 {
+            tracing::info!(
+                pairs_read = t.pairs_read,
+                done = t.done,
+                skipped = t.skipped,
+                failed = t.failed,
+                disabled = t.disabled,
+                retry_later = t.retry_later,
+                "session text pass done"
+            );
+        }
+    }
     let mut c = Counts::default();
     let mut seen = std::collections::HashSet::new();
     loop {
