@@ -11,8 +11,13 @@ pub const TIMEOUT: Duration = Duration::from_secs(5);
 
 /// The client of the pings; the timeout covers the whole request.
 pub fn http() -> reqwest::Client {
+    http_with(TIMEOUT)
+}
+
+/// The client with `timeout`, so a test asserts the timeout path without a wait of 5 seconds.
+fn http_with(timeout: Duration) -> reqwest::Client {
     reqwest::Client::builder()
-        .timeout(TIMEOUT)
+        .timeout(timeout)
         .build()
         .expect("the TLS backend of reqwest is built in")
 }
@@ -194,12 +199,9 @@ mod tests {
                 held.push(s);
             }
         });
-        let t = std::time::Instant::now();
         let k = Some(Credential::ApiKey(Secret::new("k".into())));
-        let s = ping(&http(), &target(Provider::Anthropic, &base, k)).await;
-        let took = t.elapsed();
-        println!("provider_ping_timeout_secs: {:.2}", took.as_secs_f64());
+        let client = http_with(Duration::from_millis(200));
+        let s = ping(&client, &target(Provider::Anthropic, &base, k)).await;
         assert_eq!(s.status, "unreachable");
-        assert!(took <= Duration::from_millis(5500));
     }
 }

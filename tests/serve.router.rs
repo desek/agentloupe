@@ -11,15 +11,17 @@ use loupe::Loupe;
 async fn reserved_routes_take_precedence() {
     let fake = fake::spawn().await;
     let l = Loupe::start(fake, &[], &[]);
-    check_reserved(&l).await;
+    check_reserved(&l, "/pi/fake/json").await;
     // With an active token, reserved routes still need no token.
     let data = tempfile::tempdir().unwrap();
-    loupe::create_token(data.path(), "r");
+    let t = loupe::create_token(data.path(), "r");
     let l = Loupe::start_in(data, fake, &[], &[]);
-    check_reserved(&l).await;
+    check_reserved(&l, &format!("/{t}/pi/fake/json")).await;
 }
 
-async fn check_reserved(l: &Loupe) {
+/// `proxied` is a path that the proxy forwards, sent last so its row ends the check.
+async fn check_reserved(l: &Loupe, proxied: &str) {
+    let hits = fake::HITS.load(std::sync::atomic::Ordering::SeqCst);
     assert_eq!(reqwest::get(l.url("/healthz")).await.unwrap().status(), 200);
     assert_eq!(reqwest::get(l.url("/v1/days")).await.unwrap().status(), 200);
     // The static handler serves the page and its files without a token.
@@ -39,7 +41,9 @@ async fn check_reserved(l: &Loupe) {
     }
     // The live route takes /live, so the proxy never gets it.
     assert_eq!(reqwest::get(l.url("/live")).await.unwrap().status(), 426);
-    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
-    assert_eq!(fake::HITS.load(std::sync::atomic::Ordering::SeqCst), 0);
-    assert_eq!(l.rows(), 0);
+    assert_eq!(fake::HITS.load(std::sync::atomic::Ordering::SeqCst), hits);
+    // A proxied request after the reserved routes: its row is the end state, and it must be the only row.
+    assert_eq!(reqwest::get(l.url(proxied)).await.unwrap().status(), 200);
+    l.wait_rows(1);
+    assert_eq!(l.rows(), 1);
 }

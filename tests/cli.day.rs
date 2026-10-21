@@ -79,7 +79,22 @@ async fn delete_tombstone_blocks_catch_up() {
     assert_eq!(status(&l).await, 200);
     let out = day(&l, "delete", &[]);
     assert_eq!(days::field(&out, "state"), "deleted");
-    std::thread::sleep(Duration::from_millis(2500));
+    // A queued build of the tombstone day: the publisher removes it on its next wake and does not
+    // build the day, so its removal is the end state that proves a wake ran after the delete.
+    l.db()
+        .execute(
+            "INSERT INTO agg_queue (day, reason, queued_at) VALUES (?1, 'test', '2026-10-10T00:00:00.000Z')",
+            [D],
+        )
+        .unwrap();
+    loupe::poll(
+        Duration::from_millis(2500),
+        "no queued build of the day",
+        || match days::scalar(&l.db(), "SELECT count(*) FROM agg_queue") {
+            0 => Ok(()),
+            n => Err(format!("{n} queued builds")),
+        },
+    );
     let db = l.db();
     assert_eq!(
         days::text(&db, "SELECT state FROM days").unwrap(),

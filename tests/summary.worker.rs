@@ -67,29 +67,39 @@ async fn closed_segment_gets_session_texts_and_no_line() {
     }
 }
 
+/// The status, the error kind, and the attempts of the full session summary.
+const ROW: &str =
+    "SELECT status || ':' || last_error_kind || ':' || attempts FROM session_full_summaries";
+
 #[tokio::test(flavor = "multi_thread")]
-async fn skip_and_failures() {
+async fn skip_is_retried_later() {
     let fake = fake::spawn().await;
     let l = one_closed(fake, 1).await;
     let out = run(&l, &base(fake, "skip"));
     assert_eq!(loupe::count(&out, "retry_later"), 1);
-    let row =
-        "SELECT status || ':' || last_error_kind || ':' || attempts FROM session_full_summaries";
-    assert_eq!(text(&l, row).unwrap(), "pending:skip:1");
+    assert_eq!(text(&l, ROW).unwrap(), "pending:skip:1");
+}
 
+#[tokio::test(flavor = "multi_thread")]
+async fn unauthorized_fails_and_names_the_fix() {
+    let fake = fake::spawn().await;
     let l = one_closed(fake, 1).await;
     let out = run(&l, &base(fake, "401"));
     assert_eq!(loupe::count(&out, "failed"), 1);
-    assert_eq!(text(&l, row).unwrap(), "failed:unauthorized:1");
+    assert_eq!(text(&l, ROW).unwrap(), "failed:unauthorized:1");
     let log = l.log();
     assert!(log.contains("ANTHROPIC_API_KEY") && log.contains("loupe summarize --once"));
     assert!(!log.contains(KEY_VALUE));
+}
 
+#[tokio::test(flavor = "multi_thread")]
+async fn rate_limited_fails_after_five_and_retry_resets() {
+    let fake = fake::spawn().await;
     let l = one_closed(fake, 1).await;
     for i in 1..=5 {
         run(&l, &base(fake, "429"));
         if i < 5 {
-            assert_eq!(text(&l, row).unwrap(), format!("pending:rate_limited:{i}"));
+            assert_eq!(text(&l, ROW).unwrap(), format!("pending:rate_limited:{i}"));
             l.db()
                 .execute(
                     "UPDATE session_full_summaries SET next_attempt_at = NULL",
@@ -98,7 +108,7 @@ async fn skip_and_failures() {
                 .unwrap();
         }
     }
-    assert_eq!(text(&l, row).unwrap(), "failed:rate_limited:5");
+    assert_eq!(text(&l, ROW).unwrap(), "failed:rate_limited:5");
     let out = loupe::summarize(l.data.path(), &["--retry"], &[]);
     // The full session summary and the session day summary that took its status.
     assert_eq!(loupe::count(&out, "rows"), 2);

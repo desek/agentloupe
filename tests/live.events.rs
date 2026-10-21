@@ -36,6 +36,8 @@ async fn exchange_events_in_order() {
     let l = Loupe::start(fake::spawn().await, &[], &[]);
     let (mut ws, _) = open(l.port, "/live", &[]).await.unwrap();
     frame(&mut ws, 5).await;
+    // A precondition, not a wait for a result: the rate limit sends a frame as its own kind only
+    // after its slot, so the start event must come later than one slot after the snapshot.
     tokio::time::sleep(Duration::from_millis(300)).await;
     // The stream takes 400 ms, so the end is past the next free slot of the rate limit.
     let r = reqwest::get(l.url("/pi/fake/sse?chunks=2&delay_ms=200"))
@@ -196,8 +198,23 @@ async fn allowlist_per_kind() {
             .unwrap();
         r.bytes().await.unwrap();
     }
+    // Read frames until the parse reported all 3 calls; the cap of 6 seconds only ends the poll.
+    let calls = |seen: &[serde_json::Value]| -> i64 {
+        seen.iter()
+            .map(|f| match f["kind"].as_str() {
+                Some("call.stored") => 1,
+                Some("calls.batch") => f["data"]["calls"].as_i64().unwrap_or(0),
+                _ => 0,
+            })
+            .sum()
+    };
     let deadline = tokio::time::Instant::now() + Duration::from_secs(6);
-    while tokio::time::Instant::now() < deadline {
+    while calls(&seen) < 3 {
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "poll reached its cap: expected 3 calls in the frames, last observed {} in {seen:?}",
+            calls(&seen)
+        );
         if let Some(tokio_tungstenite::tungstenite::Message::Text(t)) = live::next(&mut ws, 1).await
         {
             seen.push(serde_json::from_str(&t).unwrap());
