@@ -3,7 +3,7 @@ date: 2026-10-21
 source: cr (CR-0015)
 surface: cli (loupe config show, loupe serve) and http (GET /private/api/providers, GET /private/api/config)
 outcome: reproduced
-runs: "scenario 1: 2 of 2 passed; scenario 2: 3 of 3 passed; scenario 3: 3 of 3 passed; scenario 4: 3 of 3 passed against the real API; scenario 5: 3 of 3 passed; last run 2026-10-21"
+runs: "scenario 1: 5 of 5 passed; scenario 2: 3 of 3 passed; scenario 3: 3 of 3 passed; scenario 4: 10 of 11 passed against the real API (one run gave unreachable after a fast restart, the next 5 runs with a 2 second pause gave ok); scenario 5: 3 of 3 passed; last run 2026-10-21"
 ---
 
 ## Scenario 1: detect the providers
@@ -66,6 +66,11 @@ The test `healthz_status_independent_of_providers` (`tests/healthz.rs`) runs the
 ### Result on 2026-10-21
 
 - 3 of 3 runs: `anthropic` `ok`, `openai` `not_configured`, the start line `providers detected` with `detected` `anthropic` and `summary_provider` `anthropic`, no token in the log.
+
+### Result at verification on 2026-10-21
+
+- 8 runs: 7 gave `anthropic` `ok`. One run, started directly after the shutdown of the run before it, gave `unreachable`. The 5 runs after it, with a pause of 2 seconds between the runs, gave `ok`. No run had the token in the log.
+- Scenario 1 ran 3 more times: 2 lines with `credential=api_key` and no test value each time.
 
 ## Scenario 5: the private configuration
 
