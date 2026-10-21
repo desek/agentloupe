@@ -329,3 +329,23 @@ path = "tests/migrations.rs"
 [[test]]
 name = "summary_cli"
 path = "tests/summary.cli.rs"
+
+[[test]]
+name = "serve_start"
+path = "tests/serve_start.rs"
+
+[[test]]
+name = "healthz"
+path = "tests/healthz.rs"
+
+[[test]]
+name = "config_show"
+path = "tests/config_show.rs"
+
+[[test]]
+name = "providers_route"
+path = "tests/providers_route.rs"
+
+[[test]]
+name = "private_config"
+path = "tests/private_config.rs"

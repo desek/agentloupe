@@ -64,10 +64,7 @@ pub fn days(session: &str, n: u32) -> Vec<String> {
 /// Runs `loupe backfill` over `root` in UTC; `mode` is the fake summary mode, None for no credential.
 pub fn backfill(data: &Path, root: &Path, fake: u16, mode: Option<&str>) -> std::process::Output {
     let url = format!("http://127.0.0.1:{fake}/summary/{}", mode.unwrap_or("none"));
-    let mut env = vec![
-        ("LOUPE_TZ", "UTC"),
-        ("ANTHROPIC_BASE_URL", url.as_str()),
-    ];
+    let mut env = vec![("LOUPE_TZ", "UTC"), ("ANTHROPIC_BASE_URL", url.as_str())];
     if mode.is_some() {
         env.push(("ANTHROPIC_API_KEY", "sk-test-Sd4Qr7"));
     }
