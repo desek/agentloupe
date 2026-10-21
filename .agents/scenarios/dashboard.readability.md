@@ -29,7 +29,9 @@ Each gap is at least 24 px. The cost label is "Cost (API-equivalent)*". The foot
 |---|---|---|---|
 | 2026-10-21 | 1440 px | passed | min gap 24 px; label `Cost (API-equivalent)*`; footnote "* Prices from LiteLLM, price file model_prices_and_context_window.json at commit cfee0ff. Source: github.com/BerriAI/litellm."; total `170 930 280`; 4 segments; Input 4.8%, Cache read 91.7%, Cache write 0.1%, Output 3.4%; lines `85 270` lines added, `28 780` lines removed |
 | 2026-10-21 | 360 px | passed | the same values; no horizontal scroll |
+| 2026-10-21 | 1440 px | passed | run 2 with agent-browser 0.27.1 and the release binary: the same values; min gap 24 px; link `https://github.com/BerriAI/litellm` with `rel="noopener noreferrer"` |
+| 2026-10-21 | 360 px | passed | run 2: the same values; min gap 24 px; no horizontal scroll |
 
-Outcome: the change is verified, 1 of 1 run at each width. The empty state of the tokens card (a range with zero tokens) has no run: the seed script cannot make days with zero tokens. The code path shows the empty state when the share module returns null, and `web/test/stats.shares.test.js` asserts that null.
+Outcome: the change is verified, 2 of 2 runs at each width. The empty state of the tokens card (a range with zero tokens) has no run: the seed script cannot make days with zero tokens. The code path shows the empty state when the share module returns null, and `web/test/stats.shares.test.js` asserts that null.
 
 Screenshots: `dashboard.readability.1440.png`, `dashboard.readability.360.png`.
