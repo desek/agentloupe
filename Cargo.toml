@@ -114,7 +114,6 @@ path = "tests/prices.vendor.rs"
 [[test]]
 name = "summary_scrub_corpus"
 path = "tests/summary.scrub_corpus.rs"
-harness = false
 
 [[test]]
 name = "summary_worker"
