@@ -60,7 +60,7 @@ The private page shows the usage, the cost, and the sessions per proxy token and
 
 `GET /private/api/v1/sessions` lists the sessions of one proxy token in the range.
 
-1. Each row has `agent_label`, `started_at`, `last_call_at`, `call_count`, `total_tokens`, `api_equivalent_cost_usd`, and the one-line session summary (`summaries.md`).
+1. Each row has `agent_label`, `started_at`, `last_call_at`, `call_count`, `total_tokens`, `api_equivalent_cost_usd`, and the session day summary of the session for the start day of the session in `LOUPE_TZ` (`summaries.md`). It is never the full session summary. Two rows of one session on one day show the same text.
 2. The route returns at most 200 rows.
 3. If more rows exist, the response has a `next` cursor. A request with that cursor returns the next rows.
 

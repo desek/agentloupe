@@ -36,7 +36,7 @@ The human answered on 2026-10-21 with a decision that changes the model (see Dec
 
 * `src/backfill/transcript.rs` filters the entries of a log session with `inside(e, after, until)`. `claude_messages` and `pi_messages` keep only the entries of the segment window. `segment` passes them to `crate::summary::transcript::build_messages`.
 * `src/summary/transcript.rs` applies the CR-0006 rules: no system prompt, no tool definitions, no `<system-reminder>` block, tool parts clipped to 300 characters, the 24000-character clip that keeps the first 6000 and the last 18000 characters.
-* `session_summaries` holds one line per segment (`docs/specification/summaries.md`, section on session summaries).
+* `session_summaries` holds one line per segment (`docs/specification/summaries.md`, section on session summaries). After Decision 5, the summary worker sends no line request and writes no new row; the existing rows stay.
 * `build_day_line(day)` in `src/summary/day.rs` reads the `done` session lines of the day and writes `day_summaries` (`docs/specification/summaries.md`, section "Day line"; `docs/specification/days.md` reads it).
 
 ### Current State Diagram
@@ -124,7 +124,7 @@ sequenceDiagram
 
 12. For each session and each day D that has a call of that session, loupe **MUST** write one session day summary that describes what the session did on day D.
 13. The request for a session day summary **MUST** hold the scrubbed full session summary of the same session and day as context, and the day transcript of day D. The day transcript of day D **MUST** hold only the entries whose time is on day D in `LOUPE_TZ`, and **MUST** be made under requirements 2 to 5: the conversation-first rule, the threshold of requirement 3 measured on the day transcript, and the 24000-character clip. A session day summary **MUST NOT** be requested before the full session summary of the same session and day has a final status.
-13a. For a proxied session, the stored request bodies have no time for each message. The day transcript of day D **MUST** hold the messages that the longest message history of the calls that started on day D adds beyond the longest message history of the calls that started before day D. If no call of the session started before day D, the day transcript **MUST** hold the whole longest history of the calls of day D.
+13a. For a proxied session, the stored request bodies have no time for each message. The day transcript of day D **MUST** hold the turns of the longest message history of the calls that started on day D that are not a leading part of the longest message history of the calls that started before day D, compared turn by turn by their transcript text. A day history that shares no leading turn with the earlier history (a new conversation under the same key, or a history after a compaction) **MUST** stay whole. If no call of the session started before day D, the day transcript **MUST** hold the whole longest history of the calls of day D.
 14. The rule text of the session day summary **MUST** follow CR-0006 requirement 14, with a paragraph of at most 4 sentences, and **MUST** live in the same rule source file.
 15. If the full session summary of the same session and day has the status `skipped`, `failed`, or `disabled`, the session day summary **MUST** get the same status with no model request.
 
@@ -138,6 +138,8 @@ sequenceDiagram
 21. A text with fewer than 2 words after the scrub **MUST** give the status `skipped`.
 22. The public API **MUST NOT** publish a full session summary or a session day summary. They are for reference and for a check of correctness.
 
+27c. The summary worker **MUST NOT** send a model request for the line of a segment, and **MUST NOT** write a new row of `session_summaries`. The existing rows stay (requirements 19 and 28). The worker **MUST** find new work from the two new tables or from the close time of the segment, not from `session_summaries`.
+
 **Day line**
 
 23. `build_day_line(day)` **MUST** read the `done` session day summaries of the day in place of the `done` session summaries, and **MUST** keep the statuses `empty`, `done`, `fallback`, and `not_ready` of CR-0006 requirements 32 to 36.
@@ -148,7 +150,7 @@ sequenceDiagram
 **Scope and re-summary**
 
 27. The model **MUST** apply to backfilled sessions and to proxied sessions, one model for every session.
-27a. The raw-body retention **MUST NOT** delete the bodies of an exchange until the session day summary of each day of the session of each of its calls has a final status. A final status is `done`, `skipped`, `failed`, or `disabled`. While a segment of the session stays open, the bodies of the session stay, with no time limit; Risk 4 accepts this hold. The other conditions of the retention stay in force.
+27a. The raw-body retention **MUST NOT** delete the bodies of an exchange until the session day summary of each day of the session of each of its calls has a final status. A final status is `done`, `skipped`, `failed`, or `disabled`. While a segment of the session stays open, the bodies of the session stay, with no time limit; Risk 4 accepts this hold. The retention **MUST NOT** need a `session_summaries` row, and the summary time of the retention **MUST** be the latest updated time of the session day summaries of the session. The other conditions of the retention stay in force.
 27b. The retention worker **MUST** log the count of the exchanges whose bodies it keeps under requirement 27a, as the counter `bodies_held`, on each run.
 28. A flag `loupe summarize --rebuild-days FROM..TO` **MUST** make or reset the rows of `session_full_summaries` and `session_day_summaries` for each day in the range to `pending`, and then **MUST** rebuild the day line of each day in the range. The flag **MUST NOT** change rows of `session_summaries` or rows outside the range.
 29. The flag `--rebuild-days` **MUST** support `--dry-run`, which prints the counter `summaries_reset` and changes nothing.
@@ -461,9 +463,10 @@ Then the request holds text from the day 1 segment
 
 ```gherkin
 Given a proxied session with calls on days 1 and 2
-  And the request bodies of day 2 repeat the history of day 1
+  And the request bodies of day 2 repeat the history of day 1 as their leading turns
 When the builder makes the session day summary of day 2
-Then the day transcript holds only the messages that the day 2 calls add
+Then the day transcript holds only the turns after that leading part
+And a day 2 history that shares no leading turn with day 1 stays whole
 ```
 
 ### AC-18: Retention waits for the session day summaries
@@ -555,6 +558,9 @@ Pending the reviewer agent.
 2. Decided by the human on 2026-10-21, in answer to the end-bound question of the first draft: a session is read in whole, conversation first and tool calls only if necessary; a session gets one full session summary and one session day summary per day that has data, and the full session summary of day D covers the session up to day D and gives the context of the session day summary; both texts are stored in the database for reference and correctness, apart from the published day line. The end-bound question is closed by this decision.
 3. Decided by the human on 2026-10-21, in answer to the former Open Question 1 (the origin of the sessions): the model applies to backfilled and proxied sessions, one model for every session. The proxied transcript uses the whole session history from the stored request bodies, so the raw-body retention waits until the session day summary of each day of the session has a final status. Requirements 8a, 8b, 27, and 27a state this.
 4. Decided by the human on 2026-10-21, in answer to the former Open Question 1 (the re-summary of earlier rows): option (a), the flag `loupe summarize --rebuild-days FROM..TO` with `--dry-run` and the counter `summaries_reset`. Options (b), a one-time migration, and (c), no rebuild, are rejected. Requirements 28 to 30 state this.
+
+5. Decided by the oracle on 2026-10-21 (Decision 1 of the oracle consultation): the summary worker sends no per-segment line request and writes no new `session_summaries` row, the table and its rows stay, and the private session list of CR-0011 requirement 16 shows the session day summary of the start day of the session; the line requests cost about 278 of 793 requests on the two-day window and no reader needs a new line. Two segments of one session on one day show the same text, a known property. The request-count target does not change, and the count is re-measured after the code change.
+6. Decided by the oracle on 2026-10-21 (Decision 2 of the oracle consultation): the common-prefix cut of the proxied day transcript is the correct reading of requirement 13a, because only a turn-by-turn comparison keeps a new conversation or a compacted history whole; the CR and the specification change, not the code.
 
 ## Open Questions
 

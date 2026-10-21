@@ -1,27 +1,25 @@
 <!-- @agents-index Specification of session summaries, the day line, the scrubber, the summary client, and raw-body retention. -->
 # Summaries
 
-A session summary is one scrubbed line for each closed segment. A full session summary is one scrubbed paragraph that describes one session from its first entry up to the end of one day. A session day summary is one scrubbed paragraph that describes what one session did on one day. A day line is one scrubbed paragraph for each day, built from the session day summaries of that day. The raw-body retention deletes the encrypted bodies of an exchange after the parse and the summary.
+A session summary is one scrubbed line for a closed segment; the worker writes no new one. A full session summary is one scrubbed paragraph that describes one session from its first entry up to the end of one day. A session day summary is one scrubbed paragraph that describes what one session did on one day. A day line is one scrubbed paragraph for each day, built from the session day summaries of that day. The raw-body retention deletes the encrypted bodies of an exchange after the parse and the summary.
 
 ## Summary worker
 
-`loupe serve` starts one summary worker. The worker wakes every `LOUPE_SUMMARY_INTERVAL_SECS` seconds (default `30`). It reads the closed segments in batches of at most 20, oldest `closed_at` first. It reads a segment that has no summary row. It also reads a segment with a `pending` row when the time of the next attempt is null or in the past. It does not read a segment with a final status.
+`loupe serve` starts one summary worker. The worker wakes every `LOUPE_SUMMARY_INTERVAL_SECS` seconds (default `30`). It finds new work from the rows of `session_full_summaries` and `session_day_summaries` and from the close time of the segments. It reads a row in `pending` when the time of the next attempt is null or in the past. It does not read a row with a final status.
 
-The table `session_summaries` holds one row for each segment. The row holds the segment id (unique), the status, the line, the model, the attempt count, the kind of the last error, the time of the next attempt, the created time, and the updated time. The line is null unless the status is `done`.
+The worker sends no model request for the line of a segment and writes no new row of `session_summaries`. The table `session_summaries` and its existing rows stay. A row holds the segment id (unique), the status, the line, the model, the attempt count, the kind of the last error, the time of the next attempt, the created time, and the updated time. No reader shows a row.
 
 | Status | Meaning |
 |---|---|
 | `pending` | The worker tries again at the time of the next attempt. |
-| `done` | The row holds a scrubbed line. |
-| `skipped` | The transcript was empty, or the scrubbed line had fewer than 2 words. |
+| `done` | The row holds a scrubbed text. |
+| `skipped` | The transcript was empty, or the scrubbed text had fewer than 2 words. |
 | `failed` | A non-retryable failure occurred, or the attempt count reached the limit. |
-| `disabled` | No credential was set when the worker read the segment. |
+| `disabled` | No credential was set when the worker read the row. |
 
-The statuses `done`, `skipped`, `failed`, and `disabled` are final. The worker is idempotent: a segment with a final status never gets a second model request from the worker.
+The statuses `done`, `skipped`, `failed`, and `disabled` are final. The worker is idempotent: a row with a final status never gets a second model request from the worker.
 
-The day of a session line is the date of the start of the segment in `LOUPE_TZ`.
-
-A log line of the summary worker holds only the segment id, the status, the attempt count, the kind of error, and the duration. It never holds a transcript, a body, a line, a credential, or a hash. The worker keeps at most one decrypted request body in memory for each segment. It drops the plain bytes after it builds the transcript.
+A log line of the summary worker holds only the session key or the segment id, the day, the status, the attempt count, the kind of error, and the duration. It never holds a transcript, a body, a text, a credential, or a hash. The worker keeps at most one decrypted request body in memory at a time. It drops the plain bytes after it reads the history.
 
 ## Transcript
 
@@ -45,7 +43,7 @@ For Claude Code, a subagent file gives the transcript of its own session. The tr
 
 For a proxied session, the source is the stored request bodies of the exchanges of every segment of the session that made a call, from the first segment up to the last call whose start time is on or before the end of day D. The builder takes the longest message history of those bodies: the most entries in `messages`, or in `input` for the OpenAI Responses format. A tie goes to the latest exchange. The builder decrypts one body at a time and drops the plain bytes after it reads the history.
 
-A request body has no time for each message. Thus the day transcript of day D holds the messages that the longest history of the calls that started on day D adds beyond the longest history of the calls that started before day D. If no call of the session started before day D, the day transcript holds the whole longest history of the calls of day D.
+A request body has no time for each message. Thus the day transcript of day D holds the turns of the longest history of the calls that started on day D that are not a leading part of the longest history of the calls that started before day D. The builder compares the turns one by one by their transcript text. A day history that shares no leading turn with the earlier history stays whole, for example a new conversation under the same key or a history after a compaction. If no call of the session started before day D, the day transcript holds the whole longest history of the calls of day D.
 
 If a body that the builder needs is already deleted, the builder uses the bodies that remain. It logs the error kind `bodies_missing` with the session key and the day only.
 
@@ -219,13 +217,12 @@ This product area publishes nothing. It does not publish the day line, does not 
 `loupe serve` starts one retention worker. The worker wakes every 10 minutes. It sets the request body and the response body of an exchange to null, and sets `exchanges.bodies_deleted_at`, when all these conditions are true:
 
 1. The exchange has a parse outcome.
-2. The exchange has no call, or the segment of each of its calls has a summary row in a final status.
-3. The exchange has no call, or the session day summary of each day of the session of each of its calls has a final status: `done`, `skipped`, `failed`, or `disabled`.
-4. The later of the parse time (`exchanges.parsed_at`) and the summary time is more than `LOUPE_RAW_RETENTION_HOURS` hours ago (default `168`).
+2. The exchange has no call, or the session day summary of each day of the session of each of its calls has a final status: `done`, `skipped`, `failed`, or `disabled`.
+3. The later of the parse time (`exchanges.parsed_at`) and the summary time is more than `LOUPE_RAW_RETENTION_HOURS` hours ago (default `168`). The summary time is the latest `updated_at` of the session day summaries of the session.
 
 While a segment of the session stays open, the bodies of the session stay, with no time limit. The proxied transcript needs the whole history of the session.
 
-On each run, the worker logs the count of the exchanges whose bodies it keeps under condition 3, as the counter `bodies_held`.
+On each run, the worker logs the count of the exchanges whose bodies it keeps under condition 2, as the counter `bodies_held`.
 
 An exchange with the parse outcome `decrypt_failed` stays until the operator acts.
 
