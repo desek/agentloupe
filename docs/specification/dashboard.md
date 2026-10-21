@@ -151,21 +151,38 @@ The totals row shows only sums for the range. The page shows no streak, no count
 
 ### Lines changed in the range
 
-1. The sum of `lines_added`, the sum of `lines_removed`, and the net value (added minus removed).
-2. A change of range changes these figures.
+1. Two figures, each with a visible label: "lines added" (the sum of `lines_added`) and "lines removed" (the sum of `lines_removed`). The card shows no net value.
+2. Reason for "lines added": it shows how much new code the agent work put into the repositories in the range.
+3. Reason for "lines removed": it shows how much code the agent work deleted or replaced in the range. A reader compares it with the added figure to see the balance of growth and clean-up.
+4. The net value is not on the card. A reader cannot act on the net value alone, and the two labelled figures already show it.
+5. The added figure uses `--color-positive`. The removed figure uses `--color-output`. A negative number uses the minus sign U+2212.
+6. A change of range changes these figures.
 
 ### Tokens per day
 
 1. One line chart for `input_total` and one line chart for `output`. Each chart has its own vertical scale.
 2. The sum of `input_total` and the sum of `output`.
 
+### Tokens in the range
+
+1. A card in the totals row with the label "Tokens in the range".
+2. The figure is the total of the range, the sum of `input_total + output`, in the integer format of the totals.
+3. The card shows four kinds: input, cache read, cache write, and output. Each kind has a label, its count in the short form, and its share of the total as a percentage with one decimal.
+4. The four counts sum to the total. The printed percentages are rounded, so their sum can be from 99.8 to 100.2.
+5. The card shows the shares as one stacked horizontal bar in inline SVG. Each segment has a width in proportion to the raw count, so the segments together fill the full width of the bar. The segments use the colors `--color-input`, `--color-cache-read`, `--color-cache-write`, and `--color-output`.
+6. A kind with a count of zero shows `0.0%` and has no segment.
+7. When the total of the range is zero, the card shows the empty state and no bar.
+8. The bar has a text alternative that states each kind and its percentage.
+
 ### Cost (API-equivalent)
 
-1. A card in the totals row with the label "Cost (API-equivalent)".
+1. A card in the totals row with the label "Cost (API-equivalent)*". The asterisk refers to the footnote of item 6.
 2. The sum of `cost_usd` in US dollars with two decimals.
 3. The text "List price of the tokens, not money paid."
 4. When the sum of `unpriced_calls` is more than zero, the text "<n> calls not priced", where `<n>` is that sum.
 5. A daily line chart of `cost_usd`, in the style of the token charts.
+6. A footnote line that starts with an asterisk. It names LiteLLM and its price file `model_prices_and_context_window.json` as the source of the prices. It links to `https://github.com/BerriAI/litellm` with a plain link that has `rel="noopener noreferrer"`. The page loads no remote script, style, or font for the footnote.
+7. The footnote names the short form of the price commit. The binary reads the commit from `vendor/litellm/SOURCE.md` at build time and puts it into the page when the server starts. The page code holds no literal commit, so a refresh of the prices also changes the footnote.
 
 ### Subscription cost
 
@@ -219,7 +236,8 @@ When the request fails or returns a status other than `200`, the page shows "Dat
 1. In the totals, an integer has a thin space (U+2009) as the group mark, for example `12 345`.
 2. In chart labels and in the headline, a number uses the short form with one decimal: `k` for thousands and `M` for millions, for example `1.3M`.
 3. A US dollar amount has two decimals.
-4. The formats do not depend on the locale of the browser.
+4. A share is a percentage with one decimal and the sign `%`, for example `42.5%`.
+5. The formats do not depend on the locale of the browser.
 
 ## Fonts
 
@@ -233,7 +251,7 @@ When the request fails or returns a status other than `200`, the page shows "Dat
 
 ## Design tokens
 
-`web/assets/css/tokens.css` holds the design values as CSS custom properties. The page has one color scheme, dark. It has no light theme and no theme switch. Text has a contrast of at least 4.5 to 1 on its background. The page works at a width of 360 px with no horizontal scroll, and at 1440 px.
+`web/assets/css/tokens.css` holds the design values as CSS custom properties. The page has one color scheme, dark. It has no light theme and no theme switch. Text has a contrast of at least 4.5 to 1 on its background. The page works at a width of 360 px with no horizontal scroll, and at 1440 px. The gap between two cards and between two rows uses `--space-card-gap`, at least 24 px, so no two cards touch or share a border at 360 px and at 1440 px.
 
 | Token | Value | Use |
 |---|---|---|
@@ -249,6 +267,8 @@ When the request fails or returns a status other than `200`, the page shows "Dat
 | `--color-input` | `#5E86E0` | input tokens series, opened pull requests |
 | `--color-output` | `#BB7F35` | output tokens series, lines removed |
 | `--color-positive` | `#3FA864` | merged pull requests, lines added |
+| `--color-cache-read` | `#8C6BC8` | cache read segment of the token share bar |
+| `--color-cache-write` | `#4FA3A5` | cache write segment of the token share bar |
 | `--color-highlight` | `#D9C27A` | tag background |
 | `--color-link` | `#9DB6EE` | link |
 | `--color-link-hover` | `#C9D7F6` | link on hover |
@@ -259,6 +279,7 @@ When the request fails or returns a status other than `200`, the page shows "Dat
 | `--heat-4` | `#4FCB74` | heatmap level 4 |
 | `--font-sans` | `'Geist', system-ui, sans-serif` | text |
 | `--font-mono` | `'Geist Mono', ui-monospace, monospace` | figures, labels |
+| `--space-card-gap` | `24px` | gap between two cards in a row and between two rows, at each width |
 | `--size-headline` | `72px` | headline figure, at least two times `--size-figure` |
 | `--size-figure` | `34px` | totals figures (the largest figure size of the mockup) |
 | `--size-figure-small` | `30px` | figures of a card pair |
