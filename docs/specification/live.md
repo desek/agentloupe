@@ -43,6 +43,8 @@ The binary holds one live hub. The hub is one bounded broadcast channel with a c
 3. The parser sends `call.stored` after it stores a call.
 4. After each parse pass, the parser counts the open segments. It sends `segments.open` when the count changed since the last pass.
 
+Only the parser worker inside `loupe serve` sends `call.stored`. A `loupe parse --once` or a `loupe backfill` run in a second process stores calls that live clients see in the next snapshot, not as events.
+
 ## Event allowlist
 
 Each live event holds only the fields of the column for its route. The five token counts are `input`, `output`, `cache_read`, `cache_write`, and `reasoning`. `status` is the HTTP status. `cost_usd` is the API-equivalent cost of `cost.md`, or `null` if no price is known.

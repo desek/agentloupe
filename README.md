@@ -168,7 +168,7 @@ it shows is public.
 The headline is the token velocity: the input and output tokens of the range divided by the
 days of the range, in tokens per day. The ranges are 3M (the last 91 days), 6M (the last 182
 days), and 1Y (the last 365 days), each ending on the newest day of the API. The URL fragment
-keeps the range, for example `#range=6M`. The live section updates while calls occur. When the
+keeps the range, for example `#range=6M`. The live section updates while calls occur. Calls that `loupe parse --once` or `loupe backfill` store from a second process appear at the next page load, not as live events. When the
 socket closes it shows "Live feed paused, reconnecting" and connects again; `LOUPE_LIVE_ENABLED=false`
 removes the route, and the page then hides the section. The subscription cost card shows the subscription
 cost of the range next to the API-equivalent cost. The page shows only sums for the range. It
