@@ -224,7 +224,10 @@ fn missing_account_key_fails() {
     .unwrap();
     assert!(!o.status.success());
     let e = stderr(&o);
-    assert!(e.contains("LOUPE_ACCOUNT_KEY") && e.contains("fix 1"), "{e}");
+    assert!(
+        e.contains("LOUPE_ACCOUNT_KEY") && e.contains("fix 1"),
+        "{e}"
+    );
 }
 
 #[test]
