@@ -2,8 +2,8 @@
 date: 2026-10-21
 source: cr (CR-0010)
 surface: cli, http, and browser, with the real agents and the real Anthropic API
-outcome: pending
-runs: "0 of 0, no run yet"
+outcome: passed
+runs: "3 of 3 passed (3 attempts), last run 2026-10-21"
 ---
 
 ## Scenario: the work of Claude Code and Pi of today is on the dashboard
@@ -45,3 +45,16 @@ The human sees the work of today of Claude Code and Pi on the dashboard, after o
 
 ### Run log
 
+A first attempt on 2026-10-21 stopped at step 5: `pi -p` waited for stdin, and the extension route gave no model list. That was a defect of the run steps, not of the product, so the steps changed before the counted runs: each agent command gets `</dev/null`. The model check of step 5 runs with `ANTHROPIC_OAUTH_TOKEN=placeholder pi --no-extensions --list-models claude-haiku-5-5`, because Pi lists a model only when a credential variable exists, and the extension gives the credential only at session start. The placeholder sends no request. The route is the built-in model of Pi: the output lists `claude-haiku-5-5` under `anthropic`, so the fallback `models` entry was not necessary.
+
+Versions: Claude Code 2.1.306, Pi 1.3.0. The Pi credential came from the extension pi-cc-auth.
+
+| Run | Steps 2 and 3 | claude -p | pi -p | by_agent calls | cost_usd | unpriced | PR fields | summary sentences | seconds to record | browser | leaks | checksums |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 60, healthy, ok; list without a value | exit 0, ok | exit 0, ok | claude-code 1, pi 1 | 0.0006 | 0 | null | 5 | 74 | title AI agent activity, row 21 Oct 2026 with 57 754 tokens, footer names Claude Code and Pi, no Agentloupe, GitHub not connected | 0 | same |
+| 2 | same | exit 0, ok | exit 0, ok | claude-code 1, pi 1 | 0.0006 | 0 | null | 5 | 73 | same checks passed | 0 | same |
+| 3 | same | exit 0, ok | exit 0, ok | claude-code 1, pi 1 | 0.0006 | 0 | null | 5 | 73 | same checks passed | 0 | same |
+
+Result: 3 of 3 runs passed. Evidence: `acceptance.macos.end-to-end.run1.log`, `.run2.log`, `.run3.log` (command output, tokens masked), `acceptance.macos.end-to-end.dashboard.png` (run 3), and `acceptance.macos.end-to-end.day.json` (`/v1/days/2026-10-21` of run 3). The secret leak grep over these files and over `docker compose logs` of each run counted 0. Each run used a new volume of the project `loupe-acceptance`, removed with `docker compose -p loupe-acceptance down -v`.
+
+Observation: the daily log row shows `0 PRs` while the four PR fields are null. The success condition does not grade it.

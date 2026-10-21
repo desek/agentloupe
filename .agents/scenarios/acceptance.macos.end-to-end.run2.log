@@ -1,0 +1,34 @@
+run: 2 date: 2026-10-21 claude: 2.1.306 (Claude Code) pi: 1.3.0
+step2 idle: 60 health: healthy healthz: {"status":"ok"}
+step3 list: {"name":"acceptance","tags":{},"created_at":"2026-10-21T04:52:25.929Z","last_used_at":null,"revoked_at":null,"status":"active"}
+step4 claude exit: 0 answer: ok
+step5 list-models: provider   model                      context  max-out  thinking  images anthropic  claude-haiku-4-5-20251001  200K     64K      yes       yes    anthropic  claude-haiku-5-5           1M       128K     yes       yes    
+step5 pi exit: 0 answer: ok
+exchanges_read: 0
+calls_added: 0
+sessions_opened: 0
+sessions_closed: 0
+{"fields":{"attempts":1,"duration_ms":854,"error_kind":"","session_id":1,"status":"done"},"file":"src/summary/worker.rs:126","level":"INFO","message":"session summary","time":"2026-10-21T04:53:43.185Z"}
+{"fields":{"attempts":1,"duration_ms":794,"error_kind":"","session_id":2,"status":"done"},"file":"src/summary/worker.rs:126","level":"INFO","message":"session summary","time":"2026-10-21T04:53:43.979Z"}
+segments_read: 2
+done: 2
+skipped: 0
+failed: 0
+disabled: 0
+retry_later: 0
+bodies_deleted: 0
+bodies_kept_decrypt_failed: 0
+{"fields":{"day":"2026-10-21","session_lines":2,"status":"done"},"file":"src/summary/day.rs:151","level":"INFO","message":"day line built","time":"2026-10-21T04:53:45.324Z"}
+day: 2026-10-21
+calls: 2
+sessions: 2
+cost_usd: 0.0006
+unpriced_calls: 0
+summary: present
+revision: 1
+written: true
+{"fields":{"calls":2,"day":"2026-10-21","reason":"aggregate","revision":1,"sessions":2,"unpriced_calls":0},"file":"src/cli/aggregate.rs:35","level":"INFO","message":"day aggregated","time":"2026-10-21T04:53:45.325Z"}
+step6 seconds_to_record: 73
+step9 checksums: same
+step7 title: AI agent activity checks: "{\"agentloupe\":false,\"gh\":true,\"footer\":true,\"row\":true}"
+step8 container_log_leaks: 0
