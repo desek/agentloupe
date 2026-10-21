@@ -4,16 +4,18 @@ use super::batch::Pending;
 use super::event::{Event, heartbeat};
 use super::hub::Hub;
 use super::route::Slot;
+use crate::clock::Clock;
 use axum::extract::ws::{CloseFrame, Message, WebSocket};
 use futures_util::{SinkExt, StreamExt};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::broadcast::{Receiver, error::RecvError};
-use tokio::time::{Instant, sleep_until, timeout};
+use tokio::time::timeout;
 
 /// The idle time after which the route sends a heartbeat.
 pub const HEARTBEAT: Duration = Duration::from_secs(15);
 /// The longest time that one write may take before the client is closed.
-const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
+pub const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
 /// The largest client data frame that the route discards without a close.
 const MAX_CLIENT_FRAME: usize = 1024;
 /// Close codes: policy violation for a slow client, message too big for a large client frame.
@@ -32,25 +34,27 @@ enum End {
     Close(u16, &'static str),
 }
 
-/// Runs until the client goes or the route closes it. `first` is the snapshot frame.
+/// Runs until the client goes or the route closes it. `first` is the snapshot frame. Every
+/// timer of the loop reads `clock`, so a test with a set clock asserts it without a wait.
 pub async fn run(
     socket: WebSocket,
     mut rx: Receiver<Event>,
     first: String,
     hub: Hub,
     rate: u32,
+    clock: Arc<dyn Clock>,
     _slot: Slot,
 ) {
     let (mut sink, mut stream) = socket.split();
     let gap = Duration::from_secs(1) / rate.max(1);
     let send = async |sink: &mut futures_util::stream::SplitSink<WebSocket, Message>,
                       text: String| {
-        matches!(
-            timeout(WRITE_TIMEOUT, sink.send(Message::Text(text.into()))).await,
-            Ok(Ok(()))
-        )
+        tokio::select! {
+            r = sink.send(Message::Text(text.into())) => r.is_ok(),
+            _ = clock.sleep_until(clock.now() + WRITE_TIMEOUT) => false,
+        }
     };
-    let mut last = Instant::now();
+    let mut last = clock.now();
     let mut next_slot = last + gap;
     let mut pending = Pending::default();
     let end = if !send(&mut sink, first).await {
@@ -65,7 +69,7 @@ pub async fn run(
             let frame = tokio::select! {
                 r = rx.recv() => match r {
                     Ok(e) => {
-                        let now = Instant::now();
+                        let now = clock.now();
                         if pending.is_empty() && now >= next_slot {
                             Some(e.frame())
                         } else {
@@ -84,14 +88,14 @@ pub async fn run(
                     // Pings get their pong from the socket layer; small data frames are discarded.
                     Some(Ok(_)) => None,
                 },
-                _ = sleep_until(flush_at), if !pending.is_empty() => pending.take(now_ms(), hub.in_flight()),
-                _ = sleep_until(last + HEARTBEAT) => Some(heartbeat(now_ms())),
+                _ = clock.sleep_until(flush_at), if !pending.is_empty() => pending.take(now_ms(), hub.in_flight()),
+                _ = clock.sleep_until(last + HEARTBEAT) => Some(heartbeat(now_ms())),
             };
             if let Some(f) = frame {
                 if !send(&mut sink, f).await {
                     break End::Close(POLICY, "write timeout");
                 }
-                last = Instant::now();
+                last = clock.now();
                 next_slot = last + gap;
             }
         }

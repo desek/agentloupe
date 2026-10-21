@@ -5,6 +5,7 @@ pub mod api;
 pub mod backfill;
 pub mod capture;
 pub mod cli;
+pub mod clock;
 pub mod config;
 pub mod day;
 pub mod github;

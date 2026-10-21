@@ -3,9 +3,10 @@
 #[path = "common/live.rs"]
 mod live;
 
+use agent_loupe::live::client::HEARTBEAT;
 use agent_loupe::live::event::Tokens;
 use agent_loupe::live::hub::Hub;
-use live::{config, frame, open, serve};
+use live::{config, frame, open, serve, serve_on};
 use std::time::{Duration, Instant};
 use tokio_tungstenite::tungstenite::Message;
 
@@ -57,15 +58,26 @@ async fn coalesces_above_rate() {
     println!("frames: {}", at.len());
 }
 
-// The real clock: a paused clock advances past the frame while the socket write is still pending.
+// A set clock: the heartbeat comes when the clock reaches 15 seconds of idle time, not before.
 #[tokio::test(flavor = "multi_thread")]
 async fn heartbeat_when_idle() {
-    let (port, _d) = serve(Hub::new(64), config(10, 64)).await;
+    let clock = agent_loupe::clock::Set::new();
+    let (port, _d) = serve_on(Hub::new(64), config(10, 64), clock.clone()).await;
     let (mut ws, _) = open(port, "/live", &[]).await.unwrap();
     frame(&mut ws, 5).await;
-    let t0 = tokio::time::Instant::now();
-    let f = frame(&mut ws, 20).await;
+    clock.advance(HEARTBEAT - Duration::from_millis(1));
+    // A cap on the read of a frame that must not come; the clock, not this cap, decides the heartbeat.
+    let early = tokio::time::timeout(
+        Duration::from_millis(300),
+        futures_util::StreamExt::next(&mut ws),
+    )
+    .await;
+    assert!(
+        early.is_err(),
+        "a frame came before the idle time of the heartbeat"
+    );
+    clock.advance(Duration::from_millis(1));
+    let f = frame(&mut ws, 5).await;
     assert_eq!(f["kind"], "heartbeat");
     assert_eq!(live::keys(&f), ["ts"]);
-    assert!(t0.elapsed() >= Duration::from_millis(14_500));
 }

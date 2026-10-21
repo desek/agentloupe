@@ -107,10 +107,19 @@ pub fn config(rate: u32, buffer: usize) -> LiveConfig {
 
 /// Serves only the live route on a free port in this runtime, over a migrated empty store.
 pub async fn serve(hub: Hub, cfg: LiveConfig) -> (u16, tempfile::TempDir) {
+    serve_on(hub, cfg, agent_loupe::clock::system()).await
+}
+
+/// Like serve, with the timers of each client on `clock`.
+pub async fn serve_on(
+    hub: Hub,
+    cfg: LiveConfig,
+    clock: std::sync::Arc<dyn agent_loupe::clock::Clock>,
+) -> (u16, tempfile::TempDir) {
     let dir = tempfile::tempdir().unwrap();
     let mut c = agent_loupe::store::open::open(dir.path()).unwrap();
     agent_loupe::store::migrate::migrate(&mut c).unwrap();
-    let state = LiveState::new(hub, cfg, chrono_tz::UTC, c);
+    let state = LiveState::with_clock(hub, cfg, chrono_tz::UTC, c, clock);
     let app = axum::Router::new().fallback(move |req| {
         let s = state.clone();
         async move { handle(s, req).await }

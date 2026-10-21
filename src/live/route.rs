@@ -22,16 +22,31 @@ pub struct LiveState {
     /// Reads the calls and the sessions for the snapshot only.
     conn: Mutex<Connection>,
     connections: AtomicUsize,
+    /// Drives the heartbeat and the write timeout of each client.
+    clock: Arc<dyn crate::clock::Clock>,
 }
 
 impl LiveState {
+    /// The state of the binary, on the system clock.
     pub fn new(hub: Hub, cfg: LiveConfig, tz: chrono_tz::Tz, conn: Connection) -> Arc<LiveState> {
+        Self::with_clock(hub, cfg, tz, conn, crate::clock::system())
+    }
+
+    /// The state on `clock`, so a test can assert the heartbeat without a wait.
+    pub fn with_clock(
+        hub: Hub,
+        cfg: LiveConfig,
+        tz: chrono_tz::Tz,
+        conn: Connection,
+        clock: Arc<dyn crate::clock::Clock>,
+    ) -> Arc<LiveState> {
         Arc::new(LiveState {
             hub,
             cfg,
             tz,
             conn: Mutex::new(conn),
             connections: AtomicUsize::new(0),
+            clock,
         })
     }
 }
@@ -119,8 +134,10 @@ pub async fn handle(state: Arc<LiveState>, req: Request<Body>) -> Response {
             );
         }
     };
-    let (hub, rate) = (state.hub.clone(), state.cfg.max_rate);
+    let (hub, rate, clock) = (state.hub.clone(), state.cfg.max_rate, state.clock.clone());
     ws.max_message_size(READ_LIMIT)
         .max_frame_size(READ_LIMIT)
-        .on_upgrade(move |socket| super::client::run(socket, rx, snap.frame(), hub, rate, slot))
+        .on_upgrade(move |socket| {
+            super::client::run(socket, rx, snap.frame(), hub, rate, clock, slot)
+        })
 }

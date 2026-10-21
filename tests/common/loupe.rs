@@ -88,10 +88,24 @@ pub fn summarize(
     c.output().unwrap()
 }
 
-/// Runs `loupe parse --once` with `LOUPE_IDLE_SECS=1`, waits past the idle time, and parses again,
-/// so every segment of the sent calls is closed.
+/// The number of sessions in `data` that are still open; 0 when the table is missing.
+fn open_sessions(data: &std::path::Path) -> i64 {
+    rusqlite::Connection::open(data.join("loupe.db"))
+        .and_then(|c| {
+            c.query_row(
+                "SELECT count(*) FROM sessions WHERE state = 'open'",
+                [],
+                |r| r.get(0),
+            )
+        })
+        .unwrap_or(0)
+}
+
+/// Runs `loupe parse --once` with `LOUPE_IDLE_SECS=1` until no session is open, so every
+/// segment of the sent calls is closed. Polls every 100 ms with a cap of 2.4 seconds, the
+/// fixed wait that it replaces; at the cap it fails with the expected and the last state.
 pub fn parse_and_close(data: &std::path::Path) {
-    for _ in 0..2 {
+    let parse_once = || {
         let out = parse_command(data, &["--once"])
             .env("LOUPE_IDLE_SECS", "1")
             .output()
@@ -101,7 +115,30 @@ pub fn parse_and_close(data: &std::path::Path) {
             "{}",
             String::from_utf8_lossy(&out.stderr)
         );
-        std::thread::sleep(Duration::from_millis(1200));
+    };
+    parse_once();
+    poll(Duration::from_millis(2400), "0 open sessions", || {
+        parse_once();
+        let open = open_sessions(data);
+        (open == 0)
+            .then_some(())
+            .ok_or(format!("{open} open sessions"))
+    });
+}
+
+/// Calls `check` every 100 ms until it returns `Ok`, and returns that value. At `cap` it panics
+/// with `expected` and the last state that `check` returned; the cap only ends the poll.
+pub fn poll<T>(cap: Duration, expected: &str, mut check: impl FnMut() -> Result<T, String>) -> T {
+    let deadline = Instant::now() + cap;
+    loop {
+        let last = match check() {
+            Ok(v) => return v,
+            Err(last) => last,
+        };
+        if Instant::now() >= deadline {
+            panic!("poll reached its cap of {cap:?}: expected {expected}, last observed {last}");
+        }
+        std::thread::sleep(Duration::from_millis(100));
     }
 }
 
