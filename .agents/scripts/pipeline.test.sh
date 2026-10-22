@@ -8,7 +8,8 @@
 #
 # Output (stdout, key: value): stage, status (passed or failed), seconds, toolchain, log.
 # The Rust version comes from rust-toolchain.toml and the minimum cargo-nextest version from the
-# cargo-nextest line of .tool-versions; this script states no version. There is no fallback to cargo test,
+# line of .tool-versions whose tool name ends in cargo-nextest (the mise registry name is
+# aqua:nextest-rs/nextest/cargo-nextest, so mise can install it); this script states no version. There is no fallback to cargo test,
 # so the measured loop stays one runner. Doc tests run with cargo test --doc only if src has a doc code block,
 # because nextest does not run doc tests.
 # Full tool output goes to .agents/logs/pipeline.test.log.
@@ -47,14 +48,14 @@ if ! command -v cargo >/dev/null; then
   echo "error: cargo is not installed, so the test stage cannot run. Fix: install it with rustup. Reference: docs/specification/operations.md, section Pipeline. Verify: re-run and see 'status: passed'." >&2
   exit 3
 fi
-pin="$(awk '$1 == "cargo-nextest" {print $2}' "$ROOT/.tool-versions" 2>/dev/null || true)"
+pin="$(awk '$1 ~ /(^|[:\/])cargo-nextest$/ {print $2}' "$ROOT/.tool-versions" 2>/dev/null || true)"
 if [[ -z "$pin" ]]; then
-  echo "error: .tool-versions has no cargo-nextest line, so the test stage has no runner pin. Fix: add the line 'cargo-nextest <version>' to .tool-versions. Reference: docs/specification/operations.md, section Test runner. Verify: pipeline.test.sh --toolchain prints a cargo-nextest line." >&2
+  echo "error: .tool-versions has no cargo-nextest line, so the test stage has no runner pin. Fix: add the line 'aqua:nextest-rs/nextest/cargo-nextest <version>' to .tool-versions (the mise registry name; a bare 'cargo-nextest' makes mise fail at start). Reference: docs/specification/operations.md, section Test runner. Verify: pipeline.test.sh --toolchain prints a cargo-nextest line." >&2
   exit 3
 fi
 have="$(cd "$ROOT" && cargo nextest --version 2>/dev/null | awk 'NR==1 {print $2}' || true)"
 if [[ -z "$have" || "$(printf '%s\n%s\n' "$pin" "$have" | sort -V | head -n 1)" != "$pin" ]]; then
-  echo "error: cargo-nextest is ${have:-missing}, but .tool-versions pins at least cargo-nextest $pin, so the test stage cannot run. Fix 1: run 'cargo install cargo-nextest --locked --version $pin'. Fix 2: run 'mise use cargo:cargo-nextest@$pin' in the repository. Pin file: .tool-versions. Reference: docs/specification/operations.md, section Test runner. Verify: 'cargo nextest --version' prints $pin or later, then pipeline.test.sh prints 'status: passed'." >&2
+  echo "error: cargo-nextest is ${have:-missing}, but .tool-versions pins at least cargo-nextest $pin, so the test stage cannot run. Fix 1: run 'cargo install cargo-nextest --locked --version $pin'. Fix 2: run 'mise install' in the repository, so mise installs the pinned aqua:nextest-rs/nextest/cargo-nextest. Pin file: .tool-versions. Reference: docs/specification/operations.md, section Test runner. Verify: 'cargo nextest --version' prints $pin or later, then pipeline.test.sh prints 'status: passed'." >&2
   exit 3
 fi
 
