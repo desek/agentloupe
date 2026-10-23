@@ -2,7 +2,7 @@
 name: "CR-0020 Light mode"
 description: "The dashboard gets a light color scheme from design tokens. The system preference selects the scheme, and a three-state control in the header (System, Light, Dark) overrides it. The browser keeps the override in localStorage. The page paints the correct scheme from the first frame, and text and chart colors meet the contrast thresholds on the light surface."
 id: "CR-0020"
-status: "proposed"
+status: "approved"
 date: 2026-10-23
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
@@ -35,13 +35,13 @@ The owner gave this one requirement. The functional requirements below make it t
 * `web/assets/css/tokens.css` declares `color-scheme: dark` and the color tokens on `:root`, with one value for each token.
 * `web/assets/css/page.css` and `web/assets/css/live.css` use only `var(--…)` for colors. They hold no color literal.
 * `web/assets/js/live.chart.js` sets the SVG `stroke` and `fill` attributes to `var(--color-rule)` and `var(--color-input)`. Thus the live chart also follows the tokens.
-* `web/index.html` loads three stylesheets and one module script, `app.js`. The header holds the title, the update time, and the range group with three buttons that use `aria-pressed`.
-* `web/assets/js/section.header.js` sets the update time and the pressed state of the range buttons.
+* `web/index.html` loads three stylesheets and one module script, `app.js`. The header is one row (CR-0021): the brand at the left, an inline SVG mark and the wordmark `h1`, and the range group at the right with four buttons, `1M`, `3M`, `6M`, and `1Y`, that use `aria-pressed`. The header has no update line.
+* `web/assets/js/section.header.js` sets only the pressed state of the range buttons.
 * The spec, section "Page technology", item 6, does not let the page use `localStorage`. Item 1 lets the page use only ES modules. Item 5 does not let the page use an inline script.
 * The `content-security-policy` header has `script-src 'self'` and `style-src 'self'`. A test in `tests/web.serve.rs` asserts the header.
 * The private reports page `web/private/index.html` also loads `tokens.css`. Its spec (`private-reports.md`, section "Page", item 6) states that it uses the dark theme of the dashboard.
-* The paused state of the live section shows the kept figures in `--color-text-faint` at an opacity of 0.5.
-* `.agents/scripts/web.size.sh` gives `code_kib: 64.8` at `ac55e2a`.
+* The paused state of the live section (the card "Today") shows "Paused, reconnecting" in the status note, stops the dot in `--color-text-faint`, and shows the kept figures and the sparkline in `--color-text-faint` at an opacity of 0.5.
+* `.agents/scripts/web.size.sh` gives `code_kib: 64.8` at `ac55e2a` and `code_kib: 65.6` at `446f065`, after CR-0021.
 
 ### Current State Diagram
 
@@ -52,7 +52,7 @@ flowchart LR
   P --> D["Dashboard: always dark"]
   S --> D
   T --> R["Private page: dark"]
-  H["Header: title, update time, range group"] --> D
+  H["Header: brand (mark, wordmark) left, range group 1M 3M 6M 1Y right"] --> D
 ```
 
 ## Proposed Change
@@ -60,7 +60,7 @@ flowchart LR
 1. Add a light value for each color token. The light values use the same token names as the dark values.
 2. Resolve the scheme from two inputs: the override in `localStorage`, and the system preference.
 3. Set the resolved scheme on the root element before the first paint. Use a small same-origin classic script in the head that runs before the stylesheets apply. The content security policy does not change.
-4. Add a control with three states, System, Light, and Dark, to the header after the range group.
+4. Add a control with three states, System, Light, and Dark, to the header directly after the range group. The brand stays at the left, and the range group and the control group sit together at the right.
 5. When the reader selects Light or Dark, keep the choice in `localStorage`. When the reader selects System, remove the stored choice.
 6. When the control is in the state System, follow a change of the system preference while the page is open.
 7. Keep the private reports page dark.
@@ -144,7 +144,7 @@ sequenceDiagram
 **Manual override in the header**
 
 8. The header **MUST** show one control group with the accessible name "Color scheme" and three buttons with the text "System", "Light", and "Dark".
-9. The control group **MUST** come after the range group in the header, in the same row at 1440 px.
+9. The control group **MUST** come directly after the range group. The range group and the control group **MUST** sit together at the right end of the header row, with the brand at the left, in the same row at 1440 px.
 10. The button of the current state **MUST** have `aria-pressed="true"`. The other two buttons **MUST** have `aria-pressed="false"`. In the state System, the button "System" is pressed, not the button of the resolved scheme.
 11. The keyboard **MUST** reach and use each button. Each button **MUST** have a minimum height of 44 px, as the range buttons have.
 12. A selection of Light or Dark **MUST** write the value `light` or `dark` to one `localStorage` key. A selection of System **MUST** remove that key.
@@ -198,7 +198,7 @@ sequenceDiagram
 
 | Metric | Method | Baseline | Threshold |
 |---|---|---|---|
-| Code size | `.agents/scripts/web.size.sh` prints `code_kib` | 64.8 KiB at `ac55e2a` | at most 100 KiB |
+| Code size | `.agents/scripts/web.size.sh` prints `code_kib` | 65.6 KiB at `446f065`, after CR-0021 (64.8 KiB at `ac55e2a`) | at most 100 KiB |
 | Added scheme code | the increase of `code_kib` from the baseline | 0 | at most 6.0 KiB |
 | Draw time, each scheme | `.agents/scripts/web.render.sh --days 400 --scheme light` and `--scheme dark` print `draw_ms` | measured at the start of implementation, dark only | at most 500 ms in each scheme |
 | Remote requests, each scheme | `.agents/scripts/web.render.sh --days 400 --scheme light` and `--scheme dark` print `remote_requests` | 0, dark only | 0 in each scheme |
@@ -217,7 +217,7 @@ sequenceDiagram
 ## Affected Components
 
 * `web/assets/css/tokens.css`: the light values, `color-scheme` for each scheme, and the selector that only the dashboard activates.
-* `web/assets/css/page.css`: the style of the control group and the wrap of the header at 360 px.
+* `web/assets/css/page.css`: the style of the control group, its place beside the range group at the right of the header row, and the wrap of the header at 360 px.
 * `web/assets/css/live.css`: the muted style of the paused state, if the contrast of requirement 29 is not met.
 * `web/index.html`: the boot script in the head, before the stylesheet links, and the control group in the header.
 * `web/assets/js/`: one new classic boot script, one new module for the control, and the pure resolve rule.
@@ -275,7 +275,7 @@ A reader with a light system appearance gets a light page with no action. A read
 * One new classic script and one new module. The section modules do not change, because they use tokens.
 * The page now uses `localStorage` for one key. The spec section "Page technology" changes to permit this one key.
 * The page now has one classic script. The spec section "Page technology" changes to permit this one file.
-* The header grows by one control group. At 360 px it can wrap to a second row.
+* The header grows by one control group at the right, after the range group. At 360 px the range buttons already take a second line (CR-0021), and the control group can wrap to a third line.
 * The render script gets two flags and three outputs.
 
 ### Business Impact
@@ -441,6 +441,8 @@ Then each text token has at least 4.5 to 1 on --color-bg and on --color-surface
   And each chart color has at least 3 to 1 on --color-surface
   And --color-positive and --color-output have at least 4.5 to 1 on --color-surface
   And the heatmap levels 1 to 4 increase in contrast
+  And the dark values equal the values of the spec at ac55e2a
+  And no file under web/ other than tokens.css holds a color literal
 ```
 
 ### AC-7: Every section and state is readable in both schemes
@@ -451,6 +453,8 @@ When web.render.sh runs with --scheme light and then with --scheme dark
 Then min_text_contrast is at least 4.5 in each run
   And min_graphic_contrast is at least 3.0 in the light run
   And the empty state, the error state, "GitHub not connected", and the live paused message meet the text threshold in each scheme
+  And the muted figures of the live paused state have at least 3 to 1 on their background in each scheme
+  And the focus outline of a button has at least 3 to 1 on its background in each scheme
 ```
 
 ### AC-8: The system change is followed only in the state System
@@ -483,6 +487,20 @@ Then the code size is at most 100 KiB
   And remote_requests is 0 in each scheme
   And the headline is above the fold at 360 px and at 1440 px
   And the page has no horizontal scroll at 360 px
+```
+
+### AC-11: The control sits at the right of the product header
+
+```gherkin
+Given the dashboard at 1440 px
+When the page renders
+Then the header shows the brand at the left, and the range group 1M, 3M, 6M, 1Y followed by the group "Color scheme" at the right, in one row
+  And the group "Color scheme" has the buttons "System", "Light", and "Dark", each at least 44 px high
+  And the keyboard reaches each button and selects it with Enter and with Space
+Given the dashboard at 360 px
+When the page renders
+Then the group "Color scheme" is visible below the range group
+  And the page has no horizontal scroll
 ```
 
 ## Quality Standards Compliance
@@ -527,7 +545,7 @@ Then the code size is at most 100 KiB
 
 **Likelihood:** medium
 **Impact:** medium
-**Mitigation:** Non-functional requirement 4 and the render output `headline_above_fold_360`. The control can wrap to a second header row, and the button text stays short.
+**Mitigation:** Non-functional requirement 4 and the render output `headline_above_fold_360`. At 360 px the range buttons already take a second header line (CR-0021). The control can wrap to a third line below them, and the button text stays short.
 
 ### Risk 2: A chart color passes 3 to 1 but loses its hue identity
 
@@ -558,6 +576,7 @@ Then the code size is at most 100 KiB
 * CR-0008 (the design tokens, the content security policy, and the width rule).
 * CR-0013 (the live section and the storage rule of the live modules).
 * CR-0018 and CR-0019 (the card gap, the pull request footer line colors, and the footer sentences).
+* CR-0021 (the product header with the brand and the range buttons `1M`, `3M`, `6M`, `1Y`, and the card "Today" of the live section).
 
 ## Estimated Effort
 
@@ -570,10 +589,10 @@ None. The owner asked for a light mode. The layout details are judgement calls.
 ## Judgement Calls
 
 1. Control form: a group of three buttons, "System", "Light", and "Dark", with `aria-pressed`, in the pill style of the range group. Reason: the reader can go back to the system preference, and all states are visible.
-2. Control place: in the header, after the range group, in the same row at 1440 px. At 360 px the group can wrap to the next row, below the range group. The group has the accessible name "Color scheme".
+2. Control place: in the header, directly after the range group, so the range group and the control group sit together at the right of the one product row, and the brand stays at the left. In the same row at 1440 px. At 360 px the group can wrap to the next row, below the range group. The group has the accessible name "Color scheme".
 3. Button text: words, not icons. Reason: no icon file and no icon font, and the text is clear without a tooltip.
 4. Token names: the light scheme uses the same token names as the dark scheme. The spec table "Design tokens" gets a second value column for the light values. No new color token name.
-5. Storage: one `localStorage` key, `dashboard.scheme`, with the value `light` or `dark`. The state System removes the key. The key does not name the product, so it agrees with the rule for the site title.
+5. Storage: one `localStorage` key, `dashboard.scheme`, with the value `light` or `dark`. The state System removes the key. The key does not depend on the site title, which an operator can change with `LOUPE_SITE_TITLE`, so a change of the title keeps the stored choice.
 6. Invalid or blocked storage: an unknown value is ignored, and a storage error falls back to the system preference with no message.
 7. No preference: when the browser reports no preference or has no `matchMedia`, the page is dark, the scheme of today.
 8. Light palette: the implementer chooses the values with the contrast test. Each series keeps the hue family of its dark value: blue for input, amber for output, green for positive, violet for cache read, and teal for cache write. The heatmap is a green ramp that gets darker from level 1 to level 4. `--color-surface` is lighter than `--color-bg`, so the cards stand out as in the dark scheme.
@@ -590,8 +609,31 @@ None. The owner asked for a light mode. The layout details are judgement calls.
 
 ## Decision Outcome
 
-Pending. The status is proposed.
+Approved on 2026-10-23 by a reviewer agent in a Pi session through the proxy, separate from the author, after two passes. The first pass found four blocking findings: functional requirements 2, 3, 29 (second sentence), and 30 had no acceptance criterion. The second pass added these four criteria:
+
+1. AC-6: "the dark values equal the values of the spec at ac55e2a" (functional requirement 2).
+2. AC-6: "no file under web/ other than tokens.css holds a color literal" (functional requirement 3).
+3. AC-7: "the muted figures of the live paused state have at least 3 to 1 on their background in each scheme" (functional requirement 29, second sentence).
+4. AC-7: "the focus outline of a button has at least 3 to 1 on its background in each scheme" (functional requirement 30).
+
+The second pass found no other blocking finding.
 
 ## Notes
 
-Layer 1 boundary: this CR names the spec sections that change. It does not inline the spec text and holds no code. The spec sections that change are "Page technology" (items 1, 5, and 6: the one classic script and the one storage key), "Header" (the control), "Live section" (item 6 stays true for the live modules), "Footer" (readable in both schemes), "States" (the paused state contrast), and "Design tokens" (the two schemes, the light value column, and the contrast rules) in `dashboard.md`. Item 6 of the section "Page" in `private-reports.md` and the target table in `operations.md` also change.
+Layer 1 boundary: this CR names the spec sections that change. It does not inline the spec text and holds no code. The spec sections that change are "Page technology" (items 1, 5, and 6: the one classic script and the one storage key), "Header" (the control), "Live section" (item 11 stays true for the live modules), "Footer" (readable in both schemes), "States" (the paused state contrast), and "Design tokens" (the two schemes, the light value column, and the contrast rules) in `dashboard.md`. Item 6 of the section "Page" in `private-reports.md` and the target table in `operations.md` also change.
+
+### Review notes, 2026-10-23
+
+Reviewer agent, rebase on the header and the live card of CR-0021 (implemented in `032ff51`). Each edit is the smallest change that fits the current state. Every judgement call still holds; judgement calls 2 and 5 changed only in their place rule and their reason.
+
+1. Current State: the header bullet now describes the one product row (brand with mark and wordmark at the left, range buttons `1M`, `3M`, `6M`, `1Y` at the right, no update line). The old text named a title, an update time, and three range buttons.
+2. Current State: `section.header.js` now sets only the pressed state of the range buttons. The old text said it also set the update time.
+3. Current State: the paused bullet now names the status note "Paused, reconnecting", the still dot, and the muted sparkline of the card "Today", in addition to the muted figures.
+4. Current State and Measurable Targets: the code size baseline is now 65.6 KiB at `446f065`, after CR-0021. The baseline 64.8 KiB at `ac55e2a` would have counted the code of CR-0021 against the 6.0 KiB budget of the scheme code.
+5. Current State Diagram: the header node now shows the brand at the left and the four range buttons at the right.
+6. Proposed Change 4, functional requirement 9, judgement call 2, and Affected Components (`page.css`): the control group comes directly after the range group, and both groups sit together at the right of the header row, with the brand at the left. Reason: the header is a flex row with the brand at the left and the range buttons at the right (spec "Header", item 1). A third group placed only "after the range group" would move the range buttons away from the right end.
+7. Technical Impact and Risk 1: at 360 px the range buttons already take a second header line, so the control group can take a third line. The old text said the control could wrap to a second row.
+8. Acceptance Criteria: added AC-11 for functional requirements 8, 9, and 11 (the group name, the three buttons, the place in the new header, the 44 px height, and the keyboard). No criterion covered the place of the control in the header.
+9. Judgement call 5: the reason of the key `dashboard.scheme` no longer cites the old site title rule, because the default title is now the product name. The key and its values do not change.
+10. Notes: the storage item of the spec section "Live section" is now item 11, not item 6. Item 6 now states that the section does not show the open segments.
+11. Dependencies: added CR-0021.
