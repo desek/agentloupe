@@ -76,7 +76,8 @@ if [ "$dry_run" -eq 1 ]; then
 fi
 ( umask 077; mkdir -p "$dir" ) || die 5 "cannot make $dir. Fix: check the permissions of the parent directory. Verify: re-run and check that $dir exists."
 chmod 700 "$dir"
-tmp="$dir/.models.json.tmp"
+# A unique temporary name: two shells can connect at the same time, and each must keep its own file until its rename.
+tmp="$dir/.models.json.$$.tmp"
 ( umask 077; printf '%s\n' "$content" > "$tmp" ) || die 5 "cannot write $dir/models.json. Fix: check the free space and the permissions of $dir. Verify: re-run and check the file."
 chmod 600 "$tmp"
 mv -f "$tmp" "$dir/models.json"
