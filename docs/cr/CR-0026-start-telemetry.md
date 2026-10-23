@@ -847,3 +847,10 @@ No blocking finding stays open. The status stays `approved`.
 4. `.agents/scripts/pipeline.test.sh` hid a failed test: its run function sat in an `if`, where `set -e` does not apply, so the stage passed with a failed test. The function now returns on failure and the stage prints the output of each failed test. Two tests that this hid on the Linux runners now pass: the mode helper of `tests/scripts/agent.connect.test.sh` tries GNU `stat` first, and `every_stage_prints_its_toolchain` checks that the image toolchain fails when a base image is absent.
 5. `.agents/scripts/telemetry.probe.py` is the fake endpoint and the start delay measurement of the scenario.
 6. `SECURITY.md` does not change (judgement call 7).
+
+Implementation notes, 2026-10-24, decided by the supervisor on the implementer's questions:
+
+1. The repository variable is `LOUPE_TELEMETRY_HOST`, as the CR and the specification state. No `LOUPE_TELEMETRY_URL` variable exists.
+2. `SECURITY.md` stays unchanged; the README section on the privacy model carries the statement of the start request.
+3. The fix of the test stage script, which reported passed on a failed test and hid two Linux-only failures, is accepted in the CR-0026 merge and recorded here as a defect found outside the CR.
+4. The two development rows of the deployed store were deleted by the supervisor after the implementation.
