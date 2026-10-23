@@ -1,4 +1,4 @@
-<!-- @agents-index Specification of the public dashboard page: static routes, headers, page rules, data request, sections, states, fonts, and design tokens. -->
+<!-- @agents-index Specification of the public dashboard page: static routes, headers, page rules, data request, color scheme, sections, states, fonts, and design tokens. -->
 # Dashboard
 
 The dashboard is one page that the `loupe` binary serves at `GET /`. The page reads the public API `GET /v1/days` and shows the day records. It shows no private data.
@@ -49,7 +49,7 @@ The `GET /` response also has these headers:
 2. `x-content-type-options: nosniff`
 3. `referrer-policy: no-referrer`
 
-The live section does not change the policy. In the browsers of the baseline, `connect-src 'self'` covers a `ws:` or `wss:` socket to the same origin. A test asserts the header.
+The live section does not change the policy. In the browsers of the baseline, `connect-src 'self'` covers a `ws:` or `wss:` socket to the same origin. The color scheme does not change the policy: the scheme script is a same-origin file, which `script-src 'self'` covers. A test asserts the header.
 
 The static routes send no CORS header.
 
@@ -73,12 +73,12 @@ At start, the binary puts the title into `index.html` one time. It escapes the c
 
 ## Page technology
 
-1. The page uses plain HTML, CSS, and JavaScript ES modules. It uses no framework, no bundler, no transpiler, and no package manager.
+1. The page uses plain HTML, CSS, and JavaScript ES modules, plus one classic script: the scheme script of the section "Color scheme". It uses no framework, no bundler, no transpiler, and no package manager.
 2. The JavaScript is in small single-purpose modules with hierarchical names under `web/assets/js/`. Each file has one `@agents-index` line in its top comment.
-3. The calculation modules (`view.*`, `stats.*`, `format.*`, `range.*`) do not touch the DOM. Node runs their unit tests with no browser.
+3. The calculation modules (`view.*`, `stats.*`, `format.*`, `range.*`) do not touch the DOM. Node runs their unit tests with no browser. The rule that selects the color scheme also does not touch the DOM or a storage API. It gets the stored value and the system preference as inputs, so Node runs its tests with no browser.
 4. The page loads no file from a host other than its own origin.
-5. The page has no inline script, no inline style that the policy blocks, and no `eval`.
-6. The page does not use a cookie, `localStorage`, `sessionStorage`, or IndexedDB.
+5. The page has no inline script, no inline style that the policy blocks, and no `eval`. The only classic script is the scheme script. It is a same-origin file under `web/assets/js/`, in the head before the first stylesheet link, and it is not `async`, not `defer`, and not a module.
+6. The page does not use a cookie, `sessionStorage`, or IndexedDB. It uses `localStorage` for one key only, `dashboard.scheme`, which holds the scheme override. Only the scheme script and the scheme control read or write this key.
 7. Each chart is inline SVG that the page draws. The page uses no chart library.
 8. The page gets data only from `GET /v1/days` and from the live route `/live` on the same origin. It calls no other route of the binary, except the static files.
 
@@ -102,6 +102,34 @@ At start, the binary puts the title into `index.html` one time. It escapes the c
 | `1Y` | the last 365 days | `#range=1Y` |
 
 Each range ends on the `to` value of the response. Both ends are in the range. The URL fragment keeps the selected range, so a reload or a shared link keeps it. A missing or unknown fragment selects `1M`.
+
+## Color scheme
+
+The page has two color schemes, dark and light. The two schemes use the same design token names with different values (section "Design tokens").
+
+1. The scheme override is the choice of the reader in the scheme control: Light or Dark. The browser keeps it in `localStorage` under the key `dashboard.scheme`, with the value `light` or `dark`. When no override is stored, the control is in the state System.
+2. The page selects the scheme by this rule:
+
+   | Stored value | System preference | Scheme | Pressed button |
+   |---|---|---|---|
+   | none | light | light | System |
+   | none | dark | dark | System |
+   | none | no preference, or no `matchMedia` | dark | System |
+   | `light` | any | light | Light |
+   | `dark` | any | dark | Dark |
+   | a different value | light | light | System |
+   | a storage error | light | light | System |
+
+   The page ignores a stored value that is not `light` or `dark`, and uses the system preference. When the browser blocks `localStorage` or an access throws an error, the page uses the system preference and shows no error. The reader can then still change the scheme for the current page view.
+3. The system preference is the value of the media feature `prefers-color-scheme`.
+4. The resolved scheme is on the root element before the first paint. The first frame of the page shows the page background of the resolved scheme. The scheme script sets it (section "Page technology", items 1 and 5).
+5. The CSS property `color-scheme` of the root element is `light` or `dark`, the same as the resolved scheme. Thus the scrollbars and the native controls follow the scheme.
+6. A selection of Light or Dark in the scheme control writes `light` or `dark` to the key. A selection of System removes the key.
+7. A selection changes the scheme of the full page at once. It does not reload the page, does not send a new request to `/v1/days`, and does not close the live socket. The charts follow the tokens, so the page draws nothing again.
+8. A selection does not change the URL fragment. The scheme is not in the fragment, so a shared link uses the scheme of the reader.
+9. In the state System, the page follows a change of the system preference while it is open, with no reload. In the states Light and Dark, a change of the system preference does not change the page.
+10. After a reload, the page shows the scheme and the pressed button of the stored value.
+11. The scheme applies only to the dashboard. The private page stays dark (`private-reports.md`).
 
 ## Missing days and fields
 
@@ -140,15 +168,20 @@ The live section is directly below the headline. `live.md` gives the live route.
 8. The page opens the socket with `ws://` or `wss://` at the page origin, path `/live`. The `snapshot` frame sets the figures, and each later frame adds to them.
 9. After a close, the page connects again after 1, 2, 4, 8, 16, and then 30 seconds. A `snapshot` frame resets this sequence.
 10. The page closes the socket when the document is hidden. It opens the socket again when the document is visible.
-11. The section uses no cookie, `localStorage`, `sessionStorage`, or IndexedDB.
+11. The section uses no cookie, `localStorage`, `sessionStorage`, or IndexedDB. The key of the scheme override belongs to the scheme script and the scheme control, and the live section does not read it.
+12. The section is readable in both color schemes. The text meets the text contrast rule of the section "Design tokens".
 
 ### Header
 
-1. The header is one row. The brand is on the left, and the range buttons are on the right. When the row does not fit the width, the range buttons go to a second line.
+1. The header is one row. The brand is on the left. The range group and the scheme control sit together on the right, with the scheme control directly after the range group. At 1440 px the brand, the range group, and the scheme control are in the same row. When the row does not fit the width, the range buttons go to a second line, and the scheme control can go to a third line, below the range buttons.
 2. The brand is the mark and the wordmark. The mark is inline SVG of 44 by 44 px: a loupe ring and handle in the text color, and three bars in `--color-input` inside the lens. Assistive technology does not read the mark.
 3. The wordmark is the site title in the `h1` of the page, at 20 px.
 4. The range selector has the buttons `1M`, `3M`, `6M`, and `1Y`. The selected button has `aria-pressed="true"`. The keyboard can reach and use each button.
 5. The header does not show the time of the last update. The last row of the daily log shows the latest published day.
+6. The scheme control is one group with the accessible name "Color scheme" and three buttons with the text "System", "Light", and "Dark". The buttons have the pill style of the range buttons, and they show text, not icons.
+7. The button of the current state has `aria-pressed="true"`. The other two buttons have `aria-pressed="false"`. In the state System, the button "System" is pressed, not the button of the resolved scheme.
+8. The keyboard can reach each button of the scheme control and select it with Enter and with Space. Each button is at least 44 px high, as the range buttons are.
+9. With the scheme control in the header, the headline stays visible with no scroll at 360 px and at 1440 px, and the page has no horizontal scroll at 360 px, in each scheme.
 
 ### Totals row
 
@@ -220,10 +253,13 @@ The totals row shows only sums for the range. The page shows no streak, no count
 2. Beside it, the footer shows one short sentence that starts with an asterisk, for example "* LiteLLM list prices at a1b2c3d, not money paid." The sentence states that the cost is a list price and not money paid.
 3. The word LiteLLM in the sentence is a plain link to `https://github.com/BerriAI/litellm` with `rel="noopener noreferrer"`.
 4. The sentence names the short form of the price commit. The binary reads the commit from `vendor/litellm/SOURCE.md` at build time and puts it into the page when the server starts. The page code holds no literal commit, so a refresh of the prices also changes the sentence.
-5. The page loads no remote script, style, or font for the footer.
+5. The page loads no remote script, style, or font for the footer, in either color scheme.
 6. The gap between the footer and the cards above it is the gap token `--space-card-gap` of the cards.
+7. The footer is readable in both color schemes. The sentences and the link meet the text contrast rule of the section "Design tokens".
 
 ## States
+
+Each state is readable in both color schemes. The text of the empty state, of the error state with the button "Try again", of "GitHub not connected", of "Partial GitHub data", and of the paused message of the live section has a contrast of at least 4.5 to 1 on its rendered background.
 
 ### Empty state
 
@@ -236,7 +272,7 @@ When the response holds no record, the page shows the header, the headline with 
 
 ### Live feed paused
 
-When the socket is closed, the live section shows "Paused, reconnecting" in the status note, stops the dot, and keeps the last figures and the sparkline in a muted style. A browser cannot read the HTTP status of a failed upgrade. Thus, when 3 connects in a row fail and no `snapshot` frame came since the page load, the page hides the live section until a reload. A browser that blocks the socket shows the paused state and then hides the section.
+When the socket is closed, the live section shows "Paused, reconnecting" in the status note, stops the dot, and keeps the last figures and the sparkline in a muted style. In each color scheme, the message "Paused, reconnecting" has a contrast of at least 4.5 to 1 on its rendered background. The kept figures in the muted style have a contrast of at least 3 to 1 on their rendered background, the threshold for large text. A browser cannot read the HTTP status of a failed upgrade. Thus, when 3 connects in a row fail and no `snapshot` frame came since the page load, the page hides the live section until a reload. A browser that blocks the socket shows the paused state and then hides the section.
 
 ### Error
 
@@ -262,32 +298,50 @@ When the request fails or returns a status other than `200`, the page shows "Dat
 
 ## Design tokens
 
-`web/assets/css/tokens.css` holds the design values as CSS custom properties. The page has one color scheme, dark. It has no light theme and no theme switch. Text has a contrast of at least 4.5 to 1 on its background. The page works at a width of 360 px with no horizontal scroll, and at 1440 px. The gap between two cards and between two rows uses `--space-card-gap`, at least 24 px, so no two cards touch or share a border at 360 px and at 1440 px.
+`web/assets/css/tokens.css` holds the design values as CSS custom properties. The page has two color schemes, dark and light (section "Color scheme"). Each color token has a dark value and a light value with the same token name. The page code holds no color literal outside `tokens.css`: each color of the page, of each SVG chart, and of the live chart comes from a token. The size, font, radius, and spacing tokens are the same in both schemes. The page works at a width of 360 px with no horizontal scroll, and at 1440 px, in each scheme. The gap between two cards and between two rows uses `--space-card-gap`, at least 24 px, so no two cards touch or share a border at 360 px and at 1440 px.
+
+The contrast rules use the WCAG 2.x relative luminance ratio:
+
+1. In each scheme, each text on the page, in each section and each state, has a contrast of at least 4.5 to 1 on its rendered background.
+2. In the light scheme, each text token (`--color-text`, `--color-text-body`, `--color-text-muted`, `--color-text-faint`, `--color-link`, `--color-link-hover`) has a contrast of at least 4.5 to 1 on `--color-bg` and on `--color-surface`.
+3. In the light scheme, `--color-ink-inverse` has a contrast of at least 4.5 to 1 on `--color-text`, because a selected button uses this pair.
+4. In the light scheme, each chart color (`--color-input`, `--color-output`, `--color-positive`, `--color-cache-read`, `--color-cache-write`, `--heat-1`, `--heat-2`, `--heat-3`, `--heat-4`) has a contrast of at least 3 to 1 on `--color-surface`.
+5. In the light scheme, `--color-positive` and `--color-output` have a contrast of at least 4.5 to 1 on `--color-surface`, because the footer line of the pull request card uses them as text color.
+6. In the light scheme, the contrast of `--heat-1` to `--heat-4` on `--color-surface` increases from level to level, so a higher level is always darker.
+7. In each scheme, the focus outline of a button has a contrast of at least 3 to 1 on its background.
+8. `--heat-0`, `--color-border`, and `--color-rule` are not chart colors for rule 4. `--heat-0` shows a day with no value, and the borders and rules only separate areas.
+
+The dark values do not change. The light column states the rule that each light value meets. In the light scheme, `--color-surface` is lighter than `--color-bg`, so the cards stand out as in the dark scheme. Each series keeps the hue family of its dark value.
+
+| Token | Dark value | Light value | Use |
+|---|---|---|---|
+| `--color-bg` | `#0F1012` | a light neutral, darker than `--color-surface` | page background |
+| `--color-ink-inverse` | `#111214` | rule 3 | text on a filled button, for example a selected button |
+| `--color-surface` | `#15161A` | a light neutral, lighter than `--color-bg` | card background |
+| `--color-border` | `#24262B` | a neutral that separates the card from the page | card border |
+| `--color-rule` | `#2A2C31` | a neutral that separates areas | chart axis and divider lines |
+| `--color-text` | `#ECEAE4` | a dark neutral, rule 2 | primary text, figures, selected button fill, ring and handle of the mark |
+| `--color-text-body` | `#B5B4AE` | rule 2 | body text, unselected button text |
+| `--color-text-muted` | `#9A9AA0` | rule 2 | secondary text, headline eyebrow |
+| `--color-text-faint` | `#85868C` | rule 2 | chart labels, legends, live dot in the paused state |
+| `--color-input` | `#5E86E0` | a blue, rule 4 | input tokens series, opened pull requests, bars of the mark |
+| `--color-output` | `#BB7F35` | an amber, rules 4 and 5 | output tokens series, lines removed |
+| `--color-positive` | `#3FA864` | a green, rules 4 and 5 | merged pull requests, lines added, live dot |
+| `--color-cache-read` | `#8C6BC8` | a violet, rule 4 | cache read segment of the token share bar |
+| `--color-cache-write` | `#4FA3A5` | a teal, rule 4 | cache write segment of the token share bar |
+| `--color-highlight` | `#D9C27A` | a yellow tag background | tag background |
+| `--color-link` | `#9DB6EE` | a blue, rule 2 | link |
+| `--color-link-hover` | `#C9D7F6` | a blue, rule 2 | link on hover |
+| `--heat-0` | `#1D1F23` | a light neutral | heatmap level 0 |
+| `--heat-1` | `#1B4A2F` | a green, rules 4 and 6 | heatmap level 1 |
+| `--heat-2` | `#21703E` | a green, rules 4 and 6 | heatmap level 2 |
+| `--heat-3` | `#2E9A55` | a green, rules 4 and 6 | heatmap level 3 |
+| `--heat-4` | `#4FCB74` | a green, rules 4 and 6, the darkest level | heatmap level 4 |
+
+The tokens below are the same in both schemes.
 
 | Token | Value | Use |
 |---|---|---|
-| `--color-bg` | `#0F1012` | page background |
-| `--color-ink-inverse` | `#111214` | text on a light fill, for example a selected button |
-| `--color-surface` | `#15161A` | card background |
-| `--color-border` | `#24262B` | card border |
-| `--color-rule` | `#2A2C31` | chart axis and divider lines |
-| `--color-text` | `#ECEAE4` | primary text, figures, selected button fill, ring and handle of the mark |
-| `--color-text-body` | `#B5B4AE` | body text, unselected button text |
-| `--color-text-muted` | `#9A9AA0` | secondary text, headline eyebrow |
-| `--color-text-faint` | `#85868C` | chart labels, legends, live dot in the paused state |
-| `--color-input` | `#5E86E0` | input tokens series, opened pull requests, bars of the mark |
-| `--color-output` | `#BB7F35` | output tokens series, lines removed |
-| `--color-positive` | `#3FA864` | merged pull requests, lines added, live dot |
-| `--color-cache-read` | `#8C6BC8` | cache read segment of the token share bar |
-| `--color-cache-write` | `#4FA3A5` | cache write segment of the token share bar |
-| `--color-highlight` | `#D9C27A` | tag background |
-| `--color-link` | `#9DB6EE` | link |
-| `--color-link-hover` | `#C9D7F6` | link on hover |
-| `--heat-0` | `#1D1F23` | heatmap level 0 |
-| `--heat-1` | `#1B4A2F` | heatmap level 1 |
-| `--heat-2` | `#21703E` | heatmap level 2 |
-| `--heat-3` | `#2E9A55` | heatmap level 3 |
-| `--heat-4` | `#4FCB74` | heatmap level 4 |
 | `--font-sans` | `'Geist', system-ui, sans-serif` | text |
 | `--font-mono` | `'Geist Mono', ui-monospace, monospace` | figures, labels |
 | `--space-card-gap` | `24px` | gap between two cards in a row and between two rows, at each width |
@@ -303,7 +357,7 @@ When the request fails or returns a status other than `200`, the page shows "Dat
 | `--radius-bar` | `3px` | top corners of a bar |
 | `--max-width` | `1200px` | width of the content column |
 | `--radius-cell` | `2px` | heatmap cell and legend swatch |
-| `--radius-pill` | `999px` | range buttons |
+| `--radius-pill` | `999px` | range buttons, scheme control buttons |
 
 The page contains no file of the mockup support script and no file of the mockup vendor directory.
 

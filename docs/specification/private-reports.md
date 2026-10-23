@@ -90,7 +90,7 @@ The private page shows the usage, the cost, and the sessions per proxy token and
 3. The page shows a table of the groups.
 4. The page shows the tokens per day for the selected group.
 5. The page shows the session list of a selected proxy token.
-6. The page uses the design tokens, the fonts, and the dark theme of the dashboard (`dashboard.md`).
+6. The page uses the design tokens and the fonts of the dashboard, with the dark values only (`dashboard.md`). It stays dark: it does not follow the system preference or the stored scheme override of the dashboard. It has no scheme script and shows no scheme control.
 7. The binary contains the page files at compile time, as it does for the dashboard.
 8. The page gets data only from `/private/api/v1/...` on the same origin.
 9. The page files are at most 200 KiB, apart from the shared fonts.
