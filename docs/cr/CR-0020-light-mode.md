@@ -511,22 +511,22 @@ Then the switch is visible after the range group
 
 ### Build & Compilation
 
-- [ ] `cargo build` passes.
+- [x] `cargo build` passes.
 
 ### Linting & Code Style
 
-- [ ] `.agents/scripts/pipeline.lint.sh` and `.agents/scripts/pipeline.format.sh` pass.
-- [ ] Each new file under `web/assets/js/` has one `@agents-index` line.
+- [x] `.agents/scripts/pipeline.lint.sh` and `.agents/scripts/pipeline.format.sh` pass.
+- [x] Each new file under `web/assets/js/` has one `@agents-index` line.
 
 ### Test Execution
 
-- [ ] `.agents/scripts/pipeline.test.sh` passes.
-- [ ] `.agents/scripts/pipeline.web.sh` passes, with the new node tests.
+- [x] `.agents/scripts/pipeline.test.sh` passes.
+- [x] `.agents/scripts/pipeline.web.sh` passes, with the new node tests.
 
 ### Documentation
 
-- [ ] `docs/specification/dashboard.md` changes before the code, in the sections that this CR names.
-- [ ] `docs/specification/private-reports.md` and `docs/specification/operations.md` change in the named places.
+- [x] `docs/specification/dashboard.md` changes before the code, in the sections that this CR names.
+- [x] `docs/specification/private-reports.md` and `docs/specification/operations.md` change in the named places.
 
 ### Code Review
 
@@ -662,3 +662,4 @@ Two decisions of the owner and of the supervisor, taken after the implementation
    * Evidence: `git ls-tree -r -l` at `446f065` and at `e88f5bd`, with the sum of the sizes of the files under `web/` outside `web/assets/fonts/` and `web/private/` (65.6 KiB and 75.3 KiB), and of the files under `web/test/` (17.9 KiB and 24.1 KiB). `web.size.sh` on the two trees gives the same `code_kib` and `page_kib` values.
    * The target "Code size" does not change: `code_kib` at most 100 KiB. It was 75.3 KiB at `e88f5bd`, passed.
 3. This note does not change the other text of the CR that names the three buttons or the state System: the description, Proposed Change items 4 to 6, the diagrams, functional requirements 7, 12, 15, and 16, the alternative "A two-state toggle", and judgement calls 3 and 12. Functional requirement 10 and the spec section "Color scheme" give the rule of the switch.
+4. Verification, 2026-10-23: `node --test web/test/*.test.js` passed 43 of 43 tests, `cargo nextest run --test web_serve` passed 15 of 15, and `.agents/scripts/pipeline.verdict.sh` exited 0 in 972.9 seconds (format, lint, test, web, and image `status: passed`). The scenario `.agents/scenarios/dashboard.light-mode.md` passed 35 of 35 checks in 2 of 2 runs with the switch. The measured values of every target are in `docs/specification/operations.md`. The quality checks of the reviewer agent and of the commit title stay open.
