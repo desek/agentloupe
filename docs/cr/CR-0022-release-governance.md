@@ -2,7 +2,7 @@
 name: "CR-0022 Release governance"
 description: "Make the project production ready on GitHub: a verdict workflow on each push and pull request, release-please for the version and the changelog, a release workflow that publishes the loupe binary for three platforms with checksums and the container image on ghcr.io, a release check script, and a version governance document. The git history stays as it is."
 id: "CR-0022"
-status: "approved"
+status: "implemented"
 date: 2026-10-23
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, release manager), reviewer agent (approver)
@@ -838,3 +838,11 @@ Reviewer: a reviewer agent in a Pi session through the proxy, separate from the 
 Non-blocking remarks, not edited: D1 says 267 commits and "Current State" says 268 (268 is the count at `446f065`); the `Dockerfile` itself does not name `agent-loupe:local`, `pipeline.image.sh` and `compose.yaml` do; the `sk-` pattern of the target "Secrets in the workflow files" also matches words such as `task-`; AC-17 and the test table give `release.check.sh` a `--dry-run` that requirement 46 does not state.
 
 Open blocking findings: none.
+
+### Implementation notes, 2026-10-23
+
+1. Non-functional requirement 2: no stage entry point changed (`git diff 446f065 -- .agents/scripts/pipeline.*.sh` is empty). One helper of the web stage changed: `.agents/scripts/web.size.sh` counted bytes with `stat -f%z`, which is the BSD form; on the Linux runner `stat -f` reads the file system, the pipe failed under `pipefail`, and the web job failed with no size line. It now counts with `cat` and `wc -c`, which give the same values on macOS and Linux (76.1, 52.0, 232.0, and 12.9 KiB before and after). `web.size.sh` is not a declared input of the web stage, so the local verdict cache did not see this change; the verdict workflow ran the stage in full.
+2. The first start line is written in `src/cli/serve.rs`, right after the log starts, as `loupe serve starting` with the key field `version` from `CARGO_PKG_VERSION`. `tests/cli.version.rs` checks the flag, the first line of the log file and of stderr, and the health body.
+3. `release.build.sh` and `release.image.sh` use exit code 4 for a failed tag check. With `--dry-run` and no tag yet, they check the version against `Cargo.toml` at `HEAD` and say so in the plan line; a real run needs the tag. `release.build.sh` reads the binary from `CARGO_TARGET_DIR` when it is set.
+4. `release.check.sh --dir DIR` keeps the downloads and does not download a file that is already in `DIR`, so scenario step 16 can change one byte of a copy and check again. The pull uses an empty Docker configuration with the endpoint of the current context, so it holds no credential.
+5. The release workflow attaches the six assets, then merges the image index, in one final job that needs the three builds and the two image builds.

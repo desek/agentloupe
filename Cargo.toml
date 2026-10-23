@@ -372,3 +372,7 @@ path = "tests/timer.defaults.rs"
 [[test]]
 name = "common_poll"
 path = "tests/common.poll.rs"
+
+[[test]]
+name = "cli_version"
+path = "tests/cli.version.rs"

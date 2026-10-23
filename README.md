@@ -27,6 +27,8 @@ the private page, and backfills the session logs that predate the proxy. The two
 
 This README is the authority. Where a source differs from it, the README is correct.
 
+To install a published release, a container image, or a build from source, see [Install](#install).
+
 ## Scope
 
 In scope:
@@ -92,6 +94,7 @@ One binary holds the full product: the proxy, the workers, the public API, and t
     [--pi-label LABEL] [--dry-run]`: read the session logs on disk into the calls and the sessions,
     for the work before the proxy. A session that the proxy captured is skipped.
   - `loupe gen-key`: print a new 32-byte key for `LOUPE_DATA_KEY` or `LOUPE_ACCOUNT_KEY`.
+  - `loupe --version`: print `loupe <version>`, the version of `Cargo.toml` at build time.
   - `loupe day approve --date YYYY-MM-DD`: publish a day that waits for review.
   - `loupe day edit --date YYYY-MM-DD --summary TEXT`: replace the summary of a day.
   - `loupe day delete --date YYYY-MM-DD`: remove a day. A deleted day is marked, so the nightly
@@ -230,6 +233,75 @@ request, so you can later analyse the usage by token and by the metadata of the 
   - `loupe token create --name NAME [--tag KEY=VALUE]...`: make a token and print it one time.
   - `loupe token list`: show the name, the tags, and the dates of each token, never the token.
   - `loupe token revoke NAME`: stop the token. Its past records stay.
+
+## Install
+
+There are three ways to get `loupe`. Each release has a tag `v<version>`, for example `v0.1.0`, and
+`<version>` below is the version with no `v`. [`docs/specification/release.md`](docs/specification/release.md)
+states the versions, the release flow, and the assets.
+
+### From a release asset
+
+Each GitHub release of [desek/agentloupe](https://github.com/desek/agentloupe/releases) has one
+archive per platform and one `.sha256` checksum file per archive:
+
+| Platform | Archive |
+|---|---|
+| macOS arm64 | `loupe-v<version>-aarch64-apple-darwin.tar.gz` |
+| Linux x86_64 (glibc 2.35 or newer) | `loupe-v<version>-x86_64-unknown-linux-gnu.tar.gz` |
+| Linux arm64 (glibc 2.35 or newer) | `loupe-v<version>-aarch64-unknown-linux-gnu.tar.gz` |
+
+1. Download the archive of your platform and its checksum file:
+   ```sh
+   V=<version>; A=loupe-v$V-aarch64-apple-darwin.tar.gz
+   curl -fLO https://github.com/desek/agentloupe/releases/download/v$V/$A
+   curl -fLO https://github.com/desek/agentloupe/releases/download/v$V/$A.sha256
+   ```
+2. Check the checksum: `shasum -a 256 -c $A.sha256` on macOS, `sha256sum -c $A.sha256` on Linux.
+   Each prints `OK`.
+3. Unpack: `tar -xzf $A`. The directory `loupe-v$V-<target>/` holds `loupe`, `upstreams.toml`,
+   `config/`, `LICENSE`, and `README.md`. The binary reads `upstreams.toml` and `config/` from the
+   working directory, so run it from that directory.
+4. Run: `cd loupe-v$V-*/ && ./loupe --version` prints `loupe <version>`. Then
+   `LOUPE_DATA_KEY=... LOUPE_ACCOUNT_KEY=... ./loupe serve`, with two keys from `./loupe gen-key`.
+5. The macOS binary is not signed. A download through a browser can get the quarantine attribute;
+   remove it with `xattr -d com.apple.quarantine loupe`. A download with `curl` does not get it.
+
+### From the registry image
+
+The image `ghcr.io/desek/agentloupe` has the tags `<version>` (no `v`) and `latest`, for
+`linux/amd64` and `linux/arm64`. A pull needs no login. The command below uses the same port, volume,
+and env file as `compose.yaml`:
+
+```sh
+docker pull ghcr.io/desek/agentloupe:<version>
+docker run -d --name loupe --restart unless-stopped \
+  -p 127.0.0.1:8787:8787 -v loupe-data:/data --env-file .env -e LOUPE_ENV=container \
+  ghcr.io/desek/agentloupe:<version>
+```
+
+`docker run --rm ghcr.io/desek/agentloupe:<version> gen-key` prints a key for `.env`.
+
+### From source
+
+Install Rust with rustup. In the repository, rustup reads `rust-toolchain.toml` and uses that
+toolchain. Then build and run:
+
+```sh
+cargo build --release --locked --bin loupe
+./target/release/loupe --version
+```
+
+The local image build of [Connect the agents](#connect-the-agents) (`docker compose up -d --build`)
+also builds from source.
+
+### Check a release
+
+`.agents/scripts/release.check.sh --version <version>` checks a published release on a macOS or Linux
+machine with `curl` and Docker: it downloads the six assets with no credential, verifies the
+checksums, runs `loupe --version` of each binary, pulls the image with no login, and checks
+`GET /healthz` and the version in the first log line. It exits 0 when each check passes or is
+skipped with a stated reason.
 
 ## Connect the agents
 

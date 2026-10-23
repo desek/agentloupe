@@ -22,7 +22,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-bytes() { find "$@" -type f -exec stat -f%z {} + 2>/dev/null | awk '{s+=$1} END {print s+0}'; }
+# The byte count of every file under the paths; cat and wc behave the same on macOS and on Linux, stat does not.
+bytes() { find "$@" -type f -exec cat {} + 2>/dev/null | wc -c | tr -d ' '; }
 total="$(bytes "$ROOT/web")"
 fonts="$(bytes "$ROOT/web/assets/fonts")"
 private="$(bytes "$ROOT/web/private")"

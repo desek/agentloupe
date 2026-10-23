@@ -1,0 +1,123 @@
+# @agents-index Verdict workflow: runs the five pipeline stages as parallel jobs on the head commit, then one fail-closed verdict job.
+#
+# A thin caller of the portable pipeline: each stage job checks out the head commit, installs its tools
+# from rust-toolchain.toml and .tool-versions, and makes one call to its stage entry point. The pin files
+# and the scripts hold every version and value; docs/specification/operations.md (Hosted workflows) states
+# the rules.
+name: verdict
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_call:
+    inputs:
+      ref:
+        description: The ref or commit to check out and judge, for example a release tag.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# A new push to a pull request cancels the older run of that pull request; a push to main and a call
+# from the release workflow each get their own group and are never cancelled.
+concurrency:
+  group: verdict-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # The head commit of the event: the ref input of a call, the head of a pull request (never its merge
+  # ref), or the pushed commit.
+  HEAD_REF: ${{ inputs.ref || github.event.pull_request.head.sha || github.sha }}
+  CARGO_TERM_COLOR: never
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.HEAD_REF }}
+          persist-credentials: false
+      - name: Install the Rust toolchain of rust-toolchain.toml
+        run: rustup toolchain install
+      - run: .agents/scripts/pipeline.format.sh
+
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.HEAD_REF }}
+          persist-credentials: false
+      - name: Install the Rust toolchain of rust-toolchain.toml
+        run: rustup toolchain install
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-lint-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - run: .agents/scripts/pipeline.lint.sh
+
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.HEAD_REF }}
+          persist-credentials: false
+      - name: Install the Rust toolchain of rust-toolchain.toml
+        run: rustup toolchain install
+      - name: Install cargo-nextest of .tool-versions
+        uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
+        with:
+          install_args: aqua:nextest-rs/nextest/cargo-nextest
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-test-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - run: .agents/scripts/pipeline.test.sh
+
+  web:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.HEAD_REF }}
+          persist-credentials: false
+      - name: Install Node of .tool-versions
+        uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
+        with:
+          install_args: nodejs
+      - run: .agents/scripts/pipeline.web.sh
+
+  image:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.HEAD_REF }}
+          persist-credentials: false
+      - run: .agents/scripts/pipeline.image.sh
+
+  # Fails closed: passes only when each of the five stage jobs has the result success; failure,
+  # cancelled, and skipped each make it fail.
+  verdict:
+    runs-on: ubuntu-24.04
+    needs: [format, lint, test, web, image]
+    if: ${{ always() }}
+    steps:
+      - name: Require success of each stage job
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "stage results: $RESULTS"
+          for r in $RESULTS; do [ "$r" = success ] || exit 1; done
+          [ "$(echo "$RESULTS" | wc -w)" -eq 5 ]

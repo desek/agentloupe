@@ -35,6 +35,8 @@ pub fn run(args: &ConfigArgs) -> ExitCode {
         );
         return ExitCode::from(EXIT_RUNTIME);
     }
+    // The first line of each start names the build, so a log or a bug report shows which release ran.
+    tracing::info!(version = env!("CARGO_PKG_VERSION"), "loupe serve starting");
     match crate::serve::run(&cfg, upstreams) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {

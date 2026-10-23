@@ -1,0 +1,29 @@
+# @agents-index release-please workflow: keeps one release pull request open from the Conventional Commits on main, and makes the tag and the GitHub release when it merges.
+#
+# A thin caller: release-please-config.json and .release-please-manifest.json hold every value of the
+# release. release-please authenticates with the release token, so the release pull request gets a verdict
+# run and the tag push starts the release workflow; docs/specification/release.md (Release token) states it.
+name: release-please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+# A push to main is never cancelled; a later push waits for the earlier run.
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
