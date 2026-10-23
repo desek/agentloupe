@@ -141,6 +141,15 @@ The test stage runs the tests with the parallel runner `cargo nextest`. The mini
 
 A test that asserts a timer drives the timer through an injected clock, or sets a documented configuration variable to a short value. Such a test advances the clock, or polls for the end state with a cap, and then asserts. A test that drives a real socket or a real process keeps real time. Each wait in such a test is a poll for an end state, with a cap that is not longer than before and a poll interval of at most 100 milliseconds. No test sleeps for a fixed time before an assertion. No assertion reads the wall clock to decide pass or fail; a cap only ends a poll as a failure, and the failure prints the expected end state and the last observed state. An injected clock or a test variable does not change a default: with no variable set, each timer keeps its value.
 
+### Tests of the dependency autofix
+
+The test file `tests/deps.autofix.rs` tests `deps.autofix.sh`. It has its own `[[test]]` entry in `Cargo.toml` and runs in the test stage.
+
+1. Each test runs the script in its fixture mode. A documented flag of the script, for tests only, names a fixture directory under `tests/fixtures/deps/`. The fixtures take the place of the GitHub API and of `claude`.
+2. The fixtures are recorded responses: an alert list, an empty list, a list of Dependabot pull requests, a release pull request, a `claude -p` result, a diff, and a log. They hold no credential. A test that needs a token value uses a test value.
+3. The test stage stays hermetic. A test of the script uses no network, starts no `claude` process, and writes nothing to GitHub.
+4. The tests cover: nothing open, the dry run of an alert, an alert with a matching Dependabot pull request, an alert with no patched version, an absent verdict workflow, a missing credential that is named and not printed, an invalid result, a path outside the allowed paths, the form of the commit summary, the redaction of the log extract, a release pull request with a major version, and a pin update that replaces a SHA with a tag.
+
 ### Stage inputs and toolchain
 
 Each stage entry point has the flag `--inputs`. It prints the paths that the stage reads, one path per line, and exits 0 with no run. The declared inputs are:
@@ -234,7 +243,7 @@ A test reads the verdict and release workflow files. It fails when a checkout of
 
 ### Hosted workflows
 
-Four GitHub Actions workflows are thin callers of the pipeline. A workflow does only platform work: the trigger, the runner, the checkout, the toolchain install from the pin files, the cache, one call for each stage or release step, the upload of artifacts and release assets, the login to the registry, and the gate on the visibility of the repository. A workflow file holds no project logic, no tool version, no target triple, no image name, no version of the project, no configuration value, and no secret value. The pin files, the release-please configuration files, and the scripts hold these values. The one limit that a workflow file holds is the timeout of each job. Each action from outside the repository is pinned by its full 40-character commit SHA, with the release tag in a comment.
+Five GitHub Actions workflows are thin callers of the pipeline. A workflow does only platform work: the trigger, the runner, the checkout, the toolchain install from the pin files, the cache, one call for each stage or release step, the upload of artifacts and release assets, the login to the registry, and the gate on the visibility of the repository. A workflow file holds no project logic, no tool version, no target triple, no image name, no version of the project, no configuration value, and no secret value. The pin files, the release-please configuration files, and the scripts hold these values. The one limit that a workflow file holds is the timeout of each job. Each action from outside the repository is pinned by its full 40-character commit SHA, with the release tag in a comment.
 
 | Workflow | Starts on | Does |
 |---|---|---|
@@ -242,6 +251,7 @@ Four GitHub Actions workflows are thin callers of the pipeline. A workflow does 
 | release-please | each push to `main` | Keeps one release pull request open, and makes the tag and the GitHub release when the release pull request merges. `release.md` states the flow. |
 | release | the push of a tag `v<major>.<minor>.<patch>`, and a manual start with a tag input | Runs the verdict workflow on the tag commit, then builds and publishes the release assets. `release.md` states the assets. |
 | advisory-response | each day at 05:23 UTC, and a manual start | Makes one call of `advisory.respond.sh` on a checkout of the default branch with all tags. `release.md` (Advisory response) states the rules. It has the permissions `contents: write`, `issues: write`, and `packages: write`, and one concurrency group that never cancels a run. |
+| deps-autofix | each day at 04:17 UTC, and a manual start | Makes one call of `deps.autofix.sh`. `dependencies.md` states the rules. It has the permissions `contents: write`, `pull-requests: write`, `issues: write`, `security-events: read`, `actions: read`, and `checks: read`, and one concurrency group that never cancels a run. Only the step of the script gets the secret `CLAUDE_CODE_OAUTH_TOKEN`. The checkout keeps no credential in the git configuration. |
 
 The verdict workflow:
 
@@ -268,10 +278,11 @@ Each job that runs on a runner has a timeout. A job with no timeout can run for 
 | release | `publish` | 15 minutes |
 | release-please | the release-please job | 10 minutes |
 | advisory-response | the job `respond` | 30 minutes |
+| deps-autofix | the one job | 180 minutes |
 
 The job `verdict` of the release workflow calls the verdict workflow, which is a reusable workflow. It has no timeout of its own. The jobs of the called workflow carry their own timeouts.
 
-The release scripts `release.build.sh`, `release.image.sh`, `release.sbom.sh`, `release.notices.sh`, and `release.check.sh`, and the advisory script `advisory.respond.sh`, are in `.agents/scripts/`. They follow the same rules as the stage entry points: `--help`, a machine output by default, `--human`, actionable errors on stderr, and documented exit codes. They use the network, so they stay outside the verdict. `pipeline.verdict.sh` calls no release script and does not call `verdict.reuse.sh`. The hosted workflows do not change `pipeline.verdict.sh`, its cache, or its fingerprints. The repository settings script `repo.settings.sh` follows the same rules. Only a person runs it, and no workflow calls it. `release.md` (Repository settings) states it.
+The release scripts `release.build.sh`, `release.image.sh`, `release.sbom.sh`, `release.notices.sh`, and `release.check.sh`, the advisory script `advisory.respond.sh`, and the dependency autofix script `deps.autofix.sh`, are in `.agents/scripts/`. They follow the same rules as the stage entry points: `--help`, a machine output by default, `--human`, actionable errors on stderr, and documented exit codes. They use the network, so they stay outside the verdict. `pipeline.verdict.sh` calls no release script and does not call `verdict.reuse.sh`. The hosted workflows do not change `pipeline.verdict.sh`, its cache, or its fingerprints. The repository settings script `repo.settings.sh` follows the same rules. Only a person runs it, and no workflow calls it. `release.md` (Repository settings) states it.
 
 The project uses no paid service. The workflows use the GitHub-hosted runners and the GitHub Container Registry, which are free for a public repository. While the repository is private, only the verdict and release-please workflows run, on Linux x86_64 runners, and the release workflow stops in its first job. The account keeps a budget of 0 USD for GitHub Actions and for GitHub Packages, with usage stopped at the limit.
 
@@ -400,7 +411,7 @@ The targets of the release and the hosted workflows. `release.md` states the rel
 | Size of the image | `docker image inspect --format '{{.Size}}' ghcr.io/desek/agentloupe:<version>` after the pull, for each platform | 158 MB for `agent-loupe:local` as `docker image ls` reports on 2026-10-23 | at most 200 MB for each platform | |
 | Secrets in the workflow files | `gitleaks dir .github` finding count, plus `grep -rEc 'ghp_\|github_pat_\|gho_\|lpt_\|sk-ant-\|sk-' .github` | none, no workflow | 0 findings and 0 matches. A reference of the form `secrets.NAME` is not a secret value. | |
 | Release check result | `.agents/scripts/release.check.sh --version <version>; echo $?` | none, no release | exit code 0, every check `status: passed` or a stated `skipped` | |
-| New repository secrets | count of the secrets in the repository settings | 0 before 2026-10-23; 1 (`RELEASE_PLEASE_TOKEN`) since 2026-10-23 | exactly 1, `RELEASE_PLEASE_TOKEN` | |
+| New repository secrets | count of the secrets in the repository settings | 0 before 2026-10-23; 1 (`RELEASE_PLEASE_TOKEN`) since 2026-10-23 | exactly 2, `RELEASE_PLEASE_TOKEN` and `CLAUDE_CODE_OAUTH_TOKEN` | |
 | Paid use | the billing usage of the account for GitHub Actions and GitHub Packages, and its budgets | none, no workflow | 0 USD charged; a budget of 0 USD with usage stopped at the limit for each product | |
 | Community profile | `gh api repos/desek/agentloupe/community/profile --jq .health_percentage`, after the switch to public | 42 | 100 | |
 | Workflow jobs with no timeout | in each of the three workflow files, count the jobs that have the key `runs-on` and no key `timeout-minutes` | 11 (6 in `verdict.yml`, 4 in `release.yml`, 1 in `release-please.yml`) | 0 | |
@@ -433,6 +444,19 @@ The targets of the release and the hosted workflows. `release.md` states the rel
 | Write calls of the lookup | the fake `gh` of the shell test records the method of each call of `verdict.reuse.sh lookup` | none | 0 calls with a method other than `GET` || 0 of 21 shell test cases (`tests/scripts/verdict.reuse.test.sh`) |
 | Responses in the seeded dry run | the planned action lines of `advisory.respond.sh --dry-run` with a policy file that names a seeded advisory database | none | 1 draft, 1 note for each affected release, 1 issue, and 0 write calls || 2 of 2 runs on 2026-10-24 with a seeded database copy (`RUSTSEC-2099-0001` for `hex` 0.4.3) and a faked release `v0.1.0`: 1 draft (`blocked`, the repository is private), 1 note, 1 issue, 1 label, 0 write calls |
 | Deleted assets | before and after each run of `advisory.respond.sh` and of the release workflow: the count of releases, of release assets, of git tags, and of image tags | none | 0 deleted, 0 replaced by the advisory script || 0 deleted, 0 replaced: the repository has no release; no shell test case of the advisory script makes a delete, an upload, or a docker removal |
+
+### Dependency autofix targets
+
+The targets of the dependency autofix. `dependencies.md` states the behaviour. The column Measured is empty until the scenario `.agents/scenarios/deps.autofix.md` and the first 14 scheduled runs are measured. "None" means that the metric does not exist before the flow.
+
+| Metric | Method | Baseline | Threshold | Measured |
+|---|---|---|---|---|
+| Time of one run with nothing open | the duration of the run, from `createdAt` to `updatedAt` of `gh run view <run id> --json createdAt,updatedAt`, on a run whose summary line counts zero alerts and zero pull requests | none, no workflow | at most 5 minutes | |
+| Time of one run with one alert | the same method, on a run with exactly one alert and no Dependabot pull request, from the start to the merge of the release pull request | none, no workflow | at most 120 minutes | |
+| Credentials in logs | for each real run of the scenario: download the run log with `gh run view <run id> --log`, the issue text, and the pull request text, then run `gitleaks` on them and count the matches of the patterns `sk-ant-`, `ghp_`, `github_pat_`, `gho_`, `ghs_`, and the literal value of each secret on the machine of the owner | none, no workflow | 0 findings and 0 matches | |
+| Share of runs with a defined end | over the first 14 scheduled runs: count the runs that end with exit 0 and a count line of zero, with a merged or auto-merge fix, or with exit 1 and an updated issue; divide by the count of runs | none, no workflow | 14 of 14 (every run) | |
+| Tokens of one `claude -p` run | the fields `input_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`, and `output_tokens` of the result of the run, printed by the script on its item line | none, no run | recorded for each run; no threshold for the first 14 runs | |
+| API-equivalent cost of one `claude -p` run | the token counts of the row above and the model of the run, priced with the rules of `cost.md` and the vendored price file, as the dashboard shows a cost; compared with the field `total_cost_usd` of the result | none, no run | at most 5 US dollars for each run; the two values differ by at most 5 percent, or the difference has a stated reason in `dependencies.md` | |
 
 ### Start telemetry targets
 

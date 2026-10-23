@@ -70,7 +70,7 @@ The release workflow starts only on a tag of the git tag form. It ignores a tag 
 2. release-please keeps at most one open release pull request. Its head branch is `release-please--branches--main--components--agent-loupe`, the name that release-please makes for the package `agent-loupe`. Its title has the form `chore(release): release <version>`. A new releasable commit on `main` updates the same pull request.
 3. The release pull request changes only `Cargo.toml`, `Cargo.lock`, `.release-please-manifest.json`, and `CHANGELOG.md`.
 4. The verdict workflow runs on the release pull request, because release-please uses the release token (see "Release token").
-5. A human reviews the release pull request and squash merges it. The main ruleset (see "Repository settings") lets the merge happen only when the check `verdict` passed. The type `chore` of the title keeps the merge commit out of the next release notes. The merge setting deletes the release branch after the merge. release-please makes the branch again for the next release.
+5. A human, or the dependency autofix, squash merges the release pull request. The main ruleset (see "Repository settings") lets the merge happen only when the check `verdict` passed. The type `chore` of the title keeps the merge commit out of the next release notes. The merge setting deletes the release branch after the merge. release-please makes the branch again for the next release.
 6. The merge starts the release-please workflow again. It makes the tag `v<version>` on the merge commit and a GitHub release. The notes of the release are the changelog section of that version.
 7. The push of the tag starts the release workflow. Each tag gets exactly one automatic run. A human can start the release workflow by hand with a tag input, to run a failed release again.
 8. When the repository is private, the release workflow fails in its first job, on a Linux x86_64 runner. The error names the visibility. The run starts no macOS job, no arm64 job, and no push to the registry.
@@ -78,6 +78,18 @@ The release workflow starts only on a tag of the git tag form. It ignores a tag 
 10. The release workflow builds the three binary assets and the two platform images in parallel, on native runners.
 11. When all three binary builds and both image builds pass, the release workflow attaches the 16 asset files to the GitHub release (see "Release assets"). Then it pushes the image index with the tag `<version>`. Then the promote step moves the image tag `latest` to that index (see "Container image").
 12. When one job fails, the release workflow fails. The release gets no partial set of assets from that run.
+
+### Releases from the dependency autofix
+
+The daily dependency autofix is a source of `fix(deps)` releases. `dependencies.md` states the flow.
+
+1. The autofix merges a green fix as a `fix(deps)` squash commit on `main`. release-please then proposes a patch release in the release pull request.
+2. In the same run, the autofix waits for the release-please run on the merge commit, and for the check `verdict` of the release pull request. When the check is green, the autofix squash merges the release pull request. The tag, the release, and the release workflow follow as for a merge by a human.
+3. The autofix merges the release pull request only when a `fix(deps)` change is in it: in a run that merged a `fix(deps)` commit, or in a later run when the changelog section of the open release pull request lists a `fix(deps)` change.
+4. The autofix never merges a release pull request that proposes `1.0.0` or a new major version. A human merges it.
+5. When the check is not green before the wait cap, the release pull request stays open, and the next daily run tries again.
+6. One autofix branch for each day gives at most one autofix release for each day.
+7. A release that the autofix merges also carries each other unreleased releasable commit on `main`, for example a `feat` commit of the owner.
 
 ### First release
 
@@ -317,6 +329,18 @@ The changelog and the release notes come from the commit types.
 
 These commit types are hidden. They do not show in the notes and do not cause a bump: `checkpoint`, `docs`, `chore`, `test`, `ci`, `build`, `refactor`, and `style`.
 
+### Commit types of dependency updates
+
+A dependency update gets its type from what it changes. Only an update of the shipped binary makes a release.
+
+| Update | Type | Section |
+|---|---|---|
+| A `cargo` update, by Dependabot or by the dependency autofix | `fix(deps)` | Bug Fixes, a patch bump |
+| An `npm` update of `prototype/`, by Dependabot, or a fix of the dependency autofix that changes only `prototype/` | `chore(deps)` | hidden, because the prototype is not shipped |
+| A pin update of an action, by Dependabot | `ci(deps)` | hidden, because a pin does not change the binary or the image |
+
+The squash commit of an autofix pull request is `fix(deps)` when the pull request holds one or more `cargo` fixes, and `chore(deps)` when it holds only `prototype/` fixes. The squash body keeps one line for each fix, with the type of that fix.
+
 ## Commit rule for a change request
 
 Most work of a change request is in hidden commits. One commit carries the change request into the release notes.
@@ -337,10 +361,11 @@ Most work of a change request is in hidden commits. One commit carries the chang
 release-please uses a fine-grained personal access token. GitHub does not start a workflow from an event that the `GITHUB_TOKEN` of a workflow makes. With this token, the verdict workflow runs on the release pull request, and the tag push starts the release workflow.
 
 1. The token has the repository permissions contents, pull requests, and issues, each read and write, on this repository only. release-please needs the issues permission for the labels of the release pull request.
-2. The token is stored only as the repository secret `RELEASE_PLEASE_TOKEN`. It is the only repository secret of the project. No file holds its value.
+2. The token is stored only as the repository secret `RELEASE_PLEASE_TOKEN`. The project has two repository secrets: this token and `CLAUDE_CODE_OAUTH_TOKEN` of the dependency autofix (`dependencies.md`, Tokens). No file holds the value of either.
 3. The release-please workflow names the secret in one place.
 4. The release pull request and the tag show the owner of the token as the author.
 5. The host of the start request is the repository variable `LOUPE_TELEMETRY_HOST`, not a secret. The host is visible in each release binary, so it is not secret. The variable does not change the count of repository secrets. No workflow holds a Cloudflare token.
+6. The dependency autofix uses the same token for its push, its pull requests, its merges, and its read of the Dependabot alerts. For this use, the token also has the repository permission "Dependabot alerts: read", and "Workflows: write" when the merge of a pin update of an action needs it. `dependencies.md` (Tokens) states the use.
 
 Check the expiry date of the token before each release. To rotate the token, do these steps:
 
@@ -353,7 +378,9 @@ When the token expires, release-please fails with an authentication error. No re
 
 ## Pinned actions
 
-Each workflow pins each action from outside the repository by its full 40-character commit SHA, with the release tag in a comment. At each minor release, a human checks the pins for security fixes. No tool opens update pull requests for the pins.
+Each workflow pins each action from outside the repository by its full 40-character commit SHA, with the release tag in a comment. At each minor release, a human checks the pins for security fixes.
+
+Dependabot opens a weekly update pull request for the pins, with the type `ci(deps)`. The type is hidden, so a pin update makes no release. Dependabot updates the SHA and the version comment. The dependency autofix merges such a pull request only when its check `verdict` is green and its diff keeps a full SHA pin. It never merges a diff that replaces a SHA with a tag or a branch name, and it never lets Claude Code change a workflow file. `dependencies.md` states the rules.
 
 ## Repository settings
 

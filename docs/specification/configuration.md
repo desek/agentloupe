@@ -134,6 +134,19 @@ The binary reads three provider credentials:
 3. A subscription OAuth token works with Haiku only. If the active `anthropic` kind is `oauth_token` and the summary provider is `anthropic`, a summary model other than `claude-haiku-5-5` stops `loupe serve` and `loupe summarize` at start. The actionable error names `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, and `LOUPE_SUMMARY_MODEL`.
 4. A log line, the `loupe config show` output, and an API response never hold a credential value or a part of it.
 
+## Repository secrets
+
+The GitHub repository holds two secrets for its workflows. The binary never reads them.
+
+| Secret | Credential of | Read by |
+|---|---|---|
+| `RELEASE_PLEASE_TOKEN` | release-please and the writes of the dependency autofix | the release-please workflow and the step of `deps.autofix.sh` |
+| `CLAUDE_CODE_OAUTH_TOKEN` | the headless `claude -p` run of the dependency autofix | only the step of `deps.autofix.sh` in the deps-autofix workflow |
+
+1. The secret `CLAUDE_CODE_OAUTH_TOKEN` has the same name as the provider credential of the binary. It is a different value with a different use: the subscription token that the owner makes with `claude setup-token` for the workflow run.
+2. No workflow file, script, log line, issue, pull request, or commit holds a secret value. A script that finds a secret missing names the secret, never its value.
+3. `release.md` (Release token) and `dependencies.md` (Tokens) state the rotation of each secret.
+
 ## Provider base URLs
 
 `ANTHROPIC_BASE_URL` (default `https://api.anthropic.com`) and `OPENAI_BASE_URL` (default `https://api.openai.com/v1`) set the base URL of each provider. The vendor SDKs read the same names. The OpenAI base URL includes `/v1`, and the Anthropic base URL does not. Each base URL must use `https`, except for a host of `127.0.0.1` or `localhost`. A different value stops the start with an actionable error that names the variable. This is the rule of `proxy.md` for an upstream.
