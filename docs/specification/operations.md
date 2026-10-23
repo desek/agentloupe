@@ -12,9 +12,13 @@
 
 Each subcommand has a complete `--help`.
 
+`loupe --version` prints `loupe <version>`, then a newline, on stdout, and exits with code 0. The version comes from `Cargo.toml` at build time. `release.md` states the version rules.
+
 ## Logging
 
 The binary writes each log event as one line to stderr and to `<LOUPE_DATA_DIR>/logs/loupe.log`. Each line in the file is one JSON object. Each line has the time in UTC, the level, the source location as `path/file.rs:LINE`, and the message with its key fields. No log line contains a secret value. A normal start with valid configuration logs no warning and no error.
+
+The first log line of `loupe serve` holds the key field `version` with the version from `Cargo.toml`. Like each line, it goes to stderr and to the log file.
 
 ## Storage
 
@@ -50,6 +54,10 @@ The `Dockerfile` has two stages. The build stage compiles a release binary with 
 The runtime image is `debian:bookworm-slim`. It has the same C library as the build stage, and it has `bash`. The `HEALTHCHECK` uses the `/dev/tcp` feature of `bash`, so the image needs no `curl`. A smaller distroless image has no shell, so it cannot run a `HEALTHCHECK` without an extra program. The runtime user is `loupe` with UID and GID `10001`.
 
 `compose.yaml` has one service. It binds the port as `127.0.0.1:8787:8787`. It mounts a named volume at `/data`, reads the secrets from `.env`, and sets `LOUPE_ENV`. `.env.example` lists each variable name that `compose.yaml` passes, with no value.
+
+### Registry image
+
+A release publishes the image `ghcr.io/desek/agentloupe`. The release workflow builds it from the same `Dockerfile` with no change. The image is one multi-platform index for `linux/amd64` and `linux/arm64`, with the tags `<version>` (no `v`) and `latest`. The tag `latest` moves only when both platform builds pass. The image carries the OCI labels source, version, revision, licenses, title, description, and created. The label created is the commit time of the tag. `release.md` states the values. A pull of the image needs no login. `compose.yaml` stays a local build of the image.
 
 ### An old volume that the runtime user cannot write
 
@@ -117,6 +125,33 @@ The flag `--no-cache` runs every stage, and still writes the fingerprints of the
 The verdict fails closed. If git is missing, the temporary index fails, a hash fails, the cache is absent or unreadable, a `--inputs` or a `--toolchain` fails, or a base image is absent from the local image store, the verdict runs the affected stages in full. It prints one diagnostic line on stderr that names the cause. Only a positive match skips a stage. The fingerprint and cache logic is in a separate script under `.agents/scripts/` that the verdict calls, and the verdict stays a caller of the stage entry points.
 
 Only the hermetic stages format, lint, test, web, and image enter the verdict. The image stage is in the default verdict. The live scenarios and the benches stay outside the verdict, because they use the network or the wall clock.
+
+### Hosted workflows
+
+Three GitHub Actions workflows are thin callers of the pipeline. A workflow does only platform work: the trigger, the runner, the checkout, the toolchain install from the pin files, the cache, one call for each stage or release step, the upload of artifacts and release assets, the login to the registry, and the gate on the visibility of the repository. A workflow file holds no project logic, no tool version, no target triple, no image name, no version of the project, no configuration value, and no secret value. The pin files, the release-please configuration files, and the scripts hold these values. Each action from outside the repository is pinned by its full 40-character commit SHA, with the release tag in a comment.
+
+| Workflow | Starts on | Does |
+|---|---|---|
+| verdict | each push to `main`, each pull request that targets `main`, and a call from another workflow of the repository with the ref to check out as an input | Runs the stages format, lint, test, web, and image as five parallel jobs, then one final job `verdict`. |
+| release-please | each push to `main` | Keeps one release pull request open, and makes the tag and the GitHub release when the release pull request merges. `release.md` states the flow. |
+| release | the push of a tag `v<major>.<minor>.<patch>`, and a manual start with a tag input | Runs the verdict workflow on the tag commit, then builds and publishes the release assets. `release.md` states the assets. |
+
+The verdict workflow:
+
+1. Each stage job makes exactly one call to its stage entry point, with no argument that changes the stage.
+2. Each job checks out the head commit of the event: the head commit of the pull request, the pushed commit, or the commit of the ref input. A job never checks out the merge ref of a pull request.
+3. Each job installs the Rust toolchain with rustup from `rust-toolchain.toml`, and Node and `cargo-nextest` with mise from `.tool-versions`. A job installs only the tools that its stage needs.
+4. The workflow fails closed. The job `verdict` depends on the five stage jobs. It passes only when each of the five jobs has the result `success`. The result `failure`, `cancelled`, or `skipped` makes it fail. No job continues on an error or retries automatically.
+5. The workflow has only the permission `contents: read`.
+6. The test stage runs on Linux in the verdict workflow. The local verdict of `pipeline.verdict.sh` runs on macOS.
+7. A new push to a pull request cancels the older verdict run of that pull request. A run for a push to `main` and a release run are never cancelled.
+8. The hosted runners do not use the verdict cache of `pipeline.verdict.sh`. The jobs cache the cargo registry and the target directory with a key from `Cargo.lock` and `rust-toolchain.toml`.
+
+The release-please workflow gives its `GITHUB_TOKEN` only the permissions `contents: write` and `pull-requests: write`. release-please itself uses the release token of `release.md`. The release workflow logs in to the registry with its `GITHUB_TOKEN`, with the permissions `contents: write` and `packages: write`.
+
+The release scripts `release.build.sh`, `release.image.sh`, and `release.check.sh` are in `.agents/scripts/`. They follow the same rules as the stage entry points: `--help`, a machine output by default, `--human`, actionable errors on stderr, and documented exit codes. They use the network, so they stay outside the verdict. `pipeline.verdict.sh` calls no release script. The hosted workflows do not change `pipeline.verdict.sh`, its cache, or its fingerprints.
+
+The project uses no paid service. The workflows use the GitHub-hosted runners and the GitHub Container Registry, which are free for a public repository. While the repository is private, only the verdict and release-please workflows run, on Linux x86_64 runners, and the release workflow stops in its first job. The account keeps a budget of 0 USD for GitHub Actions and for GitHub Packages, with usage stopped at the limit.
 
 ## Connect the agents
 
@@ -230,3 +265,18 @@ The time to a full verdict is the time of the local loop. The first measured val
 | Summary request count, two-day window | the count of model requests that the fake upstream records, `loupe backfill` over the two-day window on a copy of the database | 249 requests (248 Claude Code segments and 1 Pi segment) | at most 2 times the count of distinct pairs of session key and day of a call On 2026-10-21 at 200 characters: 794 requests, of which 278 session lines, 279 full session summaries, and 237 session day summaries, against 281 pairs (threshold 562). The two session texts alone use 516 requests; the session lines of each segment stay and add 278. Re-measured on 2026-10-21: 793 requests (278 lines, 279 full, 236 day) against 282 pairs (threshold 564), failed. Re-measured on 2026-10-21 after the session lines stopped: 523 requests (0 lines, 279 full, 244 day) against 282 pairs (threshold 564), passed. |
 | Characters per summary request | the maximum and the median of the request characters that the fake upstream records, same run | measured before the change | maximum at most 24000 plus the rule text and the full session summary; median reported On 2026-10-21 at 200 characters, over the full and day requests: maximum 25767, median 2426 (400: 25838 and 2488; 800: 25823 and 2576). Re-measured on 2026-10-21: maximum 25708, median 2403. Re-measured on 2026-10-21 after the session lines stopped: maximum 25847, median 2436. |
 | Row counts of the session texts | `sqlite3` counts of `session_day_summaries` and `session_full_summaries` rows against the count of distinct pairs of session key and day of a call in `calls`, over the two-day window | no table | equal counts On 2026-10-21: 281 rows in each table against 281 pairs; 2 pending rows belong to segments that were still open. Re-measured on 2026-10-21: 282 rows in each table, 3 pending rows of open segments. |
+
+### Release targets
+
+The targets of the release and the hosted workflows. `release.md` states the release. The column Measured is empty until the first release `0.1.0` is measured. "None" means that the metric does not exist before the release work.
+
+| Metric | Method | Baseline | Threshold | Measured |
+|---|---|---|---|---|
+| Verdict workflow time on a pull request | the duration of the workflow run, from `createdAt` to `updatedAt` of `gh run view <run id> --json createdAt,updatedAt`, on a pull request that changes one Rust file | none, no workflow | at most 20 minutes with a cold cache, at most 12 minutes with a warm cache | |
+| Time from the tag to the published assets | the time from `createdAt` of `gh release view v<version> --json createdAt` to the end of the release workflow run on the same tag, when the six assets and the tag `latest` exist | none, no release | at most 45 minutes | |
+| Size of each binary | the binary size that `release.build.sh` prints for each asset, read from the log of the release run | 14 402 064 bytes for a local release build on macOS arm64 on 2026-10-21; not a release asset | at most 25 MiB for each of the three binaries | |
+| Size of the image | `docker image inspect --format '{{.Size}}' ghcr.io/desek/agentloupe:<version>` after the pull, for each platform | 158 MB for `agent-loupe:local` as `docker image ls` reports on 2026-10-23 | at most 200 MB for each platform | |
+| Secrets in the workflow files | `gitleaks dir .github` finding count, plus `grep -rEc 'ghp_\|github_pat_\|gho_\|lpt_\|sk-ant-\|sk-' .github` | none, no workflow | 0 findings and 0 matches. A reference of the form `secrets.NAME` is not a secret value. | |
+| Release check result | `.agents/scripts/release.check.sh --version <version>; echo $?` | none, no release | exit code 0, every check `status: passed` or a stated `skipped` | |
+| New repository secrets | count of the secrets in the repository settings | 0 before 2026-10-23; 1 (`RELEASE_PLEASE_TOKEN`) since 2026-10-23 | exactly 1, `RELEASE_PLEASE_TOKEN` | |
+| Paid use | the billing usage of the account for GitHub Actions and GitHub Packages, and its budgets | none, no workflow | 0 USD charged; a budget of 0 USD with usage stopped at the limit for each product | |

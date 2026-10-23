@@ -20,3 +20,4 @@ This directory describes how the `loupe` binary behaves. Each file covers one pr
 | `github.md` | The GitHub worker and the GitHub token labels. |
 | `configuration.md` | The configuration loader, the variables, the provider credentials and their detection, and `loupe config show`. |
 | `operations.md` | The subcommands, logging, storage, health, the provider ping, shutdown, the container, and the pipeline. |
+| `release.md` | The version rules, the bump rules, the tag and image tag forms, the release flow with release-please, the release assets and their checksum files, the commit rule for a change request, the release token, and the release check. |
