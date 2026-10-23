@@ -1080,3 +1080,10 @@ Open blocking findings: none.
 9. The base image digests are the index digests of `rust:slim-bookworm` (`sha256:86234e85…`) and `debian:bookworm-slim` (`sha256:7ff6ba31…`) on 2026-10-23.
 10. The test `every_stage_prints_its_inputs` still expected three web inputs after `e13351f` made `web.size.sh` an input of the web stage, so the test stage failed at `e13351f`. The test now expects four.
 11. `repo.settings.sh` reads with `gh api --jq`, which gh evaluates itself, so no `jq` is needed. Its shell tests serve the output of those reads from a fake `gh`. On the private repository, `--dry-run` gives `unavailable` for both rulesets (403), secret scanning (`security_and_analysis` null), and private vulnerability reporting (404), and `planned` for the merge settings, the actions policy, and the Dependabot alerts. Parameters P1, P2, P4, and P5 wait for the switch to public.
+
+Implementation notes, 2026-10-23, decided by the supervisor on the implementer's questions:
+
+1. The scenario file is `.agents/scenarios/release.readiness.md`, not `repo.settings.md`; this note corrects the CR.
+2. The release image jobs install the Rust toolchain because the notices script needs cargo there. Accepted as a deviation from requirement 53, recorded here.
+3. The scenario landed in its own pull request after the change. Accepted.
+4. The local commits made beside the implementation were rebased onto main by the supervisor.
