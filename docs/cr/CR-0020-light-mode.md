@@ -2,7 +2,7 @@
 name: "CR-0020 Light mode"
 description: "The dashboard gets a light color scheme from design tokens. The system preference selects the scheme, and a three-state control in the header (System, Light, Dark) overrides it. The browser keeps the override in localStorage. The page paints the correct scheme from the first frame, and text and chart colors meet the contrast thresholds on the light surface."
 id: "CR-0020"
-status: "approved"
+status: "implemented"
 date: 2026-10-23
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
