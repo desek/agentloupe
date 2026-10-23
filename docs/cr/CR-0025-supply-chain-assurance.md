@@ -1275,3 +1275,10 @@ Decisions at the implementation:
 9. Defect found at the run: `advisory.respond.sh` used `gh auth status`, which fails when any stored account has an invalid token; it now uses `gh auth token`.
 10. The scenario file is `.agents/scenarios/release.assurance.md`, the name of the implementation request, not `supply-chain.md`.
 
+Implementation notes, 2026-10-24, decided by the supervisor on the implementer's questions:
+
+1. The daily advisory workflow exists now and reports the draft advisory as blocked while the repository is private; the specification follows that behaviour. Accepted.
+2. The measured values of the release profile are in the release specification, the other values in the operations document, as the specification diff placed them. Accepted.
+3. The SBOM tool is pinned through the GitHub release backend of mise, because its registry has no entry, and the SBOM lists only the crates of the binary. Accepted.
+4. The SECURITY.md lines, the README install line, and the CR-0023 amendment note come with the public parts of this CR after the first public release.
+5. The failed first attempt of the hosted verdict on main at efe79b5 passed on a re-run with the same tree; the supervisor investigates it as a flaky test.
