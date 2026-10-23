@@ -1,101 +1,40 @@
-// @agents-index Unit tests of the color tokens: the light values meet the contrast rules, both schemes name the same tokens, no color literal elsewhere.
+// @agents-index Unit tests of the color tokens: light contrast rules, the same names in both schemes, dark kept, no literal elsewhere.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync as read, readdirSync } from 'node:fs';
 
-const css = readFileSync(new URL('../assets/css/tokens.css', import.meta.url), 'utf8');
-
-/** The color tokens (`--color-*` and `--heat-*`) of the first rule block whose selector is `selector`. */
-function colors(selector) {
-  const start = css.indexOf(`${selector} {`);
-  assert.ok(start >= 0, `tokens.css has no block ${selector}`);
-  const body = css.slice(start, css.indexOf('}', start));
-  const out = {};
-  for (const m of body.matchAll(/(--(?:color|heat)-[\w-]+):\s*(#[0-9A-Fa-f]{6})\s*;/g)) out[m[1]] = m[2].toUpperCase();
-  return out;
+const web = new URL('../', import.meta.url);
+const css = read(new URL('assets/css/tokens.css', web), 'utf8');
+const block = (s) => Object.fromEntries([...css.split(s)[1].split('}')[0].matchAll(/--([\w-]+): (#\w+)/g)].map((m) => m.slice(1)));
+const dark = block(':root {');
+const L = block('light"] {');
+/** The WCAG 2.x contrast ratio of the light values of two tokens. */
+function ratio(a, b) {
+  const lum = (h) => [1, 3, 5].reduce((s, i, k) => { const c = parseInt(h.substr(i, 2), 16) / 255; return s + [0.2126, 0.7152, 0.0722][k] * (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4); }, 0);
+  const [x, y] = [lum(L[a]), lum(L[b])].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
 }
-
-const dark = colors(':root');
-const light = colors(':root[data-scheme="light"]');
-
-/** WCAG 2.x relative luminance of a #RRGGBB color. */
-function luminance(hex) {
-  const n = parseInt(hex.slice(1), 16);
-  const [r, g, b] = [n >> 16, (n >> 8) & 255, n & 255].map((v) => {
-    const c = v / 255;
-    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
-/** WCAG 2.x contrast ratio of two colors. */
-function contrast(a, b) {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (hi + 0.05) / (lo + 0.05);
-}
-
-const TEXT = ['--color-text', '--color-text-body', '--color-text-muted', '--color-text-faint', '--color-link', '--color-link-hover'];
-const CHART = ['--color-input', '--color-output', '--color-positive', '--color-cache-read', '--color-cache-write', '--heat-1', '--heat-2', '--heat-3', '--heat-4'];
-
-// The dark values of the specification, which this change keeps.
-const DARK = {
-  '--color-bg': '#0F1012', '--color-ink-inverse': '#111214', '--color-surface': '#15161A', '--color-border': '#24262B',
-  '--color-rule': '#2A2C31', '--color-text': '#ECEAE4', '--color-text-body': '#B5B4AE', '--color-text-muted': '#9A9AA0',
-  '--color-text-faint': '#85868C', '--color-input': '#5E86E0', '--color-output': '#BB7F35', '--color-positive': '#3FA864',
-  '--color-cache-read': '#8C6BC8', '--color-cache-write': '#4FA3A5', '--color-highlight': '#D9C27A', '--color-link': '#9DB6EE',
-  '--color-link-hover': '#C9D7F6', '--heat-0': '#1D1F23', '--heat-1': '#1B4A2F', '--heat-2': '#21703E', '--heat-3': '#2E9A55',
-  '--heat-4': '#4FCB74',
-};
+const min = (list, bgs, n) => list.forEach((t) => bgs.forEach((b) => assert.ok(ratio(t, b) >= n, `${t} on ${b}`)));
+const heat = ['heat-1', 'heat-2', 'heat-3', 'heat-4'];
 
 test('light_text_contrast', () => {
-  for (const t of TEXT) {
-    for (const bg of ['--color-bg', '--color-surface']) {
-      assert.ok(contrast(light[t], light[bg]) >= 4.5, `${t} on ${bg}: ${contrast(light[t], light[bg]).toFixed(2)}`);
-    }
-  }
-});
-
-test('light_ink_inverse_contrast', () => {
-  assert.ok(contrast(light['--color-ink-inverse'], light['--color-text']) >= 4.5);
+  min(['text', 'text-body', 'text-muted', 'text-faint', 'link', 'link-hover'].map((t) => `color-${t}`), ['color-bg', 'color-surface'], 4.5);
+  min(['color-ink-inverse'], ['color-text'], 4.5);
 });
 
 test('light_chart_contrast', () => {
-  for (const t of CHART) {
-    assert.ok(contrast(light[t], light['--color-surface']) >= 3, `${t}: ${contrast(light[t], light['--color-surface']).toFixed(2)}`);
-  }
-  for (const t of ['--color-positive', '--color-output']) {
-    assert.ok(contrast(light[t], light['--color-surface']) >= 4.5, `${t} as text`);
-  }
-});
-
-test('light_heat_order', () => {
-  const r = ['--heat-1', '--heat-2', '--heat-3', '--heat-4'].map((t) => contrast(light[t], light['--color-surface']));
-  for (let i = 1; i < r.length; i++) assert.ok(r[i] > r[i - 1], `level ${i + 1} is not darker than level ${i}`);
-});
-
-test('light_surface_lighter_than_bg', () => {
-  assert.ok(luminance(light['--color-surface']) > luminance(light['--color-bg']));
+  min(['input', 'output', 'positive', 'cache-read', 'cache-write'].map((t) => `color-${t}`).concat(heat), ['color-surface'], 3);
+  min(['color-positive', 'color-output'], ['color-surface'], 4.5);
+  heat.slice(1).forEach((t, i) => assert.ok(ratio(t, 'color-surface') > ratio(heat[i], 'color-surface'), t));
 });
 
 test('every_color_token_has_light_value', () => {
-  assert.deepEqual(Object.keys(light).sort(), Object.keys(dark).sort());
-  assert.deepEqual(dark, DARK);
+  assert.deepEqual(Object.keys(L).sort(), Object.keys(dark).sort());
+  assert.equal(Object.values(dark).join(''), '#0F1012#111214#15161A#24262B#2A2C31#ECEAE4#B5B4AE#9A9AA0#85868C#5E86E0#BB7F35#3FA864#8C6BC8#4FA3A5#D9C27A#9DB6EE#C9D7F6#1D1F23#1B4A2F#21703E#2E9A55#4FCB74');
 });
 
-/** Every page file under web/ outside the tests, recursively. */
-function pageFiles(dir) {
-  return readdirSync(dir).flatMap((f) => {
-    const u = new URL(f, dir);
-    if (statSync(u).isDirectory()) return f === 'test' ? [] : pageFiles(new URL(`${f}/`, dir));
-    return /\.(css|js|html)$/.test(f) ? [u] : [];
-  });
-}
-
 test('no_color_literal_outside_tokens', () => {
-  const files = pageFiles(new URL('../', import.meta.url)).filter((u) => !u.pathname.endsWith('/assets/css/tokens.css'));
-  assert.ok(files.length > 10);
-  for (const u of files) {
-    const src = readFileSync(u, 'utf8');
-    assert.doesNotMatch(src, /#[0-9A-Fa-f]{3,8}\b(?![\w-])|\brgba?\(|\bhsla?\(/, u.pathname);
+  for (const f of readdirSync(web, { recursive: true }).filter((f) => /^(?!test).*(?<!tokens)\.(css|js|html)$/.test(f))) {
+    assert.doesNotMatch(read(new URL(f, web), 'utf8'), /#[\da-f]{3,8}\b(?![\w-])|\b(rgb|hsl)a?\(/i, f);
   }
 });

@@ -7,7 +7,7 @@ const dir = new URL('../assets/js/', import.meta.url);
 const files = readdirSync(dir).filter((f) => f.startsWith('live.'));
 
 test('no_storage_access', () => {
-  // Only the scheme script and the scheme control (scheme.*) use localStorage, for the one key of the scheme override.
+  // Only the scheme modules use localStorage, for one key.
   assert.ok(files.length >= 4);
   for (const f of files) {
     const src = readFileSync(new URL(f, dir), 'utf8');

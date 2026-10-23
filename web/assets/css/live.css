@@ -11,7 +11,7 @@
 .live-fig { min-width: 0; }
 .live-fig .note { overflow-wrap: anywhere; }
 .live-value { font-family: var(--font-mono); font-size: var(--size-figure-small); font-weight: 500; }
-/* The kept figures stay at least 3 to 1 on the card in each scheme, so only the sparkline fades. */
+/* Only the sparkline fades; the figures keep 3 to 1. */
 .live-paused .live-value { color: var(--color-text-faint); }
 .live-paused .live-box { opacity: 0.5; }
 /* The sparkline is as tall as the digits of a figure. */

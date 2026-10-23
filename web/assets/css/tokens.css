@@ -1,4 +1,4 @@
-/* @agents-index Design tokens of the dashboard: the dark and the light color values, fonts, sizes, radii, and the font faces. */
+/* @agents-index Design tokens of the dashboard from the mockup: dark and light colors, fonts, sizes, radii, and the font faces. */
 @font-face {
   font-family: 'Geist';
   src: url('/assets/fonts/Geist-Regular.woff2') format('woff2');
@@ -11,7 +11,7 @@
   font-weight: 100 900;
   font-display: swap;
 }
-/* The dark values are the default, so a page with no scheme script (the private page) stays dark. */
+/* Dark by default: the private page has no scheme script. */
 :root {
   color-scheme: dark;
   --color-bg: #0F1012;
@@ -54,7 +54,7 @@
   --radius-pill: 999px;
 }
 
-/* The light values; only the scheme script of the dashboard sets data-scheme on the root element. */
+/* Set only by the scheme script of the dashboard. */
 :root[data-scheme="light"] {
   color-scheme: light;
   --color-bg: #F3F2EE;
