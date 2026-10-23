@@ -143,10 +143,10 @@ sequenceDiagram
 
 **Manual override in the header**
 
-8. The header **MUST** show one control group with the accessible name "Color scheme" and three buttons with the text "System", "Light", and "Dark".
-9. The control group **MUST** come directly after the range group. The range group and the control group **MUST** sit together at the right end of the header row, with the brand at the left, in the same row at 1440 px.
-10. The button of the current state **MUST** have `aria-pressed="true"`. The other two buttons **MUST** have `aria-pressed="false"`. In the state System, the button "System" is pressed, not the button of the resolved scheme.
-11. The keyboard **MUST** reach and use each button. Each button **MUST** have a minimum height of 44 px, as the range buttons have.
+8. The header **MUST** show one toggle switch: a button with the role `switch` and the accessible name "Dark mode".
+9. The switch **MUST** come directly after the range group. The range group and the switch **MUST** sit together at the right end of the header row, with the brand at the left, in the same row at 1440 px.
+10. The switch **MUST** have `aria-checked="true"` when the resolved scheme is dark, and `aria-checked="false"` when it is light. A click **MUST** set the other scheme. When the new scheme equals the system preference, the click **MUST** remove the scheme key, so the page follows the system preference again. Else the click **MUST** write the new scheme to the key. With no preference or no `matchMedia`, the system preference counts as dark.
+11. The keyboard **MUST** reach the switch with Tab and set the other scheme with Space and with Enter. The switch **MUST** show a track of 44 by 24 px with a knob.
 12. A selection of Light or Dark **MUST** write the value `light` or `dark` to one `localStorage` key. A selection of System **MUST** remove that key.
 13. A selection **MUST** change the scheme of the full page at once, with no reload, no new request to `/v1/days`, and no close of the live socket.
 14. A selection **MUST NOT** change the URL fragment. The range stays in the fragment as before.
@@ -199,7 +199,7 @@ sequenceDiagram
 | Metric | Method | Baseline | Threshold |
 |---|---|---|---|
 | Code size | `.agents/scripts/web.size.sh` prints `code_kib` | 65.6 KiB at `446f065`, after CR-0021 (64.8 KiB at `ac55e2a`) | at most 100 KiB |
-| Added scheme code | the increase of `code_kib` from the baseline | 0 | at most 6.0 KiB |
+| Added scheme code | the increase of `page_kib` from the baseline; `.agents/scripts/web.size.sh` prints `page_kib`, the bytes of `web/` minus `web/assets/fonts/`, `web/private/`, and `web/test/` | 47.7 KiB at `446f065`, after CR-0021 | at most 6.0 KiB |
 | Draw time, each scheme | `.agents/scripts/web.render.sh --days 400 --scheme light` and `--scheme dark` print `draw_ms` | measured at the start of implementation, dark only | at most 500 ms in each scheme |
 | Remote requests, each scheme | `.agents/scripts/web.render.sh --days 400 --scheme light` and `--scheme dark` print `remote_requests` | 0, dark only | 0 in each scheme |
 | Headline above the fold | `.agents/scripts/web.render.sh --days 400 --scheme light` prints `headline_above_fold_360` and `headline_above_fold_1440` | true at both widths, with no control | true at both widths, with the control |
@@ -374,7 +374,7 @@ Given no stored scheme value
 When the page loads at 1440 px
 Then the page uses the light token values
   And the root color-scheme is light
-  And the button "System" has aria-pressed "true"
+  And the switch "Dark mode" has aria-checked "false"
 ```
 
 ### AC-2: The resolve rule follows the table
@@ -384,41 +384,45 @@ Given the stored value <stored>
   And the system preference <system>
 When the page resolves the scheme
 Then the scheme is <scheme>
-  And the pressed button is <button>
+  And the switch has aria-checked <checked>
 
 Examples:
-  | stored  | system        | scheme | button |
-  | none    | light         | light  | System |
-  | none    | dark          | dark   | System |
-  | none    | no preference | dark   | System |
-  | light   | dark          | light  | Light  |
-  | dark    | light         | dark   | Dark   |
-  | invalid | light         | light  | System |
-  | error   | light         | light  | System |
+  | stored  | system        | scheme | checked |
+  | none    | light         | light  | false   |
+  | none    | dark          | dark   | true    |
+  | none    | no preference | dark   | true    |
+  | light   | dark          | light  | false   |
+  | dark    | light         | dark   | true    |
+  | invalid | light         | light  | false   |
+  | error   | light         | light  | false   |
 ```
 
-### AC-3: The header control overrides and resets
+### AC-3: The header switch overrides and resets
 
 ```gherkin
-Given the page in the state System with the system preference light
-When the reader selects "Dark"
+Given no stored scheme value and the system preference light
+When the reader clicks the switch "Dark mode"
 Then the page is dark at once
+  And the switch has aria-checked "true"
   And the scheme key holds "dark"
   And no new request to /v1/days goes out
   And the live socket stays open
   And the URL fragment does not change
-When the reader selects "System"
+When the reader clicks the switch again
 Then the page is light
-  And the scheme key is absent
+  And the scheme key is absent, because light is the system preference
 ```
 
 ### AC-4: The override survives a reload
 
 ```gherkin
-Given the reader selected "Light" with the system preference dark
+Given the reader clicked the switch to light with the system preference dark
 When the reader reloads the page
 Then the page is light
-  And the button "Light" has aria-pressed "true"
+  And the switch has aria-checked "false"
+When the reader clicks the switch
+Then the page is dark
+  And the scheme key is absent, because dark is the system preference
 ```
 
 ### AC-5: No flash of the wrong scheme
@@ -457,13 +461,13 @@ Then min_text_contrast is at least 4.5 in each run
   And the focus outline of a button has at least 3 to 1 on its background in each scheme
 ```
 
-### AC-8: The system change is followed only in the state System
+### AC-8: The system change is followed only with no stored override
 
 ```gherkin
-Given the page in the state System with the system preference dark
+Given no stored scheme value and the system preference dark
 When the system preference changes to light
 Then the page is light with no reload
-Given the page in the state Dark
+Given the stored value "dark" after a click on the switch
 When the system preference changes to light
 Then the page stays dark
 ```
@@ -489,17 +493,17 @@ Then the code size is at most 100 KiB
   And the page has no horizontal scroll at 360 px
 ```
 
-### AC-11: The control sits at the right of the product header
+### AC-11: The switch sits at the right of the product header
 
 ```gherkin
 Given the dashboard at 1440 px
 When the page renders
-Then the header shows the brand at the left, and the range group 1M, 3M, 6M, 1Y followed by the group "Color scheme" at the right, in one row
-  And the group "Color scheme" has the buttons "System", "Light", and "Dark", each at least 44 px high
-  And the keyboard reaches each button and selects it with Enter and with Space
+Then the header shows the brand at the left, and the range group 1M, 3M, 6M, 1Y followed by the switch "Dark mode" at the right, in one row
+  And the switch is one button with the role switch and a track of 44 by 24 px with a knob
+  And the keyboard reaches the switch with Tab and sets the other scheme with Space and with Enter
 Given the dashboard at 360 px
 When the page renders
-Then the group "Color scheme" is visible below the range group
+Then the switch is visible after the range group
   And the page has no horizontal scroll
 ```
 
@@ -588,8 +592,8 @@ None. The owner asked for a light mode. The layout details are judgement calls.
 
 ## Judgement Calls
 
-1. Control form: a group of three buttons, "System", "Light", and "Dark", with `aria-pressed`, in the pill style of the range group. Reason: the reader can go back to the system preference, and all states are visible.
-2. Control place: in the header, directly after the range group, so the range group and the control group sit together at the right of the one product row, and the brand stays at the left. In the same row at 1440 px. At 360 px the group can wrap to the next row, below the range group. The group has the accessible name "Color scheme".
+1. Control form: one toggle switch, a button with the role `switch`, `aria-checked="true"` when the scheme is dark, and the accessible name "Dark mode". A click sets the other scheme. When the new scheme equals the system preference, the click removes the stored key, so the page follows the system again; else the key holds the scheme. Reason: the owner chose a switch on 2026-10-23, after the implementation. The rule keeps the way back to the system preference with no third state.
+2. Control place: in the header, directly after the range group, so the range group and the switch sit together at the right of the one product row, and the brand stays at the left. In the same row at 1440 px. At 360 px the switch comes after the range buttons, on their line or on the next line. The switch has the accessible name "Dark mode".
 3. Button text: words, not icons. Reason: no icon file and no icon font, and the text is clear without a tooltip.
 4. Token names: the light scheme uses the same token names as the dark scheme. The spec table "Design tokens" gets a second value column for the light values. No new color token name.
 5. Storage: one `localStorage` key, `dashboard.scheme`, with the value `light` or `dark`. The state System removes the key. The key does not depend on the site title, which an operator can change with `LOUPE_SITE_TITLE`, so a change of the title keeps the stored choice.
@@ -604,7 +608,7 @@ None. The owner asked for a light mode. The layout details are judgement calls.
 14. Private page: it stays dark and shows no control. The light scheme of the private page is out of scope.
 15. URL fragment: the scheme does not go in the fragment, so a shared link uses the scheme of the reader.
 16. Scheme switch: no redraw and no new request. The charts follow the tokens through `var()`.
-17. Code budget: the added code is at most 6.0 KiB of `code_kib`, inside the page budget of 100 KiB.
+17. Code budget: the added page code is at most 6.0 KiB of `page_kib`, the page files without the fonts, the private page, and the node tests. `code_kib`, which also counts the node tests, stays inside its budget of 100 KiB.
 18. Dark values: unchanged. The dark heatmap levels that do not meet 3 to 1 are out of scope.
 
 ## Decision Outcome
@@ -637,3 +641,24 @@ Reviewer agent, rebase on the header and the live card of CR-0021 (implemented i
 9. Judgement call 5: the reason of the key `dashboard.scheme` no longer cites the old site title rule, because the default title is now the product name. The key and its values do not change.
 10. Notes: the storage item of the spec section "Live section" is now item 11, not item 6. Item 6 now states that the section does not show the open segments.
 11. Dependencies: added CR-0021.
+
+Implementation notes, 2026-10-23, decided by the supervisor on the implementer's questions:
+
+1. The render script has two outputs that the CR did not name, `min_paused_figure_contrast` and `min_focus_contrast`. They stay, because AC-7 needs them, and the CR lets the implementer extend the render script.
+2. The scenario driver gives the page the empty, error, not-connected, and partial states through rewritten `/v1/days` responses instead of a re-seed per state. Accepted: the page code path of each state is the same, and the states are checked at the user surface.
+3. The three scheme buttons carry no `aria-pressed` in the HTML; the control sets it at load from the resolved scheme. Accepted: a static value would be wrong for a stored override, and the control runs before the first interaction.
+4. The measured values of the targets go into the operations document at the verification step, as for every CR.
+
+### Review notes, 2026-10-23, after the implementation
+
+Two decisions of the owner and of the supervisor, taken after the implementation, change this CR.
+
+1. The owner: the scheme control is a toggle switch, not three buttons. The header has one button with the role `switch`, `aria-checked="true"` when the scheme is dark, and the accessible name "Dark mode", after the range buttons. A click sets the other scheme. When the new scheme equals the system preference, the stored key is removed, so the page follows the system again; else the key holds the scheme. The resolve rule and the scheme script do not change. Changed: judgement calls 1 and 2, functional requirements 8 to 11, and AC-1, AC-2, AC-3, AC-4, AC-8, and AC-11. Implementation note 3 now applies to `aria-checked` of the switch: the HTML has the value `false`, and the control sets the value of the resolved scheme at load.
+2. The supervisor, method change of the target "Added scheme code":
+   * Old method and value: the increase of `code_kib` of `.agents/scripts/web.size.sh`, the bytes of `web/` minus `web/assets/fonts/` and `web/private/`. It gives +9.7 KiB, from 65.6 KiB at `446f065` to 75.3 KiB at `e88f5bd`.
+   * New method and value: the increase of `page_kib`, a new output of `web.size.sh`, the bytes of `web/` minus `web/assets/fonts/`, `web/private/`, and `web/test/`. It gives +3.5 KiB, from 47.7 KiB at `446f065` to 51.2 KiB at `e88f5bd`. The node tests under `web/test/` grew 6.2 KiB, from 17.9 KiB to 24.1 KiB.
+   * Threshold: unchanged, at most 6.0 KiB.
+   * Reason: judgement call 17 states a page budget, and the Estimated Effort lists about five new node tests apart from the two small scripts. Thus the method of the approved CR did not measure the metric that the CR states: `code_kib` counts the node tests, which the browser does not load.
+   * Evidence: `git ls-tree -r -l` at `446f065` and at `e88f5bd`, with the sum of the sizes of the files under `web/` outside `web/assets/fonts/` and `web/private/` (65.6 KiB and 75.3 KiB), and of the files under `web/test/` (17.9 KiB and 24.1 KiB). `web.size.sh` on the two trees gives the same `code_kib` and `page_kib` values.
+   * The target "Code size" does not change: `code_kib` at most 100 KiB. It was 75.3 KiB at `e88f5bd`, passed.
+3. This note does not change the other text of the CR that names the three buttons or the state System: the description, Proposed Change items 4 to 6, the diagrams, functional requirements 7, 12, 15, and 16, the alternative "A two-state toggle", and judgement calls 3 and 12. Functional requirement 10 and the spec section "Color scheme" give the rule of the switch.
