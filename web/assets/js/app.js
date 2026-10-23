@@ -27,7 +27,7 @@ const liveNode = mount(doc, window);
 /** Draws every section of the selected range; the heatmap is drawn once and kept. */
 function draw() {
   const key = fromFragment(location.hash);
-  header.render(doc, resp.updated_at, key);
+  header.render(doc, key);
   const view = build(resp, key);
   if (view.empty) {
     main.replaceChildren(headline.render(doc, view), liveNode, states.empty(doc));

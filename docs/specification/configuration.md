@@ -47,7 +47,7 @@ The flag `--env` or the variable `LOUPE_ENV` gives the name of the environment. 
 | `LOUPE_IDLE_SECS` | no | no | `3600` |
 | `LOUPE_PARSE_INTERVAL_SECS` | no | no | `5` |
 | `LOUPE_RAW_RETENTION_HOURS` | no | no | `168` |
-| `LOUPE_SITE_TITLE` | no | no | `AI agent activity` |
+| `LOUPE_SITE_TITLE` | no | no | `Agentloupe` |
 | `LOUPE_PUBLIC_PROJECTS` | no | no | empty |
 | `LOUPE_DAY_REVIEW` | no | no | `auto` |
 | `LOUPE_SUBSCRIPTION_<NAME>` | no | no | none |
@@ -159,7 +159,7 @@ The error never prints the value. `LOUPE_SUMMARY_MODEL`, `LOUPE_SUMMARY_INTERVAL
 
 ## Site title
 
-`LOUPE_SITE_TITLE` sets the title of the dashboard page. The default is `AI agent activity`. The loader removes the white space at the start and the end of the value. A value that is empty after this, or that is longer than 80 characters, stops the start with an actionable error that names `LOUPE_SITE_TITLE`. `dashboard.md` gives the use of the title.
+`LOUPE_SITE_TITLE` sets the title of the dashboard page. The default is `Agentloupe`, the product name. A value of the variable replaces it. The loader removes the white space at the start and the end of the value. A value that is empty after this, or that is longer than 80 characters, stops the start with an actionable error that names `LOUPE_SITE_TITLE`. `dashboard.md` gives the use of the title.
 
 ## Live variables
 

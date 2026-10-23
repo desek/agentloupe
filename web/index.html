@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- @agents-index The dashboard page shell: head, header with the site title and the range buttons, the main area, and the footer. -->
+<!-- @agents-index The dashboard page shell: head, the product header with the wordmark and the range buttons, the main area, and the footer. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -14,12 +14,19 @@
 <body>
 <div class="wrap">
 <header class="header">
-<div class="header-text">
-<h1 class="title">{{site_title}}</h1>
-<p class="updated" id="updated">Loading</p>
+<div class="brand">
+<svg class="logo" viewBox="0 0 44 44" aria-hidden="true" focusable="false">
+<circle cx="19" cy="19" r="12" fill="none" stroke="currentColor" stroke-width="2.5"/>
+<line x1="28" y1="28" x2="38.5" y2="38.5" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/>
+<rect x="12.5" y="19" width="3.5" height="6" rx="1" fill="var(--color-input)"/>
+<rect x="17.25" y="13" width="3.5" height="12" rx="1" fill="var(--color-input)"/>
+<rect x="22" y="16" width="3.5" height="9" rx="1" fill="var(--color-input)"/>
+</svg>
+<h1 class="wordmark">{{site_title}}</h1>
 </div>
 <div class="ranges" role="group" aria-label="Range" id="ranges">
-<button type="button" class="pill" data-range="3M" aria-pressed="true">3M</button>
+<button type="button" class="pill" data-range="1M" aria-pressed="true">1M</button>
+<button type="button" class="pill" data-range="3M" aria-pressed="false">3M</button>
 <button type="button" class="pill" data-range="6M" aria-pressed="false">6M</button>
 <button type="button" class="pill" data-range="1Y" aria-pressed="false">1Y</button>
 </div>

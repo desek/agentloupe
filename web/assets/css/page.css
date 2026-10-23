@@ -4,20 +4,20 @@ html, body { margin: 0; background: var(--color-bg); color: var(--color-text); f
 a { color: var(--color-link); }
 a:hover { color: var(--color-link-hover); }
 .wrap { max-width: var(--max-width); margin: 0 auto; padding: 32px 16px 48px; display: flex; flex-direction: column; gap: var(--space-card-gap); }
-.header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px 20px; }
-.header-text { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1 1 280px; }
-.title { margin: 0; font-size: var(--size-title); line-height: 1.05; font-weight: 600; letter-spacing: -0.02em; overflow-wrap: anywhere; }
-.updated { margin: 0; font-family: var(--font-mono); font-size: var(--size-label); color: var(--color-text-muted); }
+.header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px 20px; min-height: 48px; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.logo { width: 44px; height: 44px; flex: none; display: block; }
+.wordmark { margin: 0; font-size: 20px; line-height: 1; font-weight: 600; letter-spacing: -0.02em; }
 .ranges { display: flex; gap: 6px; }
 .pill { font-family: var(--font-mono); font-size: var(--size-text); font-weight: 500; padding: 0 16px; min-height: 44px; border-radius: var(--radius-pill); cursor: pointer; background: transparent; color: var(--color-text-body); border: 1px solid var(--color-border); }
 .pill[aria-pressed="true"] { background: var(--color-text); color: var(--color-ink-inverse); border-color: var(--color-text); }
 .pill:focus-visible, .button:focus-visible { outline: 2px solid var(--color-link); outline-offset: 2px; }
-.headline { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 24px; }
+.headline { display: flex; flex-direction: column; gap: 8px; }
+.eyebrow { font-family: var(--font-mono); font-size: var(--size-label); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.headline-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 24px; }
 .headline-figure { font-family: var(--font-mono); font-size: var(--size-headline); line-height: 1; font-weight: 500; letter-spacing: -0.03em; }
-.headline-unit { font-size: var(--size-body); color: var(--color-text-body); }
-.headline-text { display: flex; flex-direction: column; gap: 6px; }
-.headline-range { font-size: var(--size-text); color: var(--color-text-muted); }
-.spark { flex: 1 1 200px; height: 48px; min-width: 0; }
+/* The sparkline is as tall as the digits (the cap height of the mono font), and its bottom edge sits on their baseline. */
+.spark { flex: 1 1 200px; height: calc(var(--size-headline) * 0.72); min-width: 0; }
 #main { display: flex; flex-direction: column; gap: var(--space-card-gap); }
 .row { display: flex; flex-wrap: wrap; gap: var(--space-card-gap); }
 .card { flex: 1 1 260px; min-width: 0; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-card); padding: 20px; display: flex; flex-direction: column; gap: 12px; }
@@ -73,7 +73,6 @@ a:hover { color: var(--color-link-hover); }
 .pr-lines { white-space: nowrap; }
 @media (max-width: 600px) {
   .wrap { padding-top: 20px; }
-  .title { font-size: 30px; }
   .log-row { grid-template-columns: 1fr auto auto; }
   .log-summary { grid-column: 1 / -1; grid-row: 2; }
 }

@@ -31,9 +31,8 @@ async fn root_serves_index_html() {
     assert_eq!(res.status(), 200);
     assert_eq!(res.headers()["content-type"], "text/html; charset=utf-8");
     let body = res.text().await.unwrap();
-    assert!(body.contains("<title>AI agent activity</title>"), "{body}");
-    assert!(body.contains(">AI agent activity</h1>"));
-    assert!(!body.contains("Agentloupe"));
+    assert!(body.contains("<title>Agentloupe</title>"), "{body}");
+    assert!(body.contains(">Agentloupe</h1>"));
     assert!(!body.contains("{{site_title}}"));
 }
 

@@ -118,7 +118,7 @@ fn check(e: &Entry) -> Result<(), ConfigError> {
             Err(bad(
                 n,
                 "is empty after trim or longer than 80 characters",
-                "a title of 1 to 80 characters such as AI agent activity",
+                "a title of 1 to 80 characters such as Agentloupe",
             ))
         }
         ("LOUPE_LIVE_ENABLED", Some(v)) if v != "true" && v != "false" => {

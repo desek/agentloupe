@@ -14,7 +14,7 @@ test('missing_days_are_zero', () => {
 });
 
 test('range_lengths', () => {
-  for (const [k, n] of [['3M', 91], ['6M', 182], ['1Y', 365]]) {
+  for (const [k, n] of [['1M', 30], ['3M', 91], ['6M', 182], ['1Y', 365]]) {
     const v = build({ to: TO, days: [] }, k);
     assert.equal(v.points.length, n);
     assert.equal(v.points[n - 1], TO);

@@ -240,7 +240,7 @@ mod tests {
         assert_eq!(value("LOUPE_PUBLISH_AT"), "01:00");
         assert_eq!(value("LOUPE_PUBLISH_INTERVAL_SECS"), "60");
         assert_eq!(value("LOUPE_DAY_REVIEW"), "auto");
-        assert_eq!(value("site_title"), "AI agent activity");
+        assert_eq!(value("site_title"), "Agentloupe");
         assert!(value("publish_next_due_local").contains("T01:00:00+0"));
         assert!(value("publish_next_due_utc").ends_with("+00:00"));
         assert!(

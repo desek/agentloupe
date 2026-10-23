@@ -45,7 +45,7 @@ The human sees the work of today of Claude Code and Pi on the dashboard, after o
 
 ### Run log
 
-A first attempt on 2026-10-21 stopped at step 5: `pi -p` waited for stdin, and the extension route gave no model list. That was a defect of the run steps, not of the product, so the steps changed before the counted runs: each agent command gets `</dev/null`. The model check of step 5 runs with `ANTHROPIC_OAUTH_TOKEN=placeholder pi --no-extensions --list-models claude-haiku-5-5`, because Pi lists a model only when a credential variable exists, and the extension gives the credential only at session start. The placeholder sends no request. The route is the built-in model of Pi: the output lists `claude-haiku-5-5` under `anthropic`, so the fallback `models` entry was not necessary.
+On 2026-10-23 a `pi -p` run from a background task waited on an open stdin and sent no request; run `pi -p` with `< /dev/null` when stdin is not a terminal. A first attempt on 2026-10-21 stopped at step 5: `pi -p` waited for stdin, and the extension route gave no model list. That was a defect of the run steps, not of the product, so the steps changed before the counted runs: each agent command gets `</dev/null`. The model check of step 5 runs with `ANTHROPIC_OAUTH_TOKEN=placeholder pi --no-extensions --list-models claude-haiku-5-5`, because Pi lists a model only when a credential variable exists, and the extension gives the credential only at session start. The placeholder sends no request. The route is the built-in model of Pi: the output lists `claude-haiku-5-5` under `anthropic`, so the fallback `models` entry was not necessary.
 
 Versions: Claude Code 2.1.306, Pi 1.3.0. The Pi credential came from the extension pi-cc-auth.
 

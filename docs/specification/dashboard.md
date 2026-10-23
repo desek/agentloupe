@@ -67,9 +67,9 @@ The router keeps a list of reserved first path segments. The proxy does not get 
 
 ## Site title
 
-The variable `LOUPE_SITE_TITLE` sets the site title. The default is `AI agent activity`. The default page does not show the product name.
+The variable `LOUPE_SITE_TITLE` sets the site title. The default is `Agentloupe`, the product name, so the default page shows the product name. A value of the variable replaces it.
 
-At start, the binary puts the title into `index.html` one time. It escapes the characters `&`, `<`, `>`, `"`, and `'` as HTML entities. The title shows in the `<title>` element and in the heading of the header. The binary computes the `etag` of `index.html` from the result. `configuration.md` gives the validation of the value.
+At start, the binary puts the title into `index.html` one time. It escapes the characters `&`, `<`, `>`, `"`, and `'` as HTML entities. The title shows in the `<title>` element and in the wordmark of the header. The binary computes the `etag` of `index.html` from the result. `configuration.md` gives the validation of the value.
 
 ## Page technology
 
@@ -96,11 +96,12 @@ At start, the binary puts the title into `index.html` one time. It escapes the c
 
 | Range | Days | Fragment |
 |---|---|---|
+| `1M` | the last 30 days | `#range=1M` |
 | `3M` | the last 91 days | `#range=3M` |
 | `6M` | the last 182 days | `#range=6M` |
 | `1Y` | the last 365 days | `#range=1Y` |
 
-Each range ends on the `to` value of the response. Both ends are in the range. The URL fragment keeps the selected range, so a reload or a shared link keeps it. A missing or unknown fragment selects `3M`.
+Each range ends on the `to` value of the response. Both ends are in the range. The URL fragment keeps the selected range, so a reload or a shared link keeps it. A missing or unknown fragment selects `1M`.
 
 ## Missing days and fields
 
@@ -116,29 +117,38 @@ The sections show in this order. In each formula, the sum is over the days of th
 
 The headline is directly below the header, before every other section.
 
-1. The figure is the sum of `input_total + output`, divided by the number of days of the range, rounded to an integer.
-2. The figure uses the short form (for example `1.3M`), with the label "tokens per day".
+1. The headline starts with an eyebrow, "Tokens per day · <range> avg". `<range>` is the key of the selected range, for example "Tokens per day · 3M avg". The eyebrow uses the mono label style: `--font-mono`, `--size-label`, `--color-text-muted`, uppercase.
+2. The figure is the sum of `input_total + output`, divided by the number of days of the range, rounded to an integer. It uses the short form, for example `1.3M`.
 3. The figure is the largest text on the page. Its font size is at least two times the font size of a figure of the totals row.
-4. Below the figure, one line gives the range in words, for example "average over the last 3 months".
-5. A sparkline with no axes shows the daily `input_total + output` of the range.
-6. The headline is visible with no scroll at a width of 360 px and of 1440 px.
+4. Below the eyebrow, the figure and a sparkline sit in one row. The sparkline has no axes and shows the daily `input_total + output` of the range.
+5. The height of the sparkline is 0.72 times `--size-headline`, so it is as tall as the digits. Its bottom edge is on the baseline of the digits.
+6. At 360 px, the sparkline moves to a line under the figure.
+7. When the response holds no record, the headline shows the eyebrow and the figure, and no sparkline.
+8. The headline is visible with no scroll at a width of 360 px and of 1440 px.
 
 ### Live section
 
 The live section is directly below the headline. `live.md` gives the live route.
 
-1. The section shows four figures for the current day: calls, tokens (the sum of the five token counts), open segments, and API-equivalent cost. The label of the cost figure is "API-equivalent cost*". The asterisk refers to the asterisk sentence of the footer. The section also shows the count of exchanges in flight.
-2. The section shows a rolling chart of tokens for each 10-second bucket over the last 10 minutes. The chart is inline SVG with the design tokens of this page. The chart starts empty when the page loads.
-3. The page opens the socket with `ws://` or `wss://` at the page origin, path `/live`. The `snapshot` frame sets the figures, and each later frame adds to them.
-4. After a close, the page connects again after 1, 2, 4, 8, 16, and then 30 seconds. A `snapshot` frame resets this sequence.
-5. The page closes the socket when the document is hidden. It opens the socket again when the document is visible.
-6. The section uses no cookie, `localStorage`, `sessionStorage`, or IndexedDB.
+1. The heading row shows a dot, the heading "Today", and a status note at the right end. The accessible name of the section is "Today, live".
+2. The dot pulses in `--color-positive` while frames arrive. In the paused state, the dot is still and uses `--color-text-faint`. When the user asks for reduced motion, the dot does not pulse.
+3. The status note is a status region. It shows "Connecting" before the first frame. It is empty while frames arrive. It shows "Paused, reconnecting" in the paused state.
+4. The section shows five figures for the current day, in this order: "In flight" (the count of exchanges in flight), "Calls", "Tokens" (the sum of the five token counts), "Tokens per minute", and "API-equivalent cost*". The asterisk refers to the asterisk sentence of the footer. At 1440 px the five figures are in one row. At a smaller width they wrap to more rows.
+5. "Tokens per minute" is the sum of the last six 10-second buckets of the sparkline, in the short form.
+6. The section does not show the count of open segments.
+7. Below the figures, a sparkline shows the tokens of each 10-second bucket over the last 10 minutes. Its height is 0.72 times `--size-figure-small`, and it stretches to the width of the card. The sparkline is inline SVG with the design tokens of this page. It starts empty when the page loads.
+8. The page opens the socket with `ws://` or `wss://` at the page origin, path `/live`. The `snapshot` frame sets the figures, and each later frame adds to them.
+9. After a close, the page connects again after 1, 2, 4, 8, 16, and then 30 seconds. A `snapshot` frame resets this sequence.
+10. The page closes the socket when the document is hidden. It opens the socket again when the document is visible.
+11. The section uses no cookie, `localStorage`, `sessionStorage`, or IndexedDB.
 
 ### Header
 
-1. The site title.
-2. The time of the last update from `updated_at`, as a local date and time with the time zone name. When `updated_at` is `null`, the header shows "No update yet".
-3. The range selector with the buttons `3M`, `6M`, and `1Y`. The selected button has `aria-pressed="true"`. The keyboard can reach and use each button.
+1. The header is one row. The brand is on the left, and the range buttons are on the right. When the row does not fit the width, the range buttons go to a second line.
+2. The brand is the mark and the wordmark. The mark is inline SVG of 44 by 44 px: a loupe ring and handle in the text color, and three bars in `--color-input` inside the lens. Assistive technology does not read the mark.
+3. The wordmark is the site title in the `h1` of the page, at 20 px.
+4. The range selector has the buttons `1M`, `3M`, `6M`, and `1Y`. The selected button has `aria-pressed="true"`. The keyboard can reach and use each button.
+5. The header does not show the time of the last update. The last row of the daily log shows the latest published day.
 
 ### Totals row
 
@@ -226,7 +236,7 @@ When the response holds no record, the page shows the header, the headline with 
 
 ### Live feed paused
 
-When the socket is closed, the live section shows "Live feed paused, reconnecting" and keeps the last figures in a muted style. A browser cannot read the HTTP status of a failed upgrade. Thus, when 3 connects in a row fail and no `snapshot` frame came since the page load, the page hides the live section until a reload. A browser that blocks the socket shows the paused state and then hides the section.
+When the socket is closed, the live section shows "Paused, reconnecting" in the status note, stops the dot, and keeps the last figures and the sparkline in a muted style. A browser cannot read the HTTP status of a failed upgrade. Thus, when 3 connects in a row fail and no `snapshot` frame came since the page load, the page hides the live section until a reload. A browser that blocks the socket shows the paused state and then hides the section.
 
 ### Error
 
@@ -261,13 +271,13 @@ When the request fails or returns a status other than `200`, the page shows "Dat
 | `--color-surface` | `#15161A` | card background |
 | `--color-border` | `#24262B` | card border |
 | `--color-rule` | `#2A2C31` | chart axis and divider lines |
-| `--color-text` | `#ECEAE4` | primary text, figures, selected button fill |
+| `--color-text` | `#ECEAE4` | primary text, figures, selected button fill, ring and handle of the mark |
 | `--color-text-body` | `#B5B4AE` | body text, unselected button text |
-| `--color-text-muted` | `#9A9AA0` | secondary text, update time |
-| `--color-text-faint` | `#85868C` | chart labels, legends |
-| `--color-input` | `#5E86E0` | input tokens series, opened pull requests |
+| `--color-text-muted` | `#9A9AA0` | secondary text, headline eyebrow |
+| `--color-text-faint` | `#85868C` | chart labels, legends, live dot in the paused state |
+| `--color-input` | `#5E86E0` | input tokens series, opened pull requests, bars of the mark |
 | `--color-output` | `#BB7F35` | output tokens series, lines removed |
-| `--color-positive` | `#3FA864` | merged pull requests, lines added |
+| `--color-positive` | `#3FA864` | merged pull requests, lines added, live dot |
 | `--color-cache-read` | `#8C6BC8` | cache read segment of the token share bar |
 | `--color-cache-write` | `#4FA3A5` | cache write segment of the token share bar |
 | `--color-highlight` | `#D9C27A` | tag background |
@@ -281,13 +291,13 @@ When the request fails or returns a status other than `200`, the page shows "Dat
 | `--font-sans` | `'Geist', system-ui, sans-serif` | text |
 | `--font-mono` | `'Geist Mono', ui-monospace, monospace` | figures, labels |
 | `--space-card-gap` | `24px` | gap between two cards in a row and between two rows, at each width |
-| `--size-headline` | `72px` | headline figure, at least two times `--size-figure` |
+| `--size-headline` | `72px` | headline figure, at least two times `--size-figure`; the headline sparkline is 0.72 times this size |
 | `--size-figure` | `34px` | totals figures (the largest figure size of the mockup) |
-| `--size-figure-small` | `30px` | figures of a card pair |
-| `--size-title` | `40px` | site title |
+| `--size-figure-small` | `30px` | figures of a card pair and of the live section; the live sparkline is 0.72 times this size |
+| `--size-title` | `40px` | not used by the header; the wordmark is 20 px |
 | `--size-body` | `15px` | body text |
 | `--size-text` | `13px` | card text |
-| `--size-label` | `12px` | labels |
+| `--size-label` | `12px` | labels, headline eyebrow |
 | `--size-axis` | `11px` | chart axis labels |
 | `--radius-card` | `12px` | card corners |
 | `--radius-bar` | `3px` | top corners of a bar |

@@ -49,7 +49,7 @@ pub const VARS: &[Var] = &[
     var("LOUPE_IDLE_SECS", Some("3600"), false),
     var("LOUPE_PARSE_INTERVAL_SECS", Some("5"), false),
     var("LOUPE_RAW_RETENTION_HOURS", Some("168"), false),
-    var("LOUPE_SITE_TITLE", Some("AI agent activity"), false),
+    var("LOUPE_SITE_TITLE", Some("Agentloupe"), false),
     var("LOUPE_PUBLIC_PROJECTS", Some(""), false),
     var("LOUPE_DAY_REVIEW", Some("auto"), false),
     var("LOUPE_ADMIN_TOKEN", None, true),

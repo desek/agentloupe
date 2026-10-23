@@ -27,7 +27,7 @@ export function series(buckets, now) {
 /** One bar per bucket in a 600 by 80 view box; the colours come from the design tokens. */
 export function render(doc, values) {
   const max = Math.max(1, ...values);
-  const s = svg(doc, 'svg', { viewBox: '0 0 600 80', class: 'live-chart', role: 'img', 'aria-label': 'Tokens per 10 seconds, last 10 minutes' });
+  const s = svg(doc, 'svg', { viewBox: '0 0 600 80', preserveAspectRatio: 'none', class: 'live-chart', role: 'img', 'aria-label': 'Tokens per 10 seconds, last 10 minutes' });
   s.append(svg(doc, 'line', { x1: 0, y1: 79.5, x2: 600, y2: 79.5, stroke: 'var(--color-rule)' }));
   values.forEach((v, i) => {
     if (!v) return;

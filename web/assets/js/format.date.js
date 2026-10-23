@@ -41,13 +41,3 @@ export function label(day) {
   const [y, m, d] = day.split('-').map(Number);
   return `${d} ${months[m - 1]} ${y}`;
 }
-
-/** The update time as a local date and time with the time zone name, or the no-update text. */
-export function updated(iso) {
-  if (!iso) return 'No update yet';
-  const f = new Intl.DateTimeFormat('en-GB', {
-    year: 'numeric', month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZoneName: 'short',
-  });
-  return `Updated ${f.format(new Date(iso))}`;
-}
