@@ -1,0 +1,55 @@
+# @agents-index Advisory response workflow: each day and on dispatch, one call of advisory.respond.sh checks the Cargo.lock of each published release against the advisory database.
+#
+# A thin caller: it checks out the default branch with all tags, installs the Rust toolchain of
+# rust-toolchain.toml and cargo-deny of .tool-versions, sets up Buildx and the registry login for the move of
+# latest, and makes one call of advisory.respond.sh, which holds every rule. The script never deletes a
+# release, an asset, a tag, or an image tag. The draft security advisory follows the public repository; on a
+# private repository the script reports that action as blocked. docs/specification/release.md (Advisory
+# response) states the rules.
+name: advisory-response
+
+on:
+  schedule:
+    - cron: '23 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  packages: write
+
+# One group for all runs; a new run waits and never cancels an active run.
+concurrency:
+  group: advisory-response
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  respond:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install the Rust toolchain of rust-toolchain.toml
+        run: rustup toolchain install
+      - name: Install cargo-deny of .tool-versions
+        uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
+        with:
+          install_args: aqua:EmbarkStudios/cargo-deny
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Respond to new advisories of the published releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: .agents/scripts/advisory.respond.sh --repo "$GITHUB_REPOSITORY" --run-url "$RUN_URL"

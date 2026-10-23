@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# @agents-index Builds the release asset of the host target: loupe-v<version>-<target>.tar.gz and its .sha256 file, after the tag check.
+# @agents-index Builds the release asset of the host target: loupe-v<version>-<target>.tar.gz, its archive SBOM, and their .sha256 files, after the tag check.
 #
 # Usage: release.build.sh --tag v<major>.<minor>.<patch> [--out DIR] [--human] [--dry-run]
 #   --tag TAG    The git tag of the release, for example v1.2.3. Required. The version is the tag without the v.
@@ -15,7 +15,10 @@
 # the checked-out commit is not the tag commit. The archive holds one directory loupe-v<version>-<target>/
 # with loupe (execute bit kept), upstreams.toml, config/, LICENSE, README.md, and THIRD-PARTY-NOTICES, which
 # release.notices.sh writes before the build (it needs cargo about of .tool-versions). The checksum file holds
-# one line in the format of sha256sum, which shasum -a 256 -c and sha256sum -c accept.
+# one line in the format of sha256sum, which shasum -a 256 -c and sha256sum -c accept. After the archive, it
+# calls release.sbom.sh asset, which writes loupe-v<version>-<target>.cdx.json and its .sha256 file into the
+# same directory (it needs cargo-cyclonedx of .tool-versions and jq); when that step fails, the build fails,
+# so no archive leaves the job with no SBOM file.
 #
 # Telemetry: the environment value LOUPE_TELEMETRY_HOST (the repository variable in the release workflow)
 # and LOUPE_BUILD_COMMIT (default: the tag commit) pass to the build. With a host the binary is built-in and
@@ -23,10 +26,11 @@
 #
 # Output (stdout, key: value), one line per asset:
 #   asset: <archive> archive_bytes: <n> binary_bytes: <n> sha256: <hex> checksum_file: <archive>.sha256 dir: <out>
-#     telemetry: built-in host: <host> | telemetry: built-out
-# With --dry-run: plan lines (plan: tag, plan: notices, plan: build, plan: telemetry, plan: archive, plan: checksum).
+#     sbom_file: <name>.cdx.json sbom_components: <n> telemetry: built-in host: <host> | telemetry: built-out
+# With --dry-run: plan lines (plan: tag, plan: notices, plan: build, plan: telemetry, plan: archive, plan: checksum,
+#   plan: sbom).
 # Full cargo output goes to .agents/logs/release.build.log.
-# Exit codes: 0 built (or planned), 1 notices, build, or archive failed, 2 bad usage, 3 required tool missing,
+# Exit codes: 0 built (or planned), 1 notices, build, archive, or SBOM failed, 2 bad usage, 3 required tool missing,
 #   4 tag check failed (tag absent, tag version differs from Cargo.toml, or HEAD is not the tag commit).
 # Reference: docs/specification/release.md, section Release assets.
 set -euo pipefail
@@ -99,11 +103,12 @@ build_commit="${LOUPE_BUILD_COMMIT:-${tag_commit:-$head_commit}}"
 if [[ -n "$telemetry_host" ]]; then telemetry="built-in host: $telemetry_host"; else telemetry="built-out"; fi
 build=(env "LOUPE_TELEMETRY_HOST=$telemetry_host" "LOUPE_BUILD_COMMIT=$build_commit" cargo build --release --locked --bin loupe)
 notices=("$ROOT/.agents/scripts/release.notices.sh")
+sbom=("$ROOT/.agents/scripts/release.sbom.sh" asset --tag "$tag" --target "$target" --out "$out")
 files="loupe upstreams.toml config/ LICENSE README.md THIRD-PARTY-NOTICES"
 
 if [[ $dry_run -eq 1 ]]; then
   if [[ $human -eq 1 ]]; then
-    echo "Plan for $tag on $target: check passed at $at; write THIRD-PARTY-NOTICES with release.notices.sh; run '${build[*]}' (telemetry $telemetry); pack $archive with $files; write $archive.sha256 into $out. Nothing was built."
+    echo "Plan for $tag on $target: check passed at $at; write THIRD-PARTY-NOTICES with release.notices.sh; run '${build[*]}' (telemetry $telemetry); pack $archive with $files; write $archive.sha256 into $out; write the archive SBOM with release.sbom.sh. Nothing was built."
   else
     echo "plan: tag $tag version: $version check: passed at: $at"
     echo "plan: notices command: .agents/scripts/release.notices.sh file: THIRD-PARTY-NOTICES"
@@ -111,6 +116,7 @@ if [[ $dry_run -eq 1 ]]; then
     echo "plan: telemetry state: $telemetry"
     echo "plan: archive name: $archive files: $files dir: $out"
     echo "plan: checksum name: $archive.sha256 format: sha256sum"
+    echo "plan: sbom command: .agents/scripts/release.sbom.sh asset --tag $tag --target $target --out $out file: loupe-v$version-$target.cdx.json"
   fi
   exit 0
 fi
@@ -143,11 +149,18 @@ tar -C "$stage" "${owner[@]}" -czf "$out/$archive" "$name" || fail "tar could no
 (cd "$out" && "${SHA[@]}" "$archive" | awk '{print $1 "  " $2}' >"$archive.sha256")
 (cd "$out" && "${SHA[@]}" -c "$archive.sha256" >/dev/null) || fail "the checksum file $archive.sha256 does not verify. Fix: re-run the build into an empty --out directory. Verify: shasum -a 256 -c $archive.sha256 prints OK." 1
 
+# The archive SBOM and its checksum file go next to the archive; with no SBOM, the asset does not leave the job.
+if ! sbom_line="$("${sbom[@]}" 2>>"$LOG" </dev/null | tail -n 1)" || [[ "$sbom_line" != sbom:* ]]; then
+  tail -n 5 "$LOG" >&2
+  fail "release.sbom.sh failed for $target, so the archive has no SBOM file and the build stops. Fix: follow the error in .agents/logs/release.build.log (install cargo-cyclonedx of .tool-versions with mise install, and jq). Reference: docs/specification/release.md, section Supply chain. Verify: .agents/scripts/release.sbom.sh asset --tag $tag --target $target --out $out exits 0." 1
+fi
+sbom_file="$(echo "$sbom_line" | awk '{print $2}')"
+sbom_components="$(echo "$sbom_line" | sed -n 's/.* components: \([0-9]*\).*/\1/p')"
 archive_bytes="$(wc -c <"$out/$archive" | tr -d ' ')"
 binary_bytes="$(wc -c <"$bin" | tr -d ' ')"
 digest="$(awk '{print $1}' "$out/$archive.sha256")"
 if [[ $human -eq 1 ]]; then
-  echo "Built $archive ($archive_bytes bytes, binary $binary_bytes bytes), SHA-256 $digest, in $out; telemetry $telemetry."
+  echo "Built $archive ($archive_bytes bytes, binary $binary_bytes bytes), SHA-256 $digest, in $out, with the SBOM $sbom_file ($sbom_components components); telemetry $telemetry."
 else
-  echo "asset: $archive archive_bytes: $archive_bytes binary_bytes: $binary_bytes sha256: $digest checksum_file: $archive.sha256 dir: $out telemetry: $telemetry"
+  echo "asset: $archive archive_bytes: $archive_bytes binary_bytes: $binary_bytes sha256: $digest checksum_file: $archive.sha256 dir: $out sbom_file: $sbom_file sbom_components: $sbom_components telemetry: $telemetry"
 fi

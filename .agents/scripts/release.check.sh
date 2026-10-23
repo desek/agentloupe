@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
-# @agents-index Checks a published release on a local machine: the six assets and checksums, loupe --version per target, the image pull, /healthz, and the notices.
+# @agents-index Checks a published release on a local machine: the assets, SBOM files, and checksums, loupe --version per target, the image pull, /healthz, and the notices.
 #
-# Usage: release.check.sh --version <major>.<minor>.<patch> [--dir DIR] [--human] [--dry-run]
+# Usage: release.check.sh --version <major>.<minor>.<patch> [--dir DIR] [--skip-supply-chain] [--human] [--dry-run]
 #   --version X.Y.Z  The version of the release to check, with no v. Required.
 #   --dir DIR        Download into DIR and keep it. A file that is already in DIR is not downloaded again,
 #                    so a changed copy can be checked. Default: a temporary directory, removed at the end.
 #   --human          Print a friendly view for a person. Also the default when stdout is a terminal.
-#   --dry-run        Print the plan with the six asset names and the image name; no network, no Docker.
+#   --skip-supply-chain  For a release made before the SBOM files: do not download the SBOM files and report
+#                    each sbom check as skipped with the reason "skipped by flag".
+#   --dry-run        Print the plan with the asset and SBOM file names and the image name; no network, no Docker.
 #   -h, --help       Print this help.
 #
-# Purpose: the release check of docs/specification/release.md. It downloads the three archives and the three
-# checksum files of github.com/desek/agentloupe with curl and no credential, verifies each checksum, runs
+# Purpose: the release check of docs/specification/release.md. It downloads the three archives, the five SBOM
+# files, and their eight checksum files of github.com/desek/agentloupe with curl and no credential, verifies
+# each checksum, checks each SBOM file (the CycloneDX marker, at least one component, and for an archive SBOM
+# the metadata component agent-loupe at the version; a missing SBOM file fails its check), runs
 # loupe --version of the host archive and of each Linux archive in a debian:bookworm-slim container of its
 # platform, pulls ghcr.io/desek/agentloupe:<version> with no login (and compares latest when the version is
 # the newest release), then starts the image with two keys from its own loupe gen-key on 127.0.0.1 and a free
@@ -25,8 +29,8 @@
 # Output (stdout, key: value), one line per check, then one result line:
 #   check: <name> status: passed|failed|skipped [detail: ...]
 #   result: passed|failed exit: <code>
-# Checks: download, checksum <asset>, version <target>, notices <target>, pull, latest, health,
-#   start-version, telemetry, notices image.
+# Checks: download, checksum <asset>, sbom <file>, version <target>, notices <target>, pull, latest, health,
+#   start-version, telemetry, notices image. The verify of the attestations follows the public repository.
 # Exit codes: 0 every check passed or is skipped with a stated reason, 1 a check failed, 2 bad usage,
 #   3 a required tool is missing, 4 a download or a pull failed.
 # Reference: docs/specification/release.md, section Verify a release.
@@ -44,7 +48,7 @@ NOTICES=THIRD-PARTY-NOTICES
 LITELLM_MARK="Part 2: LiteLLM"
 FONTS_MARK="Part 3: Geist fonts"
 
-human=0; dry_run=0; version=""; dir=""; keep=0
+human=0; dry_run=0; version=""; dir=""; keep=0; skip_sc=0
 [ -t 1 ] && human=1
 
 usage() { awk 'NR>=4 && /^#/ {sub(/^# ?/, ""); print; next} NR>=4 {exit}' "$0"; }
@@ -56,6 +60,7 @@ while [ $# -gt 0 ]; do
       version="$2"; shift 2 ;;
     --dir) [ $# -ge 2 ] || die "--dir needs a directory. Fix: pass --dir <dir> or omit it. Verify: re-run with --dry-run." 2
       dir="$2"; keep=1; shift 2 ;;
+    --skip-supply-chain) skip_sc=1; shift ;;
     --human) human=1; shift ;;
     --dry-run) dry_run=1; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -68,6 +73,10 @@ if ! echo "$version" | grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9
 fi
 tag="v$version"
 url="https://github.com/$REPO/releases/download/$tag"
+# The five SBOM files: one per archive, one per platform image (release.md, Supply chain).
+SBOMS=""
+for t in $TARGETS; do SBOMS="$SBOMS loupe-$tag-$t.cdx.json"; done
+SBOMS="$SBOMS loupe-$tag-image-linux-amd64.cdx.json loupe-$tag-image-linux-arm64.cdx.json"
 
 failed=0; skipped=0
 # One machine line per check; the friendly view says the same in a sentence.
@@ -97,6 +106,14 @@ if [ $dry_run -eq 1 ]; then
     if [ $human -eq 1 ]; then echo "Would download $url/$a and $a.sha256 and verify them."; else
       echo "plan: asset $a url: $url/$a"
       echo "plan: asset $a.sha256 url: $url/$a.sha256"
+    fi
+  done
+  for f in $SBOMS; do
+    if [ $skip_sc -eq 1 ]; then
+      if [ $human -eq 1 ]; then echo "Would skip $f (skipped by flag)."; else echo "plan: sbom $f status: skipped by flag"; fi
+    elif [ $human -eq 1 ]; then echo "Would download $url/$f and $f.sha256 and check the SBOM."; else
+      echo "plan: sbom $f url: $url/$f"
+      echo "plan: sbom $f.sha256 url: $url/$f.sha256"
     fi
   done
   if [ $human -eq 1 ]; then echo "Would pull $IMAGE:$version with no login, start it on 127.0.0.1, and poll /healthz for $HEALTH_CAP_SECS seconds."; else
@@ -138,7 +155,19 @@ for t in $TARGETS; do
     fi
   done
 done
-report download passed "6 files into $([ $keep -eq 1 ] && echo "$dir" || echo 'a temporary directory')"
+# 1b. The SBOM files: a missing file is no download failure; its sbom check fails below.
+nsbom=0
+if [ $skip_sc -eq 0 ]; then
+  for f in $SBOMS; do
+    for g in "$f" "$f.sha256"; do
+      [ -s "$dir/$g" ] && continue
+      curl -q -fsSL --retry 3 -o "$dir/$g" "$url/$g" 2>/dev/null || rm -f "$dir/$g"
+    done
+    [ -s "$dir/$f" ] && nsbom=$((nsbom + 1))
+    [ -s "$dir/$f.sha256" ] && nsbom=$((nsbom + 1))
+  done
+fi
+report download passed "$((6 + nsbom)) files into $([ $keep -eq 1 ] && echo "$dir" || echo 'a temporary directory')"
 
 # 2. Each checksum file names its archive and matches its bytes.
 verified=" "
@@ -151,6 +180,31 @@ for t in $TARGETS; do
   else
     report "checksum $a" failed "the archive does not match $a.sha256, or the file is not one sha256sum line"
   fi
+done
+# 2b. Each SBOM file: its checksum, the CycloneDX marker, at least one component, and for an archive SBOM
+# the metadata component agent-loupe at the version. Plain text checks, so no jq is needed.
+for f in $SBOMS; do
+  if [ $skip_sc -eq 1 ]; then report "sbom $f" skipped "skipped by flag"; continue; fi
+  if [ ! -s "$dir/$f" ] || [ ! -s "$dir/$f.sha256" ]; then
+    report "sbom $f" failed "the file or its checksum file is missing from the release; a release made before the SBOM files needs --skip-supply-chain"
+    continue
+  fi
+  if ! awk -v a="$f" 'NF == 2 && $2 == a && $1 ~ /^[0-9a-f]{64}$/ {ok++} END {exit !(NR == 1 && ok == 1)}' "$dir/$f.sha256" \
+     || ! (cd "$dir" && sha_check "$f.sha256" >/dev/null 2>&1); then
+    report "sbom $f" failed "the file does not match $f.sha256, or the checksum file is not one sha256sum line"
+    continue
+  fi
+  compact="$(tr -d ' \t\r\n' <"$dir/$f")"
+  refs="$(echo "$compact" | grep -o '"bom-ref":' | wc -l | tr -d ' ')"
+  case "$compact" in *'"bomFormat":"CycloneDX"'*) ;; *) report "sbom $f" failed "no CycloneDX format marker"; continue ;; esac
+  if [ "$refs" -lt 2 ]; then report "sbom $f" failed "no component"; continue; fi
+  case "$f" in
+    *-image-*) report "sbom $f" passed "CycloneDX, $((refs - 1)) entries" ;;
+    *) case "$compact" in
+         *'"metadata":{'*'"name":"agent-loupe","version":"'"$version"'"'*) report "sbom $f" passed "CycloneDX, agent-loupe $version, $((refs - 1)) entries" ;;
+         *) report "sbom $f" failed "no metadata component agent-loupe at $version" ;;
+       esac ;;
+  esac
 done
 unpack() { mkdir -p "$tmp/x/$1" && tar -xzf "$dir/loupe-$tag-$1.tar.gz" -C "$tmp/x/$1"; }
 bin_of() { echo "$tmp/x/$1/loupe-$tag-$1/loupe"; }

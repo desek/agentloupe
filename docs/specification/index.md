@@ -19,6 +19,6 @@ This directory describes how the `loupe` binary behaves. Each file covers one pr
 | `private-reports.md` | The private page under `/private/`, the admin token, the login, the cookie, the report, session, providers, and configuration routes, and their headers. |
 | `github.md` | The GitHub worker and the GitHub token labels. |
 | `configuration.md` | The configuration loader, the variables, the provider credentials and their detection, and `loupe config show`. |
-| `operations.md` | The subcommands, logging, storage, health, the provider ping, shutdown, the container, and the pipeline. |
-| `release.md` | The version rules, the bump rules, the tag and image tag forms, the release flow with release-please, the release assets and their checksum files, the third-party notices, the commit rule for a change request, the release token, the repository settings and their script, and the release check. |
+| `operations.md` | The subcommands, logging, storage, health, the provider ping, shutdown, the container, the pipeline, the hosted workflows, and the hosted verdict reuse. |
+| `release.md` | The version rules, the bump rules, the tag and image tag forms, the release flow with release-please, the release assets and their checksum files, the release build profile, the supply chain with the SBOM files, the third-party notices, the commit rule for a change request, the release token, the repository settings and their script, the release check, and the advisory response for published releases. |
 | `telemetry.md` | The build state of the telemetry host, the one start request of `loupe serve` and its log line, the telemetry endpoint and its store, the deploy script, and the free plan bound. |

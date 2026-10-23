@@ -1,4 +1,4 @@
-<!-- @agents-index How the loupe binary runs: subcommands, logging, storage, health, the provider ping, the start request, shutdown, container, and the local pipeline verdict. -->
+<!-- @agents-index How the loupe binary runs: subcommands, logging, storage, health, the provider ping, the start request, shutdown, container, the local pipeline verdict, and the hosted verdict reuse. -->
 # Operations
 
 ## Subcommands
@@ -83,7 +83,7 @@ The runtime stage puts `LICENSE` into `/app` in each image. The release image al
 
 ### Registry image
 
-A release publishes the image `ghcr.io/desek/agentloupe`. The release workflow builds it from the same `Dockerfile` with no change. The image is one multi-platform index for `linux/amd64` and `linux/arm64`, with the tags `<version>` (no `v`) and `latest`. The tag `latest` moves only when both platform builds pass. The image carries the OCI labels source, version, revision, licenses, title, description, and created. The label created is the commit time of the tag. `release.md` states the values. The image holds `/app/LICENSE` and `/app/THIRD-PARTY-NOTICES`. The release image script checks both files after the build and pushes nothing when one is absent. A pull of the image needs no login. `compose.yaml` stays a local build of the image.
+A release publishes the image `ghcr.io/desek/agentloupe`. The release workflow builds it from the same `Dockerfile` with no change. The image is one multi-platform index for `linux/amd64` and `linux/arm64`, with the tags `<version>` (no `v`) and `latest`. The tag `latest` moves only when both platform builds pass, and only forward, through the promote step of the release image script. The image carries the OCI labels source, version, revision, licenses, title, description, and created. The label created is the commit time of the tag. `release.md` states the values. The image holds `/app/LICENSE` and `/app/THIRD-PARTY-NOTICES`. The release image script checks both files after the build and pushes nothing when one is absent. A pull of the image needs no login. `compose.yaml` stays a local build of the image.
 
 ### An old volume that the runtime user cannot write
 
@@ -149,7 +149,7 @@ Each stage entry point has the flag `--inputs`. It prints the paths that the sta
 |---|---|
 | format, lint | `src`, `tests`, `Cargo.toml`, `Cargo.lock`, `build.rs`, `migrations`, `vendor`, `rust-toolchain.toml`, `examples`, `.cargo`, `rustfmt.toml`, `.rustfmt.toml`, `clippy.toml`, `.clippy.toml`, and the script of the stage |
 | lint, in addition | `web`, because `build.rs` reads `web/` when clippy builds the crate, and `deny.toml`, `about.toml`, and `.agents/scripts/deps.deny.sh` of the dependency check |
-| test | the inputs of format and lint with the script of the test stage, and also `.tool-versions` (the pin of the runner), any configuration file of the runner, `upstreams.toml`, `config`, `.agents/scripts`, each file under `docs/` that a test reads, today `docs/specification/accounts.md`, and also `web` (`build.rs` embeds `web/` into the crate, and tests read `web/`) and `Dockerfile` (a test reads its `COPY` lines) |
+| test | the inputs of format and lint with the script of the test stage, and also `.tool-versions` (the pin of the runner), any configuration file of the runner, `upstreams.toml`, `config`, `.agents/scripts`, each file under `docs/` that a test reads, today `docs/specification/accounts.md`, `.github/workflows` (a test reads the verdict and release workflow files), and also `web` (`build.rs` embeds `web/` into the crate, and tests read `web/`) and `Dockerfile` (a test reads its `COPY` lines) |
 | web | `web`, `.tool-versions`, `.agents/scripts/pipeline.web.sh`, `.agents/scripts/web.size.sh` |
 | image | `Dockerfile`, `.dockerignore`, each source path of a `COPY` instruction in the Dockerfile (`rust-toolchain.toml`, `Cargo.toml`, `Cargo.lock`, `build.rs`, `web`, `vendor/litellm`, `src`, `migrations`, `tests`, `LICENSE`, `THIRD-PARTY-NOTICES`), `.agents/scripts/pipeline.image.sh` |
 
@@ -175,26 +175,84 @@ The verdict fails closed. If git is missing, the temporary index fails, a hash f
 
 Only the stages format, lint, test, web, and image enter the verdict. The image stage is in the default verdict. The lint stage reads the advisory database over the network. The stage fingerprint does not cover the advisory database, so a cached lint pass can stay when a new advisory appears. The hosted verdict workflow has no verdict cache, so it checks the advisories again on each pull request and on each release tag. The live scenarios and the benches stay outside the verdict, because they use the network or the wall clock.
 
+#### Hosted verdict reuse
+
+The hosted verdict workflow reuses an earlier full green verdict of the identical tree. A squash merge makes a new commit over the same tree as the head of its pull request. Thus the push run on `main` reuses the proof of the pull request run and does not run the slow stages again. The key is the git tree hash of the checked-out commit. Only exact equality of that hash counts. The local verdict cache, `pipeline.verdict.sh`, and its fingerprint script do not change.
+
+The entry point `.agents/scripts/verdict.reuse.sh` decides the reuse. It has two modes, `lookup` and `judge`. It follows the same rules as the stage entry points: `--help`, a machine output by default, `--human`, actionable errors on stderr, and documented exit codes.
+
+The mode `lookup` takes the platform values as explicit inputs: the repository, the commit of the checkout, the event (`push` or `pull_request`), the base commit, the id of the current run, and a file for the decision. The base commit is the first parent of the pushed commit for a push, and the base commit of the pull request for a pull request. The token comes from the environment variable `GH_TOKEN`. Where git can give a value, the script uses git as the local default.
+
+1. The lookup first checks that `HEAD` equals the commit input. Then it computes the tree hash of `HEAD` with git. Thus the tree that the decision names is the tree that the jobs check out.
+2. The lookup reads the run records of the repository. Each run record holds the head commit, the event, the conclusion, the head repository, and the tree hash of the head commit.
+3. The lookup accepts a source run only when each condition below is true:
+   1. The run is a run of the verdict workflow of this repository, with the conclusion `success`.
+   2. The event of the run is `push` or `pull_request`. A run of another event does not count.
+   3. The head repository of the run is this repository. A run from a fork does not count.
+   4. The run started within the lookback window of 72 hours before the current run.
+   5. The full 40-character tree hash of the head commit of the run equals the tree hash of item 1, by string equality. No other match counts: not a commit SHA, a branch, an ancestor, a path filter, or a green check of a pull request.
+   6. Each of the five stage jobs format, lint, test, web, and image of the run has the conclusion `success`. A run in which a reuse skipped a stage job does not count.
+   7. For a run of the event `pull_request`, the head commit of that run contains the base commit: the compare of the base with the head gives `ahead` or `identical`.
+   8. The run is not the current run.
+4. The lookup is read-only. It makes only read calls to the GitHub API. It writes no cache, no artifact, no status, and no verdict store. The run records already hold the tree and the job results.
+5. The lookup fails closed. A missing tool, a missing token, a failed or partial API call, an unknown field, a bad commit input, a `HEAD` that differs from the commit input, or a page limit that the lookup reaches gives the decision `miss` with the reason `lookup_failed` and the cause. Only a positive match gives `hit`.
+6. The lookup prints one machine line with the decision (`hit` or `miss`), the reason (`match`, `novel`, or `lookup_failed`), the tree, and, for a hit, the id of the source run and the source commit.
+
+| Exit code of `lookup` | Meaning |
+|---|---|
+| 0 | The decision is `hit`. With a decision file, also each `miss`: the script writes the decision and the reason to the file, so the platform step does not fail on a miss. |
+| 1 | With no decision file: the decision is `miss` with the reason `novel`. |
+| 2 | A usage error. |
+| 3 | A tool is missing. |
+| 4 | With no decision file: the decision is `miss` with the reason `lookup_failed`. |
+
+The mode `judge` takes the results of the five stage jobs and the decision as explicit inputs. It passes only in one of two cases:
+
+1. Each of the five stage jobs has the result `success`.
+2. The decision is `hit`, the lint job has the result `success`, and the four jobs format, test, web, and image have the result `skipped`.
+
+Each other combination fails. An absent decision counts as `miss`.
+
+The soundness of the reuse rests on two rules:
+
+1. A source run is a full run. Each of its five stage jobs ran and passed, and no reuse skipped one. Thus a reused run never becomes the source of a later reuse, and the age of a proof never passes the lookback window.
+2. A pull request run is a source only when its head contains the base commit. GitHub runs the workflow of a pull request from the merge ref. When the head contains the base, the merge ref has the tree of the head, so the workflow file of that run equals the workflow file of the tree.
+
+With these rules, the set of trees that can reach `main` with a green check `verdict`, and the set of content that a release can publish, are equal to or smaller than with a verdict that always runs in full.
+
+The verdict workflow uses the reuse in this way:
+
+1. The first job `reuse` runs on a Linux x86_64 runner. It checks out the head commit of the event, never the merge ref, with the history that the base commit needs. It makes exactly one call of `verdict.reuse.sh lookup`. Its decision goes to the other jobs as the output of the job.
+2. The job `reuse` does not run on a call from another workflow. A call from the release workflow runs the five stage jobs in full, so the release keeps its full verdict on the tag commit.
+3. The stage jobs format, test, web, and image run unless the decision is `hit`. When the job `reuse` fails, is skipped, or gives no decision, these jobs run in full.
+4. The lint job runs in full on each event. The dependency check reads the advisory database over the network, so the lint stage is not deterministic and is never reused.
+5. The job `verdict` depends on the job `reuse` and the five stage jobs. It makes exactly one call of `verdict.reuse.sh judge`. The check name `verdict` does not change, so the main ruleset still requires it.
+
+The lookback window is 72 hours. The tree does not capture the runner image, which GitHub updates about each week. A window shorter than that cadence limits the drift. A squash merge usually follows the green pull request run within this window.
+
+A test reads the verdict and release workflow files. It fails when a checkout of the verdict workflow does not use the head commit or uses the merge ref, when the job `reuse` can run on a call from another workflow, when the lint job has a condition on the decision, when the job `verdict` does not call `verdict.reuse.sh judge`, when a job of the verdict workflow has a write permission, or when the release workflow does not call the verdict workflow before its builds.
+
 ### Hosted workflows
 
-Three GitHub Actions workflows are thin callers of the pipeline. A workflow does only platform work: the trigger, the runner, the checkout, the toolchain install from the pin files, the cache, one call for each stage or release step, the upload of artifacts and release assets, the login to the registry, and the gate on the visibility of the repository. A workflow file holds no project logic, no tool version, no target triple, no image name, no version of the project, no configuration value, and no secret value. The pin files, the release-please configuration files, and the scripts hold these values. The one limit that a workflow file holds is the timeout of each job. Each action from outside the repository is pinned by its full 40-character commit SHA, with the release tag in a comment.
+Four GitHub Actions workflows are thin callers of the pipeline. A workflow does only platform work: the trigger, the runner, the checkout, the toolchain install from the pin files, the cache, one call for each stage or release step, the upload of artifacts and release assets, the login to the registry, and the gate on the visibility of the repository. A workflow file holds no project logic, no tool version, no target triple, no image name, no version of the project, no configuration value, and no secret value. The pin files, the release-please configuration files, and the scripts hold these values. The one limit that a workflow file holds is the timeout of each job. Each action from outside the repository is pinned by its full 40-character commit SHA, with the release tag in a comment.
 
 | Workflow | Starts on | Does |
 |---|---|---|
-| verdict | each push to `main`, each pull request that targets `main`, and a call from another workflow of the repository with the ref to check out as an input | Runs the stages format, lint, test, web, and image as five parallel jobs, then one final job `verdict`. |
+| verdict | each push to `main`, each pull request that targets `main`, and a call from another workflow of the repository with the ref to check out as an input | Runs the job `reuse` first, except on a call from another workflow (see "Hosted verdict reuse"). Then it runs the stages format, lint, test, web, and image as five parallel jobs. On a reuse hit, only the lint job runs. Then it runs one final job `verdict`. |
 | release-please | each push to `main` | Keeps one release pull request open, and makes the tag and the GitHub release when the release pull request merges. `release.md` states the flow. |
 | release | the push of a tag `v<major>.<minor>.<patch>`, and a manual start with a tag input | Runs the verdict workflow on the tag commit, then builds and publishes the release assets. `release.md` states the assets. |
+| advisory-response | each day at 05:23 UTC, and a manual start | Makes one call of `advisory.respond.sh` on a checkout of the default branch with all tags. `release.md` (Advisory response) states the rules. It has the permissions `contents: write`, `issues: write`, and `packages: write`, and one concurrency group that never cancels a run. |
 
 The verdict workflow:
 
 1. Each stage job makes exactly one call to its stage entry point, with no argument that changes the stage.
 2. Each job checks out the head commit of the event: the head commit of the pull request, the pushed commit, or the commit of the ref input. A job never checks out the merge ref of a pull request.
 3. Each job installs the Rust toolchain with rustup from `rust-toolchain.toml`, and Node, `cargo-nextest`, and cargo-deny with mise from `.tool-versions`. A job installs only the tools that its stage needs. The lint job installs cargo-deny.
-4. The workflow fails closed. The job `verdict` depends on the five stage jobs. It passes only when each of the five jobs has the result `success`. The result `failure`, `cancelled`, or `skipped` makes it fail. No job continues on an error or retries automatically.
-5. The workflow has only the permission `contents: read`.
+4. The workflow fails closed. The job `verdict` depends on the job `reuse` and the five stage jobs. It passes only in the two cases of the mode `judge` (see "Hosted verdict reuse"): each of the five jobs has the result `success`, or the decision is `hit`, lint has the result `success`, and the four other stage jobs have the result `skipped`. Each other result makes it fail. No job continues on an error or retries automatically.
+5. Each job of the workflow has the permission `contents: read`. The job `reuse` also has `actions: read` when the token needs it to read the run records. No job of the verdict workflow has a write permission.
 6. The test stage runs on Linux in the verdict workflow. The local verdict of `pipeline.verdict.sh` runs on macOS.
 7. A new push to a pull request cancels the older verdict run of that pull request. A run for a push to `main` and a release run are never cancelled.
-8. The hosted runners do not use the verdict cache of `pipeline.verdict.sh`. The jobs cache the cargo registry and the target directory with a key from `Cargo.lock` and `rust-toolchain.toml`.
+8. The hosted runners do not use the verdict cache of `pipeline.verdict.sh`. The job `reuse` reads the run records of the repository instead (see "Hosted verdict reuse"). The jobs cache the cargo registry and the target directory with a key from `Cargo.lock` and `rust-toolchain.toml`.
 
 The release-please workflow gives its `GITHUB_TOKEN` no permission. release-please itself uses the release token of `release.md`. The release workflow logs in to the registry with its `GITHUB_TOKEN`, with the permissions `contents: write` and `packages: write`. The build jobs and the image jobs of the release workflow install cargo-about with mise from `.tool-versions`, for the third-party notices.
 
@@ -202,16 +260,18 @@ Each job that runs on a runner has a timeout. A job with no timeout can run for 
 
 | Workflow | Job | Timeout |
 |---|---|---|
+| verdict | the job `reuse` | 5 minutes |
 | verdict | each of the five stage jobs | 30 minutes |
 | verdict | the final job `verdict` | 5 minutes |
 | release | `visibility` | 5 minutes |
 | release | each build job and each image job | 60 minutes |
 | release | `publish` | 15 minutes |
 | release-please | the release-please job | 10 minutes |
+| advisory-response | the job `respond` | 30 minutes |
 
 The job `verdict` of the release workflow calls the verdict workflow, which is a reusable workflow. It has no timeout of its own. The jobs of the called workflow carry their own timeouts.
 
-The release scripts `release.build.sh`, `release.image.sh`, `release.notices.sh`, and `release.check.sh` are in `.agents/scripts/`. They follow the same rules as the stage entry points: `--help`, a machine output by default, `--human`, actionable errors on stderr, and documented exit codes. They use the network, so they stay outside the verdict. `pipeline.verdict.sh` calls no release script. The hosted workflows do not change `pipeline.verdict.sh`, its cache, or its fingerprints. The repository settings script `repo.settings.sh` follows the same rules. Only a person runs it, and no workflow calls it. `release.md` (Repository settings) states it.
+The release scripts `release.build.sh`, `release.image.sh`, `release.sbom.sh`, `release.notices.sh`, and `release.check.sh`, and the advisory script `advisory.respond.sh`, are in `.agents/scripts/`. They follow the same rules as the stage entry points: `--help`, a machine output by default, `--human`, actionable errors on stderr, and documented exit codes. They use the network, so they stay outside the verdict. `pipeline.verdict.sh` calls no release script and does not call `verdict.reuse.sh`. The hosted workflows do not change `pipeline.verdict.sh`, its cache, or its fingerprints. The repository settings script `repo.settings.sh` follows the same rules. Only a person runs it, and no workflow calls it. `release.md` (Repository settings) states it.
 
 The project uses no paid service. The workflows use the GitHub-hosted runners and the GitHub Container Registry, which are free for a public repository. While the repository is private, only the verdict and release-please workflows run, on Linux x86_64 runners, and the release workflow stops in its first job. The account keeps a budget of 0 USD for GitHub Actions and for GitHub Packages, with usage stopped at the limit.
 
@@ -330,12 +390,12 @@ The time to a full verdict is the time of the local loop. The first measured val
 
 ### Release targets
 
-The targets of the release and the hosted workflows. `release.md` states the release. The column Measured is empty until the first release `0.1.0` is measured. "None" means that the metric does not exist before the release work. The rows from "Community profile" on are measured after the switch to public and at the first release; their baseline is the value on 2026-10-23.
+The targets of the release and the hosted workflows. `release.md` states the release. The column Measured is empty until the first release `0.1.0` is measured. "None" means that the metric does not exist before the release work. The rows from "Community profile" on are measured after the switch to public and at the first release; their baseline is the value on 2026-10-23. The rows of the SBOM files are measured at the first release with SBOM files. The rows of the verdict reuse are measured at the implementation and in the first 14 days after it. The rows of the advisory response are measured with the dry run of the script. The rows of the attestations, of the time from an advisory to the response, and of the token of the draft advisory follow the public repository.
 
 | Metric | Method | Baseline | Threshold | Measured |
 |---|---|---|---|---|
 | Verdict workflow time on a pull request | the duration of the workflow run, from `createdAt` to `updatedAt` of `gh run view <run id> --json createdAt,updatedAt`, on a pull request that changes one Rust file | none, no workflow | at most 20 minutes with a cold cache, at most 12 minutes with a warm cache | |
-| Time from the tag to the published assets | the time from `createdAt` of `gh release view v<version> --json createdAt` to the end of the release workflow run on the same tag, when the six assets and the tag `latest` exist | none, no release | at most 45 minutes | |
+| Time from the tag to the published assets | the time from `createdAt` of `gh release view v<version> --json createdAt` to the end of the release workflow run on the same tag, when the asset files and the tag `latest` exist | none, no release | at most 45 minutes | |
 | Size of each binary | the binary size that `release.build.sh` prints for each asset, read from the log of the release run | 14 402 064 bytes for a local release build on macOS arm64 on 2026-10-21; not a release asset | at most 25 MiB for each of the three binaries | |
 | Size of the image | `docker image inspect --format '{{.Size}}' ghcr.io/desek/agentloupe:<version>` after the pull, for each platform | 158 MB for `agent-loupe:local` as `docker image ls` reports on 2026-10-23 | at most 200 MB for each platform | |
 | Secrets in the workflow files | `gitleaks dir .github` finding count, plus `grep -rEc 'ghp_\|github_pat_\|gho_\|lpt_\|sk-ant-\|sk-' .github` | none, no workflow | 0 findings and 0 matches. A reference of the form `secrets.NAME` is not a secret value. | |
@@ -362,6 +422,17 @@ The targets of the release and the hosted workflows. `release.md` states the rel
 | Owner paths and mockup | `git grep -nE "/Users/[d]esek"`, `git grep -n "Repo/[d]esek" -- .agents/scripts`, and `git ls-files brainstorm` | 5 matches, 1 match, 2 archives | 0, 0, only `brainstorm/agent-ledger.zip` | |
 | Remote branches | `git ls-remote --heads origin` | `main`, the release-please branch, and one stale feature branch of the earlier release work | no stale feature branch | |
 | Default time zone | `loupe config show` with no `LOUPE_TZ` set | `Europe/Stockholm` | `UTC` with the source default | |
+| Archives with an SBOM | `gh release view v<version> --json assets` lists `loupe-v<version>-<target>.cdx.json` and its `.sha256` for each target | 0 of 3 | 3 of 3 || follows the first release with SBOM files; rehearsal on 2026-10-24 in a scratch clone: 3 of 3 archive SBOM files with their `.sha256` files |
+| Image platforms with an SBOM | the same list holds `loupe-v<version>-image-<os>-<arch>.cdx.json` and its `.sha256` | 0 of 2 | 2 of 2 || follows the first release; rehearsal on 2026-10-24 from local images (no push): 2 of 2, 90 components each, with the file `/usr/local/bin/loupe` and its digest |
+| SBOM coverage of each archive | the component count that `release.build.sh` prints, against the count of distinct crates of `cargo tree --locked --target <triple> -e normal,build --prefix none` minus the root package, at the tag | none | equal for each target || rehearsal at `2ea58a5`: `aarch64-apple-darwin` 184 of 184, `x86_64-unknown-linux-gnu` 183 of 183, `aarch64-unknown-linux-gnu` 183 of 183; equal |
+| Verdict time on a squash merge of a green pull request | the duration of the verdict run, from `createdAt` to `updatedAt` of `gh run view <run id> --json createdAt,updatedAt`, on the push of a squash merge of a pull request that was up to date with `main` and had a green verdict; median of 3 merges | 6 min 43 s and 6 min 39 s (push runs 39998277995 and 39997205916 on 2026-10-23; test job 6 min 32 s) | at most 3 minutes, and at most 50 percent of the baseline median || 1 min 4 s on the reuse of a pull request run (run 40039265435 on an empty commit over the tree of run 40038342459, 2026-10-24), 16 percent of the baseline median; the median of 3 squash merges follows the next merges |
+| Verdict time on novel content | the same method on a pull request that changes one Rust file | 5 to 7 minutes on 2026-10-23 | at most 1 minute above the baseline median, for the job `reuse`; within the thresholds of the row "Verdict workflow time on a pull request" || 7 min 9 s and 6 min 58 s (pull request runs 40037532419 and 40038342459, 2026-10-24), at most 28 s above the baseline median of 6 min 41 s |
+| Lookup time | the duration of the job `reuse` in the run of the row "Verdict time on a squash merge of a green pull request" | none | at most 60 seconds || 9 s (the job `reuse` of run 40039265435); 7 s on a miss |
+| Unsound reuse | over each run with the decision `hit` in the reuse scenario and in the first 14 days: the count of the runs where the tree on the machine line differs from the tree hash of the checked-out commit | none | 0 || 0 of 1 hit (run 40039265435: tree `df5162f8…` on the machine line equals `git rev-parse` of the checked-out commit) |
+| Reuse in a release | the count of the release runs whose called verdict has a job `reuse` that ran | none | 0 || follows the first release run |
+| Write calls of the lookup | the fake `gh` of the shell test records the method of each call of `verdict.reuse.sh lookup` | none | 0 calls with a method other than `GET` || 0 of 21 shell test cases (`tests/scripts/verdict.reuse.test.sh`) |
+| Responses in the seeded dry run | the planned action lines of `advisory.respond.sh --dry-run` with a policy file that names a seeded advisory database | none | 1 draft, 1 note for each affected release, 1 issue, and 0 write calls || 2 of 2 runs on 2026-10-24 with a seeded database copy (`RUSTSEC-2099-0001` for `hex` 0.4.3) and a faked release `v0.1.0`: 1 draft (`blocked`, the repository is private), 1 note, 1 issue, 1 label, 0 write calls |
+| Deleted assets | before and after each run of `advisory.respond.sh` and of the release workflow: the count of releases, of release assets, of git tags, and of image tags | none | 0 deleted, 0 replaced by the advisory script || 0 deleted, 0 replaced: the repository has no release; no shell test case of the advisory script makes a delete, an upload, or a docker removal |
 
 ### Start telemetry targets
 

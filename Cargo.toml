@@ -392,3 +392,25 @@ path = "tests/telemetry.send.rs"
 [[test]]
 name = "telemetry_built_out"
 path = "tests/telemetry.built_out.rs"
+
+[[test]]
+name = "workflow_verdict"
+path = "tests/workflow.verdict.rs"
+
+[[test]]
+name = "verdict_reuse"
+path = "tests/verdict.reuse.rs"
+
+[[test]]
+name = "advisory_respond"
+path = "tests/advisory.respond.rs"
+
+# The release build profile (docs/specification/release.md, section Release build profile): build hygiene
+# that makes the binary smaller and casual reading harder; no secrecy claim. The dev and test profiles stay
+# the Cargo defaults. panic = "abort" rests on the unwinding check of that section.
+[profile.release]
+strip = true
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+debug = false

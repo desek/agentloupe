@@ -63,6 +63,7 @@ fn every_stage_prints_its_inputs() {
         "config",
         ".agents/scripts",
         "docs/specification/accounts.md",
+        ".github/workflows",
     ] {
         assert!(test.contains(&p.to_string()), "test misses {p}");
     }

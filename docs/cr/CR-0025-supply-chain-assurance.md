@@ -2,7 +2,7 @@
 name: "CR-0025 Supply chain assurance"
 description: "Add three supply chain controls to the release machinery of CR-0022 and CR-0024: a CycloneDX SBOM and a signed build provenance attestation for each release asset and for the image, with a verify step in release.check.sh; a hosted verdict that reuses a prior full green verdict of the identical git tree, read-only and fail closed; and a daily advisory response that checks the Cargo.lock of each published release, makes a draft security advisory, adds a warning note to the affected release, opens one security issue, and moves the image tag latest only to a fixed version, with no deleted asset. A fourth part, added on 2026-10-23, sets the Cargo release profile of the binary (strip, fat LTO, one codegen unit, panic abort, no debug info) after a check that no code path relies on unwinding, as build hygiene with no secrecy claim."
 id: "CR-0025"
-status: "approved"
+status: "implemented"
 date: 2026-10-23
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, release manager), reviewer agent (approver)
@@ -1248,3 +1248,30 @@ Reviewer: a reviewer agent in a Pi session through the proxy, separate from the 
 No open blocking finding stays. Part 2 was checked against the fast feedback loop rules (content proved once, exact tree equality, fail closed, lint never reused, head checkout, read-only lookup, no fork source and no writer on a fork pull request) with no finding. Part 3 deletes no asset, release, tag, image tag, or package version.
 
 Non-blocking remarks, not edited: syft lists a Rust binary as a component only when it finds build metadata in it (for example from cargo-auditable), so the "loupe binary" part of requirement 9 can need a syft file cataloger setting or a reworded check at the implementation; `gh attestation verify` needs a `gh` login, so requirement 25 fails rather than skips when `gh` is present but logged out; the refusal of requirement 18 makes a manual rerun of an older tag end as failed after its attestations; requirement 71 names the five profile values in key form, which this review reads as values of the owner's request and not as file content.
+
+### Implementation notes, 2026-10-24
+
+The implementation covers the parts that the specification states for a private repository (the specification commit `75f6fe2`): Part 4 in full, Part 1 without the attestations and the signing, Part 2 in full, and Part 3 without the draft security advisory. The run log is `.agents/scenarios/release.assurance.md`; the Part 4 values are in `docs/specification/release.md` (Release build profile, Measured values), and the values of Parts 1 to 3 in `docs/specification/operations.md` (Release targets).
+
+Parts that wait for the public repository:
+
+1. Requirements 15, 17, 19, 20, and 21, and the `--output-file` of requirement 16: the build provenance attestations of the job `publish` and their permissions. `release.image.sh merge` tags the version only, and `promote` moves `latest` forward after the merge; the image attestation step goes between the two when it exists.
+2. Requirements 25 and 26: `gh attestation verify` in `release.check.sh` and the optional `gh`; parameter P4.
+3. Requirement 22 and judgement call 7: the cosign decision.
+4. Requirements 49 and 55, parameter P3: the draft security advisory and its token. On a private repository the script reports the draft action `blocked`; the workflow passes no advisory token yet.
+5. Every measurement on a published release: the 16 files, the image SBOM files of the release run, the release build jobs, the median of 3 squash merges, the 14-day count of unsound reuse, the release run with no job `reuse`, the time from an advisory to the response, the real (not seeded) advisory runs, and the counts of releases, assets, tags, and image tags around a write run.
+6. Requirements 65 and 68 (the limit in `SECURITY.md`), the `README.md` line of the section "Affected Components", and the amendment note of CR-0023 (judgement call 24): the specification diff is silent on them, and they belong to the first public release.
+
+Decisions at the implementation:
+
+1. Parameter P1: the registry of mise has syft but no cargo-cyclonedx. `.tool-versions` pins `github:CycloneDX/cyclonedx-rust-cargo cargo-cyclonedx-0.5.9` (the release backend, tag prefix in the version) and `aqua:anchore/syft 1.55.0`. Both write CycloneDX JSON 1.5.
+2. cargo-cyclonedx lists the crates of `cargo metadata`, which unifies the development dependencies and lists optional crates that the build does not enable: 208 crates for macOS, 24 of them not in the binary. `release.sbom.sh asset` keeps the crates that `cargo tree --target <triple> -e normal,build` lists, the method of the coverage row, and replaces the path of the checkout by `.`.
+3. Review remark on requirement 9: syft lists a Rust binary only with embedded build metadata. `release.sbom.sh image` asks syft for the digest of each file and keeps the operating system packages and the file `/usr/local/bin/loupe` with its digest and the version.
+4. `release.image.sh` got a read-only mode `latest`, so the advisory script plans the move of `latest` without a second copy of the image name.
+5. The owner asked for the daily workflow `advisory-response.yml` now, while the specification commit placed it after the public repository; `release.md` (Advisory response) and `operations.md` (Hosted workflows) now state the workflow, and that a private run reports the draft `blocked` instead of the exit code 3, which stays for a write run on a public repository without the token.
+6. Parameter P2: the `GITHUB_TOKEN` of a private repository needs `actions: read` to list the runs; the job `reuse` has it.
+7. Parameter P5 holds with no extra flag: cargo deny reads a seeded advisory file from the scratch copy that `db-path` names, and `cargo deny fetch db` keeps it.
+8. Parameter P6: cargo-nextest 0.9.149 accepts `--cargo-profile release`.
+9. Defect found at the run: `advisory.respond.sh` used `gh auth status`, which fails when any stored account has an invalid token; it now uses `gh auth token`.
+10. The scenario file is `.agents/scenarios/release.assurance.md`, the name of the implementation request, not `supply-chain.md`.
+

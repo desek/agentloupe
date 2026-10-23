@@ -1,8 +1,9 @@
-# @agents-index Release workflow: on a tag v<major>.<minor>.<patch>, gates on visibility and the verdict, builds three binaries and two platform images, then publishes.
+# @agents-index Release workflow: on a tag v<major>.<minor>.<patch>, gates on visibility and the verdict, builds three binaries and two platform images with SBOM files, then publishes.
 #
-# A thin caller of the release scripts: release.build.sh builds the asset of the host target and
-# release.image.sh builds, pushes, and merges the image; the scripts hold the image name, the targets,
-# and the tag checks. docs/specification/release.md (Release flow) states the order.
+# A thin caller of the release scripts: release.build.sh builds the asset of the host target with its SBOM,
+# release.image.sh builds and pushes the platform image with its SBOM, merges the version index, and promotes
+# latest; the scripts hold the image name, the targets, the SBOM tools, and the tag checks.
+# docs/specification/release.md (Release flow) states the order.
 name: release
 
 on:
@@ -65,10 +66,10 @@ jobs:
           persist-credentials: false
       - name: Install the Rust toolchain of rust-toolchain.toml
         run: rustup toolchain install
-      - name: Install cargo-about of .tool-versions
+      - name: Install cargo-about and cargo-cyclonedx of .tool-versions
         uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
         with:
-          install_args: github:EmbarkStudios/cargo-about
+          install_args: github:EmbarkStudios/cargo-about github:CycloneDX/cyclonedx-rust-cargo
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -109,10 +110,10 @@ jobs:
           persist-credentials: false
       - name: Install the Rust toolchain of rust-toolchain.toml
         run: rustup toolchain install
-      - name: Install cargo-about of .tool-versions
+      - name: Install cargo-about and syft of .tool-versions
         uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
         with:
-          install_args: github:EmbarkStudios/cargo-about
+          install_args: github:EmbarkStudios/cargo-about aqua:anchore/syft
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
@@ -125,16 +126,22 @@ jobs:
         run: |
           LOUPE_BUILD_COMMIT="$(git rev-parse "refs/tags/$TAG^{commit}")"
           export LOUPE_BUILD_COMMIT
-          .agents/scripts/release.image.sh build --tag "$TAG" --digest-dir "$RUNNER_TEMP/digests"
+          .agents/scripts/release.image.sh build --tag "$TAG" --digest-dir "$RUNNER_TEMP/digests" --sbom-dir "$RUNNER_TEMP/sbom"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: digests-${{ matrix.runner }}
           path: ${{ runner.temp }}/digests/
           retention-days: 3
           if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom-${{ matrix.runner }}
+          path: ${{ runner.temp }}/sbom/
+          retention-days: 3
+          if-no-files-found: error
 
   # Runs only when the three builds and both image builds passed, so the release never gets a partial set
-  # from this run and the tag latest moves only with both platforms.
+  # of its 16 files from this run; the index gets the version tag, then promote moves latest forward.
   publish:
     needs: [build, image]
     runs-on: ubuntu-24.04
@@ -157,6 +164,11 @@ jobs:
           pattern: assets-*
           path: ${{ runner.temp }}/assets
           merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: sbom-*
+          path: ${{ runner.temp }}/assets
+          merge-multiple: true
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
@@ -168,3 +180,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "$TAG" "$RUNNER_TEMP"/assets/* --clobber --repo "$GITHUB_REPOSITORY"
       - run: .agents/scripts/release.image.sh merge --tag "$TAG" --digest-dir "$RUNNER_TEMP/digests"
+      - run: .agents/scripts/release.image.sh promote --tag "$TAG"

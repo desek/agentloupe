@@ -1,9 +1,11 @@
-# @agents-index Verdict workflow: runs the five pipeline stages as parallel jobs on the head commit, then one fail-closed verdict job.
+# @agents-index Verdict workflow: a read-only reuse lookup, the five pipeline stages as parallel jobs on the head commit, then one fail-closed verdict job.
 #
 # A thin caller of the portable pipeline: each stage job checks out the head commit, installs its tools
-# from rust-toolchain.toml and .tool-versions, and makes one call to its stage entry point. The pin files
-# and the scripts hold every version and value; docs/specification/operations.md (Hosted workflows) states
-# the rules.
+# from rust-toolchain.toml and .tool-versions, and makes one call to its stage entry point. The job reuse
+# makes one call of verdict.reuse.sh lookup, which reads the run records for a full green run of the same
+# git tree; on a hit, format, test, web, and image do not run, and lint always runs. A call from another
+# workflow (the release) never runs the lookup. The pin files and the scripts hold every version and value;
+# docs/specification/operations.md (Hosted workflows, Hosted verdict reuse) states the rules.
 name: verdict
 
 on:
@@ -34,7 +36,32 @@ env:
   CARGO_TERM_COLOR: never
 
 jobs:
+  # Read-only and fail closed: any doubt gives the decision miss, and a failed or skipped job reuse leaves
+  # every stage to run. A call from another workflow has the ref input and never runs this job.
+  reuse:
+    if: ${{ !inputs.ref && (github.event_name == 'push' || github.event_name == 'pull_request') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      decision: ${{ steps.lookup.outputs.decision }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.HEAD_REF }}
+          fetch-depth: 2
+          persist-credentials: false
+      - id: lookup
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: .agents/scripts/verdict.reuse.sh lookup --repo "$GITHUB_REPOSITORY" --commit "$HEAD_REF" --event "$GITHUB_EVENT_NAME" --base "$BASE" --run-id "$GITHUB_RUN_ID" --decision-file "$GITHUB_OUTPUT"
+
   format:
+    needs: reuse
+    if: ${{ !cancelled() && needs.reuse.outputs.decision != 'hit' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -70,6 +97,8 @@ jobs:
       - run: .agents/scripts/pipeline.lint.sh
 
   test:
+    needs: reuse
+    if: ${{ !cancelled() && needs.reuse.outputs.decision != 'hit' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -93,6 +122,8 @@ jobs:
       - run: .agents/scripts/pipeline.test.sh
 
   web:
+    needs: reuse
+    if: ${{ !cancelled() && needs.reuse.outputs.decision != 'hit' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -107,6 +138,8 @@ jobs:
       - run: .agents/scripts/pipeline.web.sh
 
   image:
+    needs: reuse
+    if: ${{ !cancelled() && needs.reuse.outputs.decision != 'hit' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -116,18 +149,23 @@ jobs:
           persist-credentials: false
       - run: .agents/scripts/pipeline.image.sh
 
-  # Fails closed: passes only when each of the five stage jobs has the result success; failure,
-  # cancelled, and skipped each make it fail.
+  # Fails closed: passes only when each of the five stage jobs succeeded, or when the decision is hit, lint
+  # succeeded, and the other four were skipped; verdict.reuse.sh judge holds the rule.
   verdict:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [format, lint, test, web, image]
+    needs: [reuse, format, lint, test, web, image]
     if: ${{ always() }}
     steps:
-      - name: Require success of each stage job
-        env:
-          RESULTS: ${{ join(needs.*.result, ' ') }}
-        run: |
-          echo "stage results: $RESULTS"
-          for r in $RESULTS; do [ "$r" = success ] || exit 1; done
-          [ "$(echo "$RESULTS" | wc -w)" -eq 5 ]
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.HEAD_REF }}
+          persist-credentials: false
+      - env:
+          FORMAT: ${{ needs.format.result }}
+          LINT: ${{ needs.lint.result }}
+          TEST: ${{ needs.test.result }}
+          WEB: ${{ needs.web.result }}
+          IMAGE: ${{ needs.image.result }}
+          DECISION: ${{ needs.reuse.outputs.decision }}
+        run: .agents/scripts/verdict.reuse.sh judge --format "$FORMAT" --lint "$LINT" --test "$TEST" --web "$WEB" --image "$IMAGE" --decision "$DECISION"
