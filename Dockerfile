@@ -2,7 +2,11 @@
 
 # The build image carries rustup; rustup reads rust-toolchain.toml and installs that exact toolchain,
 # so this file states no Rust version of its own.
-FROM rust:slim-bookworm AS build
+# Each base image is pinned by the digest of its multi-platform index, so two builds of one commit get the
+# same layers on linux/amd64 and linux/arm64. A human refreshes the digests at each minor release with
+# docker buildx imagetools inspect <image>:<tag> (its Digest: line); docs/specification/operations.md (Container).
+# Tag: rust:slim-bookworm
+FROM rust:slim-bookworm@sha256:86234e857a413004348b471d11a4ebe1aa92d2eae2b6b143cac68fd1ac3c48be AS build
 WORKDIR /src
 COPY rust-toolchain.toml ./
 RUN rustup show active-toolchain || rustup toolchain install
@@ -17,7 +21,8 @@ COPY examples ./examples
 RUN cargo build --release --locked --bin loupe
 
 # debian slim has bash, so the HEALTHCHECK can use /dev/tcp and the image needs no curl.
-FROM debian:bookworm-slim
+# Tag: debian:bookworm-slim
+FROM debian:bookworm-slim@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8
 ARG UID=10001
 ARG GID=10001
 RUN groupadd --gid "$GID" loupe \
@@ -27,6 +32,10 @@ WORKDIR /app
 COPY --from=build /src/target/release/loupe /usr/local/bin/loupe
 COPY config ./config
 COPY upstreams.toml ./
+# Each image holds the license of the project. The release image also holds the third-party notices that
+# release.notices.sh writes before the release build; the bracket makes the notices optional, so a local
+# build with no notices file still passes.
+COPY LICENSE THIRD-PARTY-NOTICE[S] ./
 ENV LOUPE_ENV=container
 USER loupe
 EXPOSE 8787

@@ -85,7 +85,7 @@ for v in "${list[@]}"; do
   skipped=$(q "SELECT count(*) FROM session_day_summaries WHERE status = 'skipped'")
   pending=$(q "SELECT count(*) FROM session_day_summaries WHERE status = 'pending'")
   full_rows=$(q "SELECT count(*) FROM session_full_summaries")
-  pairs=$(python3 -I - "$db" "${LOUPE_TZ:-Europe/Stockholm}" <<'PY'
+  pairs=$(python3 -I - "$db" "${LOUPE_TZ:-UTC}" <<'PY'
 import sqlite3, sys, datetime, zoneinfo
 tz = zoneinfo.ZoneInfo(sys.argv[2])
 rows = sqlite3.connect(sys.argv[1]).execute("SELECT s.key_hash, c.started_at FROM calls c JOIN sessions s ON s.id = c.session_id")

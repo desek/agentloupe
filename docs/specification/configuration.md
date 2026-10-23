@@ -41,7 +41,7 @@ The flag `--env` or the variable `LOUPE_ENV` gives the name of the environment. 
 | `LOUPE_SUMMARY_INTERVAL_SECS` | no | no | `30` |
 | `LOUPE_SUMMARY_MAX_ATTEMPTS` | no | no | `5` |
 | `LOUPE_SUMMARY_MIN_CONVERSATION_CHARS` | no | no | `200` |
-| `LOUPE_TZ` | no | no | `Europe/Stockholm` |
+| `LOUPE_TZ` | no | no | `UTC` |
 | `LOUPE_PUBLISH_AT` | no | no | `01:00` |
 | `LOUPE_PUBLISH_INTERVAL_SECS` | no | no | `60` |
 | `LOUPE_IDLE_SECS` | no | no | `3600` |
@@ -151,7 +151,7 @@ The error never prints the value. `LOUPE_SUMMARY_MODEL`, `LOUPE_SUMMARY_INTERVAL
 
 ## Day variables
 
-`LOUPE_TZ` is an IANA time zone name, for example `Europe/Stockholm`. `LOUPE_PUBLISH_AT` has the format `HH:MM`, with an hour from 00 to 23 and a minute from 00 to 59. `LOUPE_PUBLISH_INTERVAL_SECS` is the interval of the publisher in seconds. `LOUPE_DAY_REVIEW` is `auto` or `manual`. A value that is not valid stops the start with an actionable error that names the variable and an example. `days.md` gives the full rules.
+`LOUPE_TZ` is an IANA time zone name, for example `Europe/Stockholm`. The default is `UTC`. A value from the environment or from `.env` keeps its effect. `LOUPE_PUBLISH_AT` has the format `HH:MM`, with an hour from 00 to 23 and a minute from 00 to 59. `LOUPE_PUBLISH_INTERVAL_SECS` is the interval of the publisher in seconds. `LOUPE_DAY_REVIEW` is `auto` or `manual`. A value that is not valid stops the start with an actionable error that names the variable and an example. `days.md` gives the full rules.
 
 ## Admin token
 

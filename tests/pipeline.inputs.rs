@@ -68,8 +68,22 @@ fn every_stage_prints_its_inputs() {
     }
     assert_eq!(
         lines("web", "--inputs"),
-        ["web", ".tool-versions", ".agents/scripts/pipeline.web.sh"]
+        [
+            "web",
+            ".tool-versions",
+            ".agents/scripts/pipeline.web.sh",
+            ".agents/scripts/web.size.sh"
+        ]
     );
+}
+
+/// The dependency check of the lint stage reads its policy files and its script, so they are lint inputs.
+#[test]
+fn lint_inputs_cover_deny_files() {
+    let inputs = lines("lint", "--inputs");
+    for p in ["deny.toml", "about.toml", ".agents/scripts/deps.deny.sh"] {
+        assert!(inputs.contains(&p.to_string()), "lint misses {p}");
+    }
 }
 
 #[test]
@@ -84,12 +98,42 @@ fn image_inputs_cover_dockerfile_copy_sources() {
             continue;
         }
         for src in &words[1..words.len() - 1] {
-            let src = src.trim_start_matches("./");
-            assert!(covered(src, &inputs), "image misses {src}");
+            // A one-character bracket makes a source optional, for example THIRD-PARTY-NOTICE[S]; the
+            // declared input is the plain path.
+            let src = src.trim_start_matches("./").replace(['[', ']'], "");
+            assert!(covered(&src, &inputs), "image misses {src}");
         }
     }
-    for p in ["Dockerfile", ".dockerignore"] {
+    for p in [
+        "Dockerfile",
+        ".dockerignore",
+        "LICENSE",
+        "THIRD-PARTY-NOTICES",
+    ] {
         assert!(inputs.contains(&p.to_string()), "image misses {p}");
+    }
+}
+
+/// Each FROM line names its base image by the SHA-256 digest of the image index, so a build is repeatable.
+#[test]
+fn dockerfile_base_images_pinned() {
+    let docker = std::fs::read_to_string(root().join("Dockerfile")).unwrap();
+    let froms: Vec<&str> = docker
+        .lines()
+        .filter(|l| {
+            l.split_whitespace()
+                .next()
+                .is_some_and(|w| w.eq_ignore_ascii_case("FROM"))
+        })
+        .collect();
+    assert!(!froms.is_empty(), "no FROM line");
+    for line in froms {
+        let image = line.split_whitespace().nth(1).unwrap_or("");
+        let digest = image.split_once("@sha256:").map(|(_, d)| d).unwrap_or("");
+        assert!(
+            digest.len() == 64 && digest.chars().all(|c| c.is_ascii_hexdigit()),
+            "FROM line without a sha256 digest of 64 hex digits: {line}"
+        );
     }
 }
 
@@ -130,6 +174,10 @@ const NOT_READ: &[(&str, &str)] = &[
     ("private.off.rs", ".env.example"),
     // An expected entry of the image inputs.
     ("pipeline.inputs.rs", ".dockerignore"),
+    ("pipeline.inputs.rs", "LICENSE"),
+    // Expected entries of the lint inputs.
+    ("pipeline.inputs.rs", "deny.toml"),
+    ("pipeline.inputs.rs", "about.toml"),
     // Files of the scratch repository of the verdict tests, not of this repository.
     ("pipeline.rs", "Dockerfile"),
     ("pipeline.rs", "docs/specification/operations.md"),

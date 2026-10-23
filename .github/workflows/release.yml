@@ -32,6 +32,7 @@ jobs:
   # before any push to the registry, so a private run uses no paid runner.
   visibility:
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - name: Stop when the repository is private
         env:
@@ -56,6 +57,7 @@ jobs:
       matrix:
         runner: [macos-15, ubuntu-22.04, ubuntu-22.04-arm]
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -63,6 +65,10 @@ jobs:
           persist-credentials: false
       - name: Install the Rust toolchain of rust-toolchain.toml
         run: rustup toolchain install
+      - name: Install cargo-about of .tool-versions
+        uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
+        with:
+          install_args: github:EmbarkStudios/cargo-about
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -85,6 +91,7 @@ jobs:
       matrix:
         runner: [ubuntu-24.04, ubuntu-24.04-arm]
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
     permissions:
       contents: read
       packages: write
@@ -93,6 +100,12 @@ jobs:
         with:
           ref: refs/tags/${{ env.TAG }}
           persist-credentials: false
+      - name: Install the Rust toolchain of rust-toolchain.toml
+        run: rustup toolchain install
+      - name: Install cargo-about of .tool-versions
+        uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
+        with:
+          install_args: github:EmbarkStudios/cargo-about
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
@@ -112,6 +125,7 @@ jobs:
   publish:
     needs: [build, image]
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: write
       packages: write

@@ -37,6 +37,8 @@
 | `latest` | `latest` has the digest of `<version>` | `<version>` is not the newest release, or Docker is absent |
 | `health` | the image starts with two keys from its own `loupe gen-key` on `127.0.0.1` and a free port, and `GET /healthz` gives 200 and `{"status":"ok"}` within 30 seconds | Docker is absent |
 | `start-version` | the first log line of the container holds `"version":"<version>"` | Docker is absent |
+| `notices <target>` (three lines) | `THIRD-PARTY-NOTICES` of the archive is present and not empty, holds the LiteLLM part and the Geist part, and has the same SHA-256 digest as the other copies | the checksum of the archive failed |
+| `notices image` | `/app/THIRD-PARTY-NOTICES` of the image passes the same rules, with the same digest as the archive copies | Docker is absent |
 
 The container, its anonymous volume, and the temporary directory are removed on each exit path. No key is printed.
 

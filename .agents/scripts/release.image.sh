@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# @agents-index Builds and pushes the release image of the host platform by digest, or merges the platform digests into the tagged index on ghcr.io.
+# @agents-index Builds, checks, and pushes the release image of the host platform by digest, or merges the platform digests into the tagged index on ghcr.io.
 #
 # Usage: release.image.sh build --tag v<major>.<minor>.<patch> --digest-dir DIR [--human] [--dry-run]
 #        release.image.sh merge --tag v<major>.<minor>.<patch> --digest-dir DIR [--human] [--dry-run]
-#   build            Build the image of the host platform from the root Dockerfile, set the OCI labels, push
-#                    it by digest (no tag), and write the digest to DIR/<os>-<arch>.
+#   build            Write THIRD-PARTY-NOTICES with release.notices.sh, build the image of the host platform
+#                    from the root Dockerfile with the OCI labels, check that it holds /app/LICENSE and
+#                    /app/THIRD-PARTY-NOTICES, push it by digest (no tag), and write the digest to
+#                    DIR/<os>-<arch>. A missing file stops the step before the push.
 #   merge            Read one digest per platform from DIR and make one multi-platform index with the
 #                    tags <version> and latest. With a digest missing, it stops and moves no tag.
 #   --tag TAG        The git tag of the release, for example v1.2.3. Required. The image tag is the version
@@ -25,7 +27,8 @@
 #   merge: image: <name> tags: <version>,latest digest: <index digest> platforms: linux/amd64,linux/arm64
 #   With --dry-run: command: <the command that a real run would run>, one line each.
 # Full docker output goes to .agents/logs/release.image.log.
-# Exit codes: 0 done (or planned), 1 build, push, or merge failed, 2 bad usage, 3 required tool missing,
+# Exit codes: 0 done (or planned), 1 notices, build, file check, push, or merge failed, 2 bad usage,
+#   3 required tool missing,
 #   4 tag check failed (tag absent, tag version differs from Cargo.toml, or HEAD is not the tag commit).
 # Reference: docs/specification/release.md, section Container image.
 set -euo pipefail
@@ -125,6 +128,9 @@ show() { local a out=""; for a in "$@"; do [[ "$a" == *" "* ]] && a="'$a'"; out=
 
 platform_key() { echo "${1//\//-}"; }
 
+# The files that the release image must hold; release.md (Container image) states them.
+REQUIRED_FILES="/app/LICENSE /app/THIRD-PARTY-NOTICES"
+
 do_build() {
   local platform meta digest
   if [[ $dry_run -eq 1 ]]; then platform="<host os/arch>"; else
@@ -134,11 +140,34 @@ do_build() {
     esac
   fi
   meta="${TMPDIR:-/tmp}/release.image.meta.$$.json"
+  local check_tag="agentloupe-release-check:$version"
+  local notices=("$ROOT/.agents/scripts/release.notices.sh")
+  # The first build loads the image into Docker for the file check; the second build pushes the same
+  # layers from the build cache by digest, so nothing reaches the registry before the check passes.
+  local load=(docker buildx build --platform "$platform" "${labels[@]}" --load --tag "$check_tag" --file Dockerfile .)
+  local check=(docker run --rm --platform "$platform" --entrypoint /bin/sh "$check_tag" -c "for f in $REQUIRED_FILES; do test -s \$f || { echo missing \$f; exit 1; }; done")
   local cmd=(docker buildx build --platform "$platform" "${labels[@]}"
     --output "type=image,name=$IMAGE,push-by-digest=true,name-canonical=true,push=true"
     --metadata-file "$meta" --file Dockerfile .)
-  if [[ $dry_run -eq 1 ]]; then show "${cmd[@]}"; echo "command: write the digest to $dir/<os>-<arch>"; return 0; fi
+  if [[ $dry_run -eq 1 ]]; then
+    show .agents/scripts/release.notices.sh; show "${load[@]}"; show "${check[@]}"; show "${cmd[@]}"
+    echo "command: write the digest to $dir/<os>-<arch>"; return 0
+  fi
   mkdir -p "$(dirname "$LOG")" "$dir"
+  if ! "${notices[@]}" >>"$LOG" 2>&1; then
+    tail -n 10 "$LOG" >&2
+    fail "release.notices.sh failed, so the image would lack THIRD-PARTY-NOTICES; nothing was built or pushed. Fix: follow the error of release.notices.sh above (install cargo about from .tool-versions, or settle the license). Reference: docs/specification/release.md, section Third-party notices. Verify: .agents/scripts/release.notices.sh exits 0." 1
+  fi
+  if ! "${load[@]}" >>"$LOG" 2>&1; then
+    tail -n 30 "$LOG" >&2
+    fail "the image build for $platform failed; nothing was pushed. Fix: read .agents/logs/release.image.log; check that pipeline.image.sh passes on the tag commit. Verify: re-run release.image.sh build --tag $tag --digest-dir $dir." 1
+  fi
+  if ! "${check[@]}" >>"$LOG" 2>&1; then
+    docker image rm "$check_tag" >/dev/null 2>&1 || true
+    tail -n 5 "$LOG" >&2
+    fail "the built image for $platform lacks one of $REQUIRED_FILES or holds it empty, so nothing was pushed. Fix: check that the Dockerfile copies LICENSE and THIRD-PARTY-NOTICES into /app and that .dockerignore allows both. Reference: docs/specification/release.md, section Container image. Verify: re-run release.image.sh build --tag $tag --digest-dir $dir." 1
+  fi
+  docker image rm "$check_tag" >/dev/null 2>&1 || true
   if ! "${cmd[@]}" >>"$LOG" 2>&1; then
     tail -n 30 "$LOG" >&2
     fail "the image build or push for $platform failed. Fix: read .agents/logs/release.image.log; check the registry login (packages: write) and that pipeline.image.sh passes on the tag commit. Verify: re-run release.image.sh build --tag $tag --digest-dir $dir." 1

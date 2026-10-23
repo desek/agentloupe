@@ -846,3 +846,11 @@ Open blocking findings: none.
 3. `release.build.sh` and `release.image.sh` use exit code 4 for a failed tag check. With `--dry-run` and no tag yet, they check the version against `Cargo.toml` at `HEAD` and say so in the plan line; a real run needs the tag. `release.build.sh` reads the binary from `CARGO_TARGET_DIR` when it is set.
 4. `release.check.sh --dir DIR` keeps the downloads and does not download a file that is already in `DIR`, so scenario step 16 can change one byte of a copy and check again. The pull uses an empty Docker configuration with the endpoint of the current context, so it holds no credential.
 5. The release workflow attaches the six assets, then merges the image index, in one final job that needs the three builds and the two image builds.
+
+Implementation notes, 2026-10-23, decided by the supervisor on the implementer's questions:
+
+1. The release branch name `release-please--branches--main--components--agent-loupe` and the title pattern warning are accepted as release-please behaviour; judgement call 6 is corrected by this note.
+2. The compare link of the first changelog heading points at the same tag twice, because no earlier tag exists. Accepted for the first release.
+3. The size script is now an input of the web stage, so a change to it runs the stage again.
+4. A local throwaway tag in a scratch clone, never pushed, is inside the rule that forbids a tag on the repository.
+5. The outward steps, the switch to public and the merge of the release pull request, wait for the owner after the pre-release audits.

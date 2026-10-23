@@ -13,21 +13,24 @@ The product domains are `agentloupe.dev` and `agentloupe.app`.
 
 ## Status
 
-The `loupe` binary is implemented. Thirteen change requests under [`docs/cr/`](docs/cr/) carry the
-specification of each part, and [`docs/specification/`](docs/specification/) describes the behaviour
-of the code. The binary runs in the container, captures Claude Code and Pi through the proxy, prices
-and summarizes the calls, publishes the day records, serves the dashboard with its live section and
-the private page, and backfills the session logs that predate the proxy. The two archives in
-[`brainstorm/`](brainstorm/) record the brainstorm and stay as reference only:
+The `loupe` binary is implemented and runs in the container. 24 change requests under
+[`docs/cr/`](docs/cr/) carry the specification of each part, and
+[`docs/specification/`](docs/specification/) describes the behaviour of the code. The binary
+captures Claude Code and Pi through the proxy, prices and summarizes the calls, publishes the day
+records, serves the dashboard with its live section and the private page, and backfills the session
+logs that predate the proxy.
 
-| Source | What it is | Use |
-|---|---|---|
-| `brainstorm/agent-ledger.zip` | Untested prototype code for the proxy, in Rust. | Reference only. The code base was written from scratch to this README. |
-| `brainstorm/dashboard.grenemark.se-html.zip` | A design mockup of the public dashboard, with sample data. | The source of the design values of the dashboard. Not production code. |
+Releases are automated. release-please keeps one release pull request from the Conventional Commits
+on `main`; its merge makes the tag `v<version>` and the GitHub release. The release workflow then
+attaches one archive per platform with its checksum file, and publishes the multi-platform image
+`ghcr.io/desek/agentloupe`. See [Install](#install) and
+[`docs/specification/release.md`](docs/specification/release.md).
+
+The design values of the dashboard came from a design mockup with sample data. The archive
+`brainstorm/agent-ledger.zip` records the brainstorm and stays as reference only: it holds untested
+prototype code for the proxy, in Rust, and the code base was written from scratch to this README.
 
 This README is the authority. Where a source differs from it, the README is correct.
-
-To install a published release, a container image, or a build from source, see [Install](#install).
 
 ## Scope
 
@@ -75,7 +78,7 @@ GitHub API ─► GitHub worker (PRs, lines) ───────────�
    day comes from the session day summaries of that day, in a neutral tone. A scrubber then
    removes URLs, paths, email addresses, and numbers from the line.
 7. The GitHub worker counts the pull requests and the changed lines of the day (see "GitHub").
-8. At 01:00 (Europe/Stockholm) the binary builds the previous day and publishes it on
+8. At 01:00 (`LOUPE_TZ`, default UTC) the binary builds the previous day and publishes it on
    `GET /v1/days`.
 9. The same binary serves the dashboard at `/`. The page reads `/v1/days` and shows the data.
 
@@ -131,7 +134,7 @@ Configuration:
 | `LOUPE_SUMMARY_PROVIDER` | no | `anthropic` or `openai`. Default: `anthropic` if it is detected, else `openai`. A detected provider enables the summaries; with no detected provider, no summaries. |
 | `LOUPE_SUMMARY_MODEL` | no | Model for the summaries. Default `claude-haiku-5-5` for `anthropic`, no default for `openai`. With `CLAUDE_CODE_OAUTH_TOKEN` as the active credential, a different model needs `ANTHROPIC_API_KEY`. |
 | `LOUPE_PROVIDER_PING_SECS` | no | Seconds between two pings of the models list of each provider. Default `300`, minimum `60`. |
-| `LOUPE_TZ` | no | Time zone that cuts the days. Default `Europe/Stockholm`. |
+| `LOUPE_TZ` | no | Time zone that cuts the days, an IANA name such as `Europe/Stockholm`. Default `UTC`. |
 | `LOUPE_PUBLISH_AT` | no | Time to publish the previous day. Default `01:00`. |
 | `LOUPE_PUBLISH_INTERVAL_SECS` | no | Seconds between two checks for days to publish. Default `60`. |
 | `LOUPE_IDLE_SECS` | no | Seconds without calls before a session closes. Default `3600`. |
@@ -260,7 +263,8 @@ archive per platform and one `.sha256` checksum file per archive:
 2. Check the checksum: `shasum -a 256 -c $A.sha256` on macOS, `sha256sum -c $A.sha256` on Linux.
    Each prints `OK`.
 3. Unpack: `tar -xzf $A`. The directory `loupe-v$V-<target>/` holds `loupe`, `upstreams.toml`,
-   `config/`, `LICENSE`, and `README.md`. The binary reads `upstreams.toml` and `config/` from the
+   `config/`, `LICENSE`, `README.md`, and `THIRD-PARTY-NOTICES` (the licenses of the third-party
+   parts of the binary). The binary reads `upstreams.toml` and `config/` from the
    working directory, so run it from that directory.
 4. Run: `cd loupe-v$V-*/ && ./loupe --version` prints `loupe <version>`. Then
    `LOUPE_DATA_KEY=... LOUPE_ACCOUNT_KEY=... ./loupe serve`, with two keys from `./loupe gen-key`.
@@ -299,8 +303,9 @@ also builds from source.
 
 `.agents/scripts/release.check.sh --version <version>` checks a published release on a macOS or Linux
 machine with `curl` and Docker: it downloads the six assets with no credential, verifies the
-checksums, runs `loupe --version` of each binary, pulls the image with no login, and checks
-`GET /healthz` and the version in the first log line. It exits 0 when each check passes or is
+checksums, runs `loupe --version` of each binary, pulls the image with no login, checks
+`GET /healthz` and the version in the first log line, and checks `THIRD-PARTY-NOTICES` in each
+archive and in the image. It exits 0 when each check passes or is
 skipped with a stated reason.
 
 ## Connect the agents
@@ -520,13 +525,23 @@ token with a digit, except a name in `LOUPE_PUBLIC_PROJECTS`. Raw bodies are del
 
 ## Open work
 
-- **Code base.** Write the `loupe` binary from scratch to this README. Use the prototype only to
-  understand the brainstorm.
-- **Account ID sources.** Confirm the Claude Code and Codex account IDs with a capture of real
-  requests during the implementation, and update the "Accounts" section.
-- **Dashboard design.** The mockup has no cost card and shows merged PRs only. Design the cost
-  card and the opened PRs in the style of the mockup.
+- **Codex account source.** Confirm the `ChatGPT-Account-Id` header of Codex with a capture of
+  real requests, and update the "Accounts" section.
+- **Build provenance.** Attest the release assets and sign the image, with an SBOM.
+- **Draft releases.** Keep a release as a draft until its assets exist.
+- **Release build cache.** Build the release assets with no cargo cache.
+- **Pinned actions text.** Align the "Pinned actions" text of `release.md` with the Dependabot
+  updates of the actions.
+- **Secret scanning of fixtures.** Add a `.gitleaksignore` for the test fixtures.
+- **Repository files.** Add `CODEOWNERS` and `.editorconfig`, and sign the commits.
+- **Release check after publish.** Run `release.check.sh` automatically after each release.
+
+## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before you open a pull request, and follow the
+[Code of Conduct](CODE_OF_CONDUCT.md). Report a vulnerability in private as
+[SECURITY.md](SECURITY.md) describes, never in a public issue.
 
 ## License
 
-Agentloupe is MIT licensed, see [`LICENSE`](LICENSE). The vendored LiteLLM files are MIT licensed, and the vendored Geist fonts are under the SIL Open Font License (`web/assets/fonts/OFL.txt`).
+Agentloupe is MIT licensed, see [`LICENSE`](LICENSE). The vendored LiteLLM files are MIT licensed, and the vendored Geist fonts are under the SIL Open Font License (`web/assets/fonts/OFL.txt`). Each release archive and the release image carry `THIRD-PARTY-NOTICES`, with the licenses of the crates of the binary, the LiteLLM license, and the Geist font license.

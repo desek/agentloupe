@@ -43,7 +43,7 @@ pub const VARS: &[Var] = &[
     var("LOUPE_SUMMARY_INTERVAL_SECS", Some("30"), false),
     var("LOUPE_SUMMARY_MAX_ATTEMPTS", Some("5"), false),
     var("LOUPE_SUMMARY_MIN_CONVERSATION_CHARS", Some("200"), false),
-    var("LOUPE_TZ", Some("Europe/Stockholm"), false),
+    var("LOUPE_TZ", Some("UTC"), false),
     var("LOUPE_PUBLISH_AT", Some("01:00"), false),
     var("LOUPE_PUBLISH_INTERVAL_SECS", Some("60"), false),
     var("LOUPE_IDLE_SECS", Some("3600"), false),

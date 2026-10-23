@@ -21,7 +21,9 @@ human=0; dry_run=0
 usage() { awk 'NR>=4 && /^#/ {sub(/^# ?/, ""); print; next} NR>=4 {exit}' "$0"; }
 
 # The declared inputs: the Dockerfile, .dockerignore, every COPY source of the Dockerfile, and this script.
-inputs() { printf '%s\n' Dockerfile .dockerignore rust-toolchain.toml Cargo.toml Cargo.lock build.rs web vendor/litellm src migrations tests examples config upstreams.toml .agents/scripts/pipeline.image.sh; }
+# LICENSE and THIRD-PARTY-NOTICES are COPY sources of the runtime stage. Git ignores the generated
+# notices, so the fingerprint sees them as absent; a local build passes with no notices file.
+inputs() { printf '%s\n' Dockerfile .dockerignore rust-toolchain.toml Cargo.toml Cargo.lock build.rs web vendor/litellm src migrations tests examples config upstreams.toml LICENSE THIRD-PARTY-NOTICES .agents/scripts/pipeline.image.sh; }
 toolchain() {
   docker version --format 'docker-server {{.Server.Version}}'
   local img id

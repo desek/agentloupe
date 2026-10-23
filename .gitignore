@@ -8,6 +8,8 @@
 
 # Build output and local data
 /target/
+# The third-party notices that release.notices.sh writes at release time
+/THIRD-PARTY-NOTICES
 *.db
 *.db-*
 data/

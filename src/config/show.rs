@@ -236,7 +236,7 @@ mod tests {
         assert_eq!(value("LOUPE_SUMMARY_MAX_ATTEMPTS"), "5");
         assert_eq!(value("LOUPE_RAW_RETENTION_HOURS"), "168");
         assert_eq!(value("LOUPE_PUBLIC_PROJECTS"), "");
-        assert_eq!(value("LOUPE_TZ"), "Europe/Stockholm");
+        assert_eq!(value("LOUPE_TZ"), "UTC");
         assert_eq!(value("LOUPE_PUBLISH_AT"), "01:00");
         assert_eq!(value("LOUPE_PUBLISH_INTERVAL_SECS"), "60");
         assert_eq!(value("LOUPE_DAY_REVIEW"), "auto");

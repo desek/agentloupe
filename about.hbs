@@ -1,0 +1,24 @@
+{{!-- @agents-index Template of cargo about for the crate part of THIRD-PARTY-NOTICES: each license text once, with the crates that use it. --}}
+================================================================================
+Part 1: Rust crates
+================================================================================
+
+The loupe binary embeds the following crates of Cargo.lock. Each license text
+appears one time, with the crates that use it listed above the text.
+
+Overview:
+{{#each overview}}
+  {{{name}}} ({{id}}): {{count}} crates
+{{/each}}
+
+{{#each licenses}}
+--------------------------------------------------------------------------------
+License: {{{name}}} ({{id}})
+Used by:
+{{#each used_by}}
+  {{crate.name}} {{crate.version}}{{#if crate.repository}} <{{crate.repository}}>{{/if}}
+{{/each}}
+
+{{{text}}}
+
+{{/each}}

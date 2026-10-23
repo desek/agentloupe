@@ -216,10 +216,7 @@ mod tests {
     #[test]
     fn default_when_unset() {
         let l = resolve(&[], &BTreeMap::new(), &BTreeMap::new());
-        assert_eq!(
-            value(&l, "LOUPE_TZ"),
-            ("Europe/Stockholm".into(), Source::Default)
-        );
+        assert_eq!(value(&l, "LOUPE_TZ"), ("UTC".into(), Source::Default));
         assert_eq!(
             value(&l, "LOUPE_IDLE_SECS"),
             ("3600".into(), Source::Default)

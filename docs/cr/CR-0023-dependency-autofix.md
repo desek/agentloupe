@@ -137,8 +137,8 @@ sequenceDiagram
 
 **Dependabot configuration (D1)**
 
-1. `.github/dependabot.yml` **MUST** declare version updates for three ecosystems: `cargo` with the directory `/`, `npm` with the directory `/prototype`, and `github-actions` with the directory `/`. Each **MUST** have the interval `weekly`.
-2. The Dependabot configuration **MUST** set a commit message prefix, so that the title of each Dependabot pull request is a Conventional Commit. The `cargo` and `npm` updates **MUST** give the form `fix(deps): ...`. The `github-actions` updates **MUST** give the form `ci(deps): ...` (judgement call 13).
+1. `.github/dependabot.yml` **MUST** declare version updates for three ecosystems: `cargo` with the directory `/`, `npm` with the directory `/prototype`, and `github-actions` with the directory `/`. Each **MUST** have the interval `weekly`. *(Amended by CR-0024: see "Amendment by CR-0024", item 1.)*
+2. The Dependabot configuration **MUST** set a commit message prefix, so that the title of each Dependabot pull request is a Conventional Commit. The `cargo` and `npm` updates **MUST** give the form `fix(deps): ...`. The `github-actions` updates **MUST** give the form `ci(deps): ...` (judgement call 13). *(Amended by CR-0024: see "Amendment by CR-0024", item 1.)*
 3. Dependabot security alerts **MUST** be on for the repository. The script **MUST** check this at start through the list call of the Dependabot alerts with the read token of P1, whose error names disabled alerts (the endpoint of the repository setting needs the administration permission, which no token of this flow holds), and stop with an actionable error when the alerts are off.
 
 **Workflow**
@@ -148,7 +148,7 @@ sequenceDiagram
 6. The workflow job **MUST** have a timeout. The value is judgement call 4.
 7. The workflow **MUST** request these permissions of the `GITHUB_TOKEN`, and no others: `contents: write`, `pull-requests: write`, `issues: write`, `security-events: read`, `actions: read`, and `checks: read`. The read of the Dependabot alerts is parameter P1.
 8. The workflow **MUST** be a thin caller per CR-0022, requirements 19 to 22. It **MUST** call `deps.autofix.sh` in exactly one step. The workflow file **MUST NOT** hold the schedule logic of the fix, a tool version, a model name, a limit other than the job timeout of requirement 6, a branch name, or a label.
-9. The workflow **MUST** install the Rust toolchain from `rust-toolchain.toml`, and Node, `cargo-nextest`, and Claude Code from `.tool-versions` (judgement call 3), in the same way as the verdict workflow of CR-0022.
+9. The workflow **MUST** install the Rust toolchain from `rust-toolchain.toml`, and Node, `cargo-nextest`, and Claude Code from `.tool-versions` (judgement call 3), in the same way as the verdict workflow of CR-0022. *(Amended by CR-0024: see "Amendment by CR-0024", item 5.)*
 10. The workflow **MUST** give the secret `CLAUDE_CODE_OAUTH_TOKEN` to the script step only, as an environment variable. It **MUST NOT** give it to another step. This extends CR-0022, requirement 22, by one repository secret for this workflow only; the target "New repository secrets" of CR-0022 becomes exactly 2, `RELEASE_PLEASE_TOKEN` and `CLAUDE_CODE_OAUTH_TOKEN`.
 
 **Precondition**
@@ -172,7 +172,7 @@ sequenceDiagram
 21. Claude Code **MUST NOT** commit, push, or call the GitHub API. The script **MUST** give the `claude -p` process no GitHub token. The checkout **MUST NOT** persist a credential in the git configuration, and the script **MUST** give a token to git only for its own push, so that no file in the tree or in `.git/` holds a GitHub token while `claude -p` runs. The tool allowlist of the run is judgement call 5.
 22. After each `claude -p` run, the script **MUST** check the diff. A diff that changes a path outside the allowed paths of judgement call 6 **MUST** count as `failed` with the reason `path_not_allowed`. A diff that holds a match of the credential patterns of the section "Measurable Targets" or the value of a token of the run **MUST** count as `failed` with the reason `credential_in_diff`, and the script **MUST NOT** write the matched text anywhere.
 23. After each `claude -p` run with the status `fixed`, the script **MUST** run `pipeline.verdict.sh` itself, with no GitHub token and no `CLAUDE_CODE_OAUTH_TOKEN` in its environment. Only a verdict with exit code 0 in this script run counts as passed. For an update in `prototype/`, the script **MUST** also install with the frozen lock file and build the prototype (judgement call 9).
-24. When the check of requirement 23 passes, the script **MUST** make one commit on the autofix branch. The summary **MUST** have the form `fix(deps): bump <package> to <version> (<GHSA id>)`. The script, not Claude Code, writes the message from the alert data.
+24. When the check of requirement 23 passes, the script **MUST** make one commit on the autofix branch. The summary **MUST** have the form `fix(deps): bump <package> to <version> (<GHSA id>)`. The script, not Claude Code, writes the message from the alert data. *(Amended by CR-0024: see "Amendment by CR-0024", item 2.)*
 25. When a fix fails, the script **MUST** reset the autofix branch to its last good commit, record the failure, and continue with the next item. It **MUST NOT** start a second `claude -p` run for the same alert in the same workflow run.
 
 **Dependabot pull requests**
@@ -187,7 +187,7 @@ sequenceDiagram
 30. All fixes of one workflow run **MUST** land on one branch `deps/autofix-<YYYY-MM-DD>`, with the date of the run in UTC, created from the head of `main`. When the branch exists from an earlier run on the same day, the script **MUST** reuse it.
 31. When the branch holds one or more fix commits, the script **MUST** push it and open one pull request to `main`, or update the open pull request of that branch. The title and the body are judgement call 7.
 32. The script **MUST** enable auto-merge with the squash method on the autofix pull request. The pull request **MUST** merge only when the check `verdict` of CR-0022 is green, through the ruleset of requirement 45. When the check of parameter P4 shows that the token of P2 bypasses the ruleset, the script **MUST NOT** enable auto-merge; it **MUST** instead wait for the check `verdict` of the head commit with the wait cap of judgement call 4 and merge with squash only when it is green.
-33. The squash commit of the autofix pull request **MUST** be a `fix(deps)` commit, so that release-please of CR-0022 proposes a patch release. When the pull request holds more than one fix, the squash body **MUST** hold one `fix(deps)` line for each fix, so that each fix shows in the changelog (parameter P6).
+33. The squash commit of the autofix pull request **MUST** be a `fix(deps)` commit, so that release-please of CR-0022 proposes a patch release. When the pull request holds more than one fix, the squash body **MUST** hold one `fix(deps)` line for each fix, so that each fix shows in the changelog (parameter P6). *(Amended by CR-0024: see "Amendment by CR-0024", item 2.)*
 34. The script **MUST NOT** push to `main`. Each change to `main` **MUST** come through a pull request merge.
 
 **Release pull request (D2)**
@@ -214,7 +214,7 @@ sequenceDiagram
 
 **Repository settings**
 
-45. A repository ruleset on `main` **MUST** require the status check `verdict` for a pull request, with the repository admin in the bypass list. The repository setting "Allow auto-merge" **MUST** be on (parameter P4).
+45. A repository ruleset on `main` **MUST** require the status check `verdict` for a pull request, with the repository admin in the bypass list. The repository setting "Allow auto-merge" **MUST** be on (parameter P4). *(Amended by CR-0024: see "Amendment by CR-0024", item 3.)*
 
 **Documentation**
 
@@ -227,7 +227,7 @@ sequenceDiagram
 ### Non-Functional Requirements
 
 1. The pipeline entry points, `pipeline.verdict.sh`, and the fingerprint script **MUST NOT** change.
-2. The verdict workflow, the release-please workflow, and the release workflow of CR-0022 **MUST NOT** change, except for the ruleset name of the check `verdict` when the implementation of CR-0022 gives it another name.
+2. The verdict workflow, the release-please workflow, and the release workflow of CR-0022 **MUST NOT** change, except for the ruleset name of the check `verdict` when the implementation of CR-0022 gives it another name. *(Amended by CR-0024: see "Amendment by CR-0024", item 4.)*
 3. The project **MUST NOT** use a paid service other than the Claude Code subscription of the owner. The runners are free for a public repository (D3).
 4. The count of credentials in the workflow logs, the issues, and the pull requests of this flow **MUST** be zero.
 5. Each workflow run **MUST** end in one of three states: nothing open (exit 0), every item merged or set to auto-merge (exit 0), or an issue that holds each failed item (exit 1). A run that ends with exit code 3, 4, or 5 **MUST** show as failed in GitHub Actions.
@@ -431,6 +431,8 @@ Success condition: each check passes in one run of each part. Part A passes in 2
 
 ### AC-1: Dependabot declares the three ecosystems (requirements 1 and 2)
 
+*Amended by CR-0024: see "Amendment by CR-0024", item 1.*
+
 ```gherkin
 Given the tree after the CR
 When a reader opens .github/dependabot.yml
@@ -566,6 +568,8 @@ And for an update in prototype the frozen install and the build of the prototype
 ```
 
 ### AC-13: A fix is one fix(deps) commit by the script (requirement 24)
+
+*Amended by CR-0024: see "Amendment by CR-0024", item 2.*
 
 ```gherkin
 Given a fixed alert for crate "foo" at version 1.2.4 with advisory GHSA-xxxx-xxxx-xxxx
@@ -890,7 +894,7 @@ Verify that release-please reads each `fix(deps)` line of the body of one squash
 10. **Major version bump that fails the verdict.** One `claude -p` run can change code in the allowed paths to adapt to the new major version. If the run fails, the Dependabot pull request stays open with a comment that links the issue, and the item waits for the hold time. The script does not ignore the major version in Dependabot.
 11. **Hold time of a failed item.** 7 days, or until the input changes: a new head commit of the Dependabot pull request, a new patched version of the advisory, or a new commit on `main` in the manifest of the item. The flag `--retry-failed` of the script ends the hold for a manual run.
 12. **Merge method and scope of the release merge.** Squash for the autofix pull request, the Dependabot pull requests, and the release pull request (CR-0022). The script merges the release pull request only in a run that merged at least one `fix(deps)` commit. The release can then also carry the unreleased `feat` and `fix` commits of the owner on `main`; `dependencies.md` states this.
-13. **Commit type of the action updates.** `ci(deps)` for `github-actions`, hidden by release-please, so a pin update of an action makes no release, because it does not change the binary or the image. `fix(deps)` for `cargo` and `npm`, per D2.
+13. **Commit type of the action updates.** `ci(deps)` for `github-actions`, hidden by release-please, so a pin update of an action makes no release, because it does not change the binary or the image. `fix(deps)` for `cargo` and `npm`, per D2. *(Amended by CR-0024: see "Amendment by CR-0024", item 1.)*
 14. **Pin update of GitHub Actions by SHA.** Dependabot updates the 40-character SHA and the version comment. The script merges such a pull request only when the diff keeps a SHA pin (requirement 29). The script never asks Claude Code to change a workflow file.
 15. **Grouping of Dependabot updates.** The minor and patch updates of one ecosystem come in one grouped pull request each week. Each major update has its own pull request.
 16. **Process of an alert covered by a Dependabot pull request.** The pull request path (requirement 15), so that one change does not start two fixes.
@@ -937,3 +941,14 @@ Checked with no finding: the workflow calls `deps.autofix.sh` in one step (requi
 Non-blocking remarks, not edited: the fallback of P3 checks the budget after a run, so one run can pass the per-run budget of the target "API-equivalent cost" before the process timeout ends it; Claude Code itself holds `CLAUDE_CODE_OAUTH_TOKEN`, and its Bash subprocesses may inherit it (GitHub masks the literal value in the log, and edit 7 covers the commit); `docs/specification/release.md` states the token of P1, and requirement 47 does not list the update for the permissions that P1 and P2 add; "Dependencies" still treats CR-0022 P1 as open, but CR-0022 decided it (D5); the `.tool-versions` line for Claude Code can make a blanket `mise install` in the verdict jobs of CR-0022 install it.
 
 Open blocking findings: none.
+
+## Amendment by CR-0024
+
+CR-0024 (Public release readiness, approved on 2026-10-23) amends this CR before its implementation starts. The status of this CR stays `approved`. Each changed item carries a short marker that points to this section. Where this section and a changed item differ, this section applies.
+
+1. **Commit type of the prototype updates.** The `npm` updates of `/prototype` use the commit message prefix `chore(deps)`, which the release notes hide, because the prototype is not shipped. The `cargo` updates keep `fix(deps)`. The `github-actions` updates keep `ci(deps)`. This changes requirements 1 and 2, judgement call 13, and AC-1.
+2. **Commit type of a prototype-only fix.** A fix commit of `deps.autofix.sh` that changes only `prototype/` uses `chore(deps)`, with the same summary form as requirement 24. The squash commit of an autofix pull request is `fix(deps)` when the pull request holds one or more `cargo` fixes, and `chore(deps)` when it holds only `prototype/` fixes. The squash body keeps one line for each fix, with the type of that fix. This changes requirements 24 and 33, and AC-13.
+3. **Ruleset on `main`.** The script `.agents/scripts/repo.settings.sh` of CR-0024 meets requirement 45: its main ruleset requires the check `verdict` with the repository admin role in the bypass list, and its merge settings turn on "Allow auto-merge". This CR **MUST NOT** make a second ruleset on `main`. Parameter P4 stays a check of the effect of the bypass on auto-merge.
+4. **Frozen workflows.** The verdict workflow, the release-please workflow, and the release workflow that non-functional requirement 2 freezes are the workflows after CR-0024, with its job timeouts, the empty permissions of the `GITHUB_TOKEN` of the release-please workflow, and its tool installs.
+5. **Tools of the workflow.** The workflow of requirement 9 also installs cargo-deny from `.tool-versions`, because the verdict that `deps.autofix.sh` runs calls the dependency check `deps.deny.sh` in the lint stage.
+6. **Changed items.** Requirements 1, 2, 9, 24, 33, and 45, non-functional requirement 2, judgement call 13, AC-1, and AC-13.

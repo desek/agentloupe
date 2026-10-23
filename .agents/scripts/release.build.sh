@@ -13,14 +13,15 @@
 # target of the toolchain that rust-toolchain.toml pins; this script states no version and no toolchain.
 # Before the build it stops when the tag version differs from the version in Cargo.toml at the tag, or when
 # the checked-out commit is not the tag commit. The archive holds one directory loupe-v<version>-<target>/
-# with loupe (execute bit kept), upstreams.toml, config/, LICENSE, and README.md. The checksum file holds one
-# line in the format of sha256sum, which shasum -a 256 -c and sha256sum -c accept.
+# with loupe (execute bit kept), upstreams.toml, config/, LICENSE, README.md, and THIRD-PARTY-NOTICES, which
+# release.notices.sh writes before the build (it needs cargo about of .tool-versions). The checksum file holds
+# one line in the format of sha256sum, which shasum -a 256 -c and sha256sum -c accept.
 #
 # Output (stdout, key: value), one line per asset:
 #   asset: <archive> archive_bytes: <n> binary_bytes: <n> sha256: <hex> checksum_file: <archive>.sha256 dir: <out>
-# With --dry-run: plan lines (plan: tag, plan: build, plan: archive, plan: checksum).
+# With --dry-run: plan lines (plan: tag, plan: notices, plan: build, plan: archive, plan: checksum).
 # Full cargo output goes to .agents/logs/release.build.log.
-# Exit codes: 0 built (or planned), 1 build or archive failed, 2 bad usage, 3 required tool missing,
+# Exit codes: 0 built (or planned), 1 notices, build, or archive failed, 2 bad usage, 3 required tool missing,
 #   4 tag check failed (tag absent, tag version differs from Cargo.toml, or HEAD is not the tag commit).
 # Reference: docs/specification/release.md, section Release assets.
 set -euo pipefail
@@ -86,21 +87,29 @@ target="$(rustc -vV | sed -n 's/^host: //p')"
 name="loupe-v$version-$target"
 archive="$name.tar.gz"
 build=(cargo build --release --locked --bin loupe)
+notices=("$ROOT/.agents/scripts/release.notices.sh")
+files="loupe upstreams.toml config/ LICENSE README.md THIRD-PARTY-NOTICES"
 
 if [[ $dry_run -eq 1 ]]; then
   if [[ $human -eq 1 ]]; then
-    echo "Plan for $tag on $target: check passed at $at; run '${build[*]}'; pack $archive with loupe, upstreams.toml, config/, LICENSE, README.md; write $archive.sha256 into $out. Nothing was built."
+    echo "Plan for $tag on $target: check passed at $at; write THIRD-PARTY-NOTICES with release.notices.sh; run '${build[*]}'; pack $archive with $files; write $archive.sha256 into $out. Nothing was built."
   else
     echo "plan: tag $tag version: $version check: passed at: $at"
+    echo "plan: notices command: .agents/scripts/release.notices.sh file: THIRD-PARTY-NOTICES"
     echo "plan: build command: ${build[*]} target: $target"
-    echo "plan: archive name: $archive files: loupe upstreams.toml config/ LICENSE README.md dir: $out"
+    echo "plan: archive name: $archive files: $files dir: $out"
     echo "plan: checksum name: $archive.sha256 format: sha256sum"
   fi
   exit 0
 fi
 
 mkdir -p "$(dirname "$LOG")" "$out"
-if ! "${build[@]}" >"$LOG" 2>&1; then
+# The notices come first: a crate with a license outside the accepted list stops the release before the build.
+if ! "${notices[@]}" >"$LOG" 2>&1; then
+  tail -n 10 "$LOG" >&2
+  fail "release.notices.sh failed, so the archive would lack THIRD-PARTY-NOTICES. Fix: follow the error of release.notices.sh above (install cargo about from .tool-versions, or settle the license). Reference: docs/specification/release.md, section Third-party notices. Verify: .agents/scripts/release.notices.sh exits 0." 1
+fi
+if ! "${build[@]}" >>"$LOG" 2>&1; then
   tail -n 30 "$LOG" >&2
   fail "cargo build failed for $target. Fix: read .agents/logs/release.build.log and correct the code; the same commit must pass pipeline.verdict.sh. Verify: re-run release.build.sh --tag $tag." 1
 fi
@@ -110,7 +119,7 @@ trap 'rm -rf "$stage"' EXIT
 mkdir "$stage/$name"
 cp "$bin" "$stage/$name/loupe"
 chmod 0755 "$stage/$name/loupe"
-cp -R upstreams.toml config LICENSE README.md "$stage/$name/"
+cp -R upstreams.toml config LICENSE README.md THIRD-PARTY-NOTICES "$stage/$name/"
 export COPYFILE_DISABLE=1  # no AppleDouble files of macOS in the archive
 # Fixed owner and order keep the archive free of the user name of the runner.
 if tar --version 2>/dev/null | grep -q GNU; then

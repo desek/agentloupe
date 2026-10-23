@@ -1,0 +1,35 @@
+# @agents-index Configuration of cargo about for the third-party notices: accepted licenses, the release targets, and no dev dependencies.
+#
+# .agents/scripts/release.notices.sh renders about.hbs with this configuration into THIRD-PARTY-NOTICES.
+# docs/specification/release.md (Third-party notices) states the file. The accepted list must equal the
+# allow list of deny.toml; .agents/scripts/deps.deny.sh fails when the two lists differ.
+
+accepted = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "Unicode-3.0",
+  "CC0-1.0",
+  "CDLA-Permissive-2.0",
+]
+
+# The union of the three release targets, the same as deny.toml.
+targets = [
+  "aarch64-apple-darwin",
+  "x86_64-unknown-linux-gnu",
+  "aarch64-unknown-linux-gnu",
+]
+
+# The binary carries the build dependencies' output, not the dev dependencies.
+ignore-dev-dependencies = true
+ignore-build-dependencies = false
+
+# The project itself is not a third party.
+private = { ignore = true }
+
+# The license files of these crates need the known corrections of cargo about.
+workarounds = ["ring", "rustls"]

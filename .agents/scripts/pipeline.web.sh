@@ -19,7 +19,7 @@ human=0; only_toolchain=0
 [[ -t 1 ]] && human=1
 usage() { awk 'NR>=4 && /^#/ {sub(/^# ?/, ""); print; next} NR>=4 {exit}' "$0"; }
 # The declared inputs: a change outside them cannot change the result of this stage.
-inputs() { printf '%s\n' web .tool-versions .agents/scripts/pipeline.web.sh; }
+inputs() { printf '%s\n' web .tool-versions .agents/scripts/pipeline.web.sh .agents/scripts/web.size.sh; }
 toolchain() {
   (cd "$ROOT" && if command -v mise >/dev/null; then mise exec -- node --version 2>/dev/null && echo "npm $(mise exec -- npm --version 2>/dev/null)"; else node --version && echo "npm $(npm --version)"; fi)
 }

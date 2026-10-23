@@ -53,11 +53,15 @@ The `Dockerfile` has two stages. The build stage compiles a release binary with 
 
 The runtime image is `debian:bookworm-slim`. It has the same C library as the build stage, and it has `bash`. The `HEALTHCHECK` uses the `/dev/tcp` feature of `bash`, so the image needs no `curl`. A smaller distroless image has no shell, so it cannot run a `HEALTHCHECK` without an extra program. The runtime user is `loupe` with UID and GID `10001`.
 
+Each `FROM` line of the `Dockerfile` names its base image by the SHA-256 digest of the multi-platform image index, not by a tag alone. A comment next to the line keeps the tag. The index digest resolves to the correct platform on each runner, so one `Dockerfile` builds `linux/amd64` and `linux/arm64`. Thus two builds of one commit get the same operating system layers. No `FROM` line is without a digest, and a test asserts this. At each minor release, a human refreshes the digests. `docker buildx imagetools inspect <image>:<tag>` prints the current digest of the index of a tag on its `Digest:` line. No tool opens update pull requests for the digests.
+
+The runtime stage puts `LICENSE` into `/app` in each image. The release image also holds `/app/THIRD-PARTY-NOTICES`. A local build passes when no `THIRD-PARTY-NOTICES` file exists, and the image then holds `/app/LICENSE` only. `release.md` (Third-party notices) states the file.
+
 `compose.yaml` has one service. It binds the port as `127.0.0.1:8787:8787`. It mounts a named volume at `/data`, reads the secrets from `.env`, and sets `LOUPE_ENV`. `.env.example` lists each variable name that `compose.yaml` passes, with no value.
 
 ### Registry image
 
-A release publishes the image `ghcr.io/desek/agentloupe`. The release workflow builds it from the same `Dockerfile` with no change. The image is one multi-platform index for `linux/amd64` and `linux/arm64`, with the tags `<version>` (no `v`) and `latest`. The tag `latest` moves only when both platform builds pass. The image carries the OCI labels source, version, revision, licenses, title, description, and created. The label created is the commit time of the tag. `release.md` states the values. A pull of the image needs no login. `compose.yaml` stays a local build of the image.
+A release publishes the image `ghcr.io/desek/agentloupe`. The release workflow builds it from the same `Dockerfile` with no change. The image is one multi-platform index for `linux/amd64` and `linux/arm64`, with the tags `<version>` (no `v`) and `latest`. The tag `latest` moves only when both platform builds pass. The image carries the OCI labels source, version, revision, licenses, title, description, and created. The label created is the commit time of the tag. `release.md` states the values. The image holds `/app/LICENSE` and `/app/THIRD-PARTY-NOTICES`. The release image script checks both files after the build and pushes nothing when one is absent. A pull of the image needs no login. `compose.yaml` stays a local build of the image.
 
 ### An old volume that the runtime user cannot write
 
@@ -77,14 +81,35 @@ The pipeline entry points are in `.agents/scripts/`. Each entry point does one s
 | Entry point | Stage |
 |---|---|
 | `pipeline.format.sh` | `cargo fmt --check` |
-| `pipeline.lint.sh` | `cargo clippy` with warnings as errors |
+| `pipeline.lint.sh` | `cargo clippy` with warnings as errors, then the dependency check `deps.deny.sh` |
 | `pipeline.test.sh` | `cargo nextest run`, and `cargo test --doc` if nextest does not run the doc tests |
 | `pipeline.web.sh` | Checks that `node --version` equals the pin in `.tool-versions`, runs `node --test` on the calculation modules of the page, and checks the size of `web/` with `web.size.sh`. `--check-toolchain` does only the check of the pin. |
 | `pipeline.image.sh` | Builds the container image. `--dry-run` prints the build command and does not run it. |
 
 Each entry point has `--help`, a machine output by default, and `--human` for the friendly view. It writes actionable errors to stderr and returns documented exit codes. The entry points read the toolchain version from `rust-toolchain.toml` and state no version of their own.
 
-`pipeline.verdict.sh` runs the stages in the order format, lint, test, web, image. It only calls the stage entry points. It prints one line for each stage with `status: passed` or `status: failed`, and the time of the stage. It also prints the total time. It returns a non-zero exit code if a stage fails. The entry point `pipeline.web.sh` reads the Node version from `.tool-versions`. If `node` is missing or its version differs from the pin, it stops with a non-zero exit code and an actionable error. The thin caller installs Node from `.tool-versions` and states no Node version. The stages format, lint, test, and web are hermetic: they use no network after the dependencies are fetched, and no assertion reads the wall clock.
+`pipeline.verdict.sh` runs the stages in the order format, lint, test, web, image. It only calls the stage entry points. It prints one line for each stage with `status: passed` or `status: failed`, and the time of the stage. It also prints the total time. It returns a non-zero exit code if a stage fails. The entry point `pipeline.web.sh` reads the Node version from `.tool-versions`. If `node` is missing or its version differs from the pin, it stops with a non-zero exit code and an actionable error. The thin caller installs Node from `.tool-versions` and states no Node version. The stages format, test, and web are hermetic: they use no network after the dependencies are fetched, and no assertion reads the wall clock. The lint stage is hermetic with one exception: the dependency check fetches the advisory database over the network. This fetch is the one network use of the lint stage.
+
+### Dependency check
+
+The lint stage calls `.agents/scripts/deps.deny.sh` after clippy. The script runs `cargo deny` with the four checks advisories, licenses, bans, and sources against `deny.toml` at the root, with the lock file locked. The dependency check is not a stage of its own, so the verdict keeps its five stages.
+
+1. `pipeline.lint.sh` prints one stage line. The stage status is `failed` when clippy or the dependency check fails. The stage log holds the output of both.
+2. When the advisory database cannot be fetched, the script stops with an actionable error that names the fetch, and the lint stage fails. The check fails closed.
+3. The script fails when the accepted licenses of `about.toml` differ from the allowed licenses of `deny.toml`. The error names each license that is in one list only.
+4. `.tool-versions` pins cargo-deny and cargo-about under their names in the registry of mise. The script reads no version of its own. When cargo-deny is missing, the script stops with exit code 3 and an actionable error that names the install from `.tool-versions`.
+5. The script follows the same rules as the stage entry points: `--help`, a machine output by default, `--human`, actionable errors on stderr, and documented exit codes.
+
+`deny.toml` states this policy:
+
+| Check | Policy |
+|---|---|
+| Licenses | An allow list of permissive SPDX identifiers. No copyleft license is on the list. An exception for one crate names the crate and the reason in a comment. |
+| Advisories | A vulnerability in any crate fails. An unmaintained or unsound advisory fails for a direct dependency. A yanked crate fails. An ignore entry names the advisory identifier, the reason, and a review date. |
+| Bans | A wildcard version requirement fails. More than one version of a crate gives a warning, not a failure. |
+| Sources | Only the crates.io registry. A git source or another registry fails. |
+
+When a new advisory has no patched version, the owner adds an ignore entry with the identifier, the reason, and a review date.
 
 ### Test runner
 
@@ -101,14 +126,16 @@ Each stage entry point has the flag `--inputs`. It prints the paths that the sta
 | Stage | Declared inputs |
 |---|---|
 | format, lint | `src`, `tests`, `Cargo.toml`, `Cargo.lock`, `build.rs`, `migrations`, `vendor`, `rust-toolchain.toml`, `examples`, `.cargo`, `rustfmt.toml`, `.rustfmt.toml`, `clippy.toml`, `.clippy.toml`, and the script of the stage |
-| lint, in addition | `web`, because `build.rs` reads `web/` when clippy builds the crate |
+| lint, in addition | `web`, because `build.rs` reads `web/` when clippy builds the crate, and `deny.toml`, `about.toml`, and `.agents/scripts/deps.deny.sh` of the dependency check |
 | test | the inputs of format and lint with the script of the test stage, and also `.tool-versions` (the pin of the runner), any configuration file of the runner, `upstreams.toml`, `config`, `.agents/scripts`, each file under `docs/` that a test reads, today `docs/specification/accounts.md`, and also `web` (`build.rs` embeds `web/` into the crate, and tests read `web/`) and `Dockerfile` (a test reads its `COPY` lines) |
-| web | `web`, `.tool-versions`, `.agents/scripts/pipeline.web.sh` |
-| image | `Dockerfile`, `.dockerignore`, each source path of a `COPY` instruction in the Dockerfile (`rust-toolchain.toml`, `Cargo.toml`, `Cargo.lock`, `build.rs`, `web`, `vendor/litellm`, `src`, `migrations`, `tests`), `.agents/scripts/pipeline.image.sh` |
+| web | `web`, `.tool-versions`, `.agents/scripts/pipeline.web.sh`, `.agents/scripts/web.size.sh` |
+| image | `Dockerfile`, `.dockerignore`, each source path of a `COPY` instruction in the Dockerfile (`rust-toolchain.toml`, `Cargo.toml`, `Cargo.lock`, `build.rs`, `web`, `vendor/litellm`, `src`, `migrations`, `tests`, `LICENSE`, `THIRD-PARTY-NOTICES`), `.agents/scripts/pipeline.image.sh` |
+
+Git ignores the generated `THIRD-PARTY-NOTICES`, so the temporary tree of the fingerprint never holds it, and the image stage fingerprint always sees it as absent.
 
 Some declared paths do not exist today, for example the configuration files of the format and lint tools. A declared path that does not exist is part of the fingerprint as absent, so its later creation changes the fingerprint. A test finds each repository path that a test file reads, and fails if that path is not a declared input of the test stage.
 
-Each stage entry point also has the flag `--toolchain`. It prints the versions of the tools outside the tree that the stage uses: the Rust compiler and cargo for format and lint, also the runner for test, Node and the package manager for web, and the Docker server version and the local digest of each base image for image. The image stage reads the digests from the local image store with no network call.
+Each stage entry point also has the flag `--toolchain`. It prints the versions of the tools outside the tree that the stage uses: the Rust compiler and cargo for format and lint, also cargo-deny for lint, also the runner for test, Node and the package manager for web, and the Docker server version and the local digest of each base image for image. The image stage reads the digests from the local image store with no network call.
 
 ### Fingerprints and the verdict cache
 
@@ -124,11 +151,11 @@ The flag `--no-cache` runs every stage, and still writes the fingerprints of the
 
 The verdict fails closed. If git is missing, the temporary index fails, a hash fails, the cache is absent or unreadable, a `--inputs` or a `--toolchain` fails, or a base image is absent from the local image store, the verdict runs the affected stages in full. It prints one diagnostic line on stderr that names the cause. Only a positive match skips a stage. The fingerprint and cache logic is in a separate script under `.agents/scripts/` that the verdict calls, and the verdict stays a caller of the stage entry points.
 
-Only the hermetic stages format, lint, test, web, and image enter the verdict. The image stage is in the default verdict. The live scenarios and the benches stay outside the verdict, because they use the network or the wall clock.
+Only the stages format, lint, test, web, and image enter the verdict. The image stage is in the default verdict. The lint stage reads the advisory database over the network. The stage fingerprint does not cover the advisory database, so a cached lint pass can stay when a new advisory appears. The hosted verdict workflow has no verdict cache, so it checks the advisories again on each pull request and on each release tag. The live scenarios and the benches stay outside the verdict, because they use the network or the wall clock.
 
 ### Hosted workflows
 
-Three GitHub Actions workflows are thin callers of the pipeline. A workflow does only platform work: the trigger, the runner, the checkout, the toolchain install from the pin files, the cache, one call for each stage or release step, the upload of artifacts and release assets, the login to the registry, and the gate on the visibility of the repository. A workflow file holds no project logic, no tool version, no target triple, no image name, no version of the project, no configuration value, and no secret value. The pin files, the release-please configuration files, and the scripts hold these values. Each action from outside the repository is pinned by its full 40-character commit SHA, with the release tag in a comment.
+Three GitHub Actions workflows are thin callers of the pipeline. A workflow does only platform work: the trigger, the runner, the checkout, the toolchain install from the pin files, the cache, one call for each stage or release step, the upload of artifacts and release assets, the login to the registry, and the gate on the visibility of the repository. A workflow file holds no project logic, no tool version, no target triple, no image name, no version of the project, no configuration value, and no secret value. The pin files, the release-please configuration files, and the scripts hold these values. The one limit that a workflow file holds is the timeout of each job. Each action from outside the repository is pinned by its full 40-character commit SHA, with the release tag in a comment.
 
 | Workflow | Starts on | Does |
 |---|---|---|
@@ -140,16 +167,29 @@ The verdict workflow:
 
 1. Each stage job makes exactly one call to its stage entry point, with no argument that changes the stage.
 2. Each job checks out the head commit of the event: the head commit of the pull request, the pushed commit, or the commit of the ref input. A job never checks out the merge ref of a pull request.
-3. Each job installs the Rust toolchain with rustup from `rust-toolchain.toml`, and Node and `cargo-nextest` with mise from `.tool-versions`. A job installs only the tools that its stage needs.
+3. Each job installs the Rust toolchain with rustup from `rust-toolchain.toml`, and Node, `cargo-nextest`, and cargo-deny with mise from `.tool-versions`. A job installs only the tools that its stage needs. The lint job installs cargo-deny.
 4. The workflow fails closed. The job `verdict` depends on the five stage jobs. It passes only when each of the five jobs has the result `success`. The result `failure`, `cancelled`, or `skipped` makes it fail. No job continues on an error or retries automatically.
 5. The workflow has only the permission `contents: read`.
 6. The test stage runs on Linux in the verdict workflow. The local verdict of `pipeline.verdict.sh` runs on macOS.
 7. A new push to a pull request cancels the older verdict run of that pull request. A run for a push to `main` and a release run are never cancelled.
 8. The hosted runners do not use the verdict cache of `pipeline.verdict.sh`. The jobs cache the cargo registry and the target directory with a key from `Cargo.lock` and `rust-toolchain.toml`.
 
-The release-please workflow gives its `GITHUB_TOKEN` only the permissions `contents: write` and `pull-requests: write`. release-please itself uses the release token of `release.md`. The release workflow logs in to the registry with its `GITHUB_TOKEN`, with the permissions `contents: write` and `packages: write`.
+The release-please workflow gives its `GITHUB_TOKEN` no permission. release-please itself uses the release token of `release.md`. The release workflow logs in to the registry with its `GITHUB_TOKEN`, with the permissions `contents: write` and `packages: write`. The build jobs and the image jobs of the release workflow install cargo-about with mise from `.tool-versions`, for the third-party notices.
 
-The release scripts `release.build.sh`, `release.image.sh`, and `release.check.sh` are in `.agents/scripts/`. They follow the same rules as the stage entry points: `--help`, a machine output by default, `--human`, actionable errors on stderr, and documented exit codes. They use the network, so they stay outside the verdict. `pipeline.verdict.sh` calls no release script. The hosted workflows do not change `pipeline.verdict.sh`, its cache, or its fingerprints.
+Each job that runs on a runner has a timeout. A job with no timeout can run for 360 minutes.
+
+| Workflow | Job | Timeout |
+|---|---|---|
+| verdict | each of the five stage jobs | 30 minutes |
+| verdict | the final job `verdict` | 5 minutes |
+| release | `visibility` | 5 minutes |
+| release | each build job and each image job | 60 minutes |
+| release | `publish` | 15 minutes |
+| release-please | the release-please job | 10 minutes |
+
+The job `verdict` of the release workflow calls the verdict workflow, which is a reusable workflow. It has no timeout of its own. The jobs of the called workflow carry their own timeouts.
+
+The release scripts `release.build.sh`, `release.image.sh`, `release.notices.sh`, and `release.check.sh` are in `.agents/scripts/`. They follow the same rules as the stage entry points: `--help`, a machine output by default, `--human`, actionable errors on stderr, and documented exit codes. They use the network, so they stay outside the verdict. `pipeline.verdict.sh` calls no release script. The hosted workflows do not change `pipeline.verdict.sh`, its cache, or its fingerprints. The repository settings script `repo.settings.sh` follows the same rules. Only a person runs it, and no workflow calls it. `release.md` (Repository settings) states it.
 
 The project uses no paid service. The workflows use the GitHub-hosted runners and the GitHub Container Registry, which are free for a public repository. While the repository is private, only the verdict and release-please workflows run, on Linux x86_64 runners, and the release workflow stops in its first job. The account keeps a budget of 0 USD for GitHub Actions and for GitHub Packages, with usage stopped at the limit.
 
@@ -268,7 +308,7 @@ The time to a full verdict is the time of the local loop. The first measured val
 
 ### Release targets
 
-The targets of the release and the hosted workflows. `release.md` states the release. The column Measured is empty until the first release `0.1.0` is measured. "None" means that the metric does not exist before the release work.
+The targets of the release and the hosted workflows. `release.md` states the release. The column Measured is empty until the first release `0.1.0` is measured. "None" means that the metric does not exist before the release work. The rows from "Community profile" on are measured after the switch to public and at the first release; their baseline is the value on 2026-10-23.
 
 | Metric | Method | Baseline | Threshold | Measured |
 |---|---|---|---|---|
@@ -280,3 +320,23 @@ The targets of the release and the hosted workflows. `release.md` states the rel
 | Release check result | `.agents/scripts/release.check.sh --version <version>; echo $?` | none, no release | exit code 0, every check `status: passed` or a stated `skipped` | |
 | New repository secrets | count of the secrets in the repository settings | 0 before 2026-10-23; 1 (`RELEASE_PLEASE_TOKEN`) since 2026-10-23 | exactly 1, `RELEASE_PLEASE_TOKEN` | |
 | Paid use | the billing usage of the account for GitHub Actions and GitHub Packages, and its budgets | none, no workflow | 0 USD charged; a budget of 0 USD with usage stopped at the limit for each product | |
+| Community profile | `gh api repos/desek/agentloupe/community/profile --jq .health_percentage`, after the switch to public | 42 | 100 | |
+| Workflow jobs with no timeout | in each of the three workflow files, count the jobs that have the key `runs-on` and no key `timeout-minutes` | 11 (6 in `verdict.yml`, 4 in `release.yml`, 1 in `release-please.yml`) | 0 | |
+| Unpinned base images | count the `FROM` lines of `Dockerfile` whose image reference has no `@sha256:` with 64 hex digits | 2 | 0 | |
+| Dependency check | `.agents/scripts/deps.deny.sh; echo $?` on `main`, and the lint job of the verdict workflow on the tag `v0.1.0` | none, no `deny.toml` | exit code 0 | |
+| Notices in the archives | `tar -tzf <archive>` lists `THIRD-PARTY-NOTICES` in the top directory, for each of the three archives of the release | 0 of 3 | 3 of 3 | |
+| Notices in the image | `docker run --rm --entrypoint cat ghcr.io/desek/agentloupe:<version> /app/THIRD-PARTY-NOTICES` exits 0 with a file that is not empty, for `linux/amd64` and `linux/arm64` | 0 of 2 | 2 of 2 | |
+| Notices check | the lines `notices <target>` and `notices image` of `release.check.sh --version <version>` | none | 4 lines, each `status: passed` | |
+| Main branch rules | `gh api repos/desek/agentloupe/rules/branches/main --jq '[.[].type]'` | 403 | holds `pull_request`, `required_status_checks` with the context `verdict`, `required_linear_history`, `non_fast_forward`, and `deletion` | |
+| Tag ruleset | `gh api repos/desek/agentloupe/rulesets`, then the ruleset with the target `tag` | 403 | active, includes `refs/tags/v*`, rules `creation`, `update`, and `deletion` | |
+| Merge settings | `gh api repos/desek/agentloupe --jq '[.allow_squash_merge,.allow_merge_commit,.allow_rebase_merge,.delete_branch_on_merge,.allow_auto_merge]'` | true, true, true, false, false | true, false, false, true, true | |
+| Actions policy | `gh api repos/desek/agentloupe/actions/permissions --jq .sha_pinning_required` | false | true | |
+| Secret scanning | `gh api repos/desek/agentloupe --jq .security_and_analysis` | null | `secret_scanning` and `secret_scanning_push_protection` with status `enabled` | |
+| Dependabot alerts | `gh api -i repos/desek/agentloupe/vulnerability-alerts`, the HTTP status | 404 | 204 | |
+| Private vulnerability reporting | `gh api repos/desek/agentloupe/private-vulnerability-reporting --jq .enabled` | 404 | true | |
+| Idempotence of the settings script | the count of writes on the last line of a second `repo.settings.sh` run, and the exit code of `repo.settings.sh --check` | none, no script | 0 writes, exit code 0 | |
+| Length of the community files | `wc -l` of `CONTRIBUTING.md`, `SECURITY.md`, the pull request template, and each issue template | none, no file | at most 80, 60, 30, and 40 lines | |
+| Verdict workflow time with the dependency check | the method of the row "Verdict workflow time on a pull request", on a pull request that changes one Rust file | 5 min 13 s and 6 min 39 s (runs 39997262577 and 39997205916) | at most 20 minutes with a cold cache, at most 12 minutes with a warm cache | |
+| Owner paths and mockup | `git grep -nE "/Users/[d]esek"`, `git grep -n "Repo/[d]esek" -- .agents/scripts`, and `git ls-files brainstorm` | 5 matches, 1 match, 2 archives | 0, 0, only `brainstorm/agent-ledger.zip` | |
+| Remote branches | `git ls-remote --heads origin` | `main`, the release-please branch, and one stale feature branch of the earlier release work | no stale feature branch | |
+| Default time zone | `loupe config show` with no `LOUPE_TZ` set | `Europe/Stockholm` | `UTC` with the source default | |

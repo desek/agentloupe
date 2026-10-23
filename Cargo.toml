@@ -226,6 +226,14 @@ name = "agent_connect"
 path = "tests/agent.connect.rs"
 
 [[test]]
+name = "pi_session"
+path = "tests/pi.session.rs"
+
+[[test]]
+name = "repo_settings"
+path = "tests/repo.settings.rs"
+
+[[test]]
 name = "private_off"
 path = "tests/private.off.rs"
 

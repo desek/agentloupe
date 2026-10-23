@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# @agents-index Checks a published release on a local machine: the six assets and checksums, loupe --version per target, the image pull, and /healthz.
+# @agents-index Checks a published release on a local machine: the six assets and checksums, loupe --version per target, the image pull, /healthz, and the notices.
 #
 # Usage: release.check.sh --version <major>.<minor>.<patch> [--dir DIR] [--human] [--dry-run]
 #   --version X.Y.Z  The version of the release to check, with no v. Required.
@@ -14,14 +14,17 @@
 # loupe --version of the host archive and of each Linux archive in a debian:bookworm-slim container of its
 # platform, pulls ghcr.io/desek/agentloupe:<version> with no login (and compares latest when the version is
 # the newest release), then starts the image with two keys from its own loupe gen-key on 127.0.0.1 and a free
-# port, polls GET /healthz for at most 30 seconds, and reads the version in the first log line. It runs with
+# port, polls GET /healthz for at most 30 seconds, and reads the version in the first log line. It checks
+# THIRD-PARTY-NOTICES in each archive and in the image: present, not empty, with the LiteLLM part and the
+# Geist part, and with one SHA-256 digest over all four copies. It runs with
 # the bash 3.2 of macOS, the default tools of macOS, curl, and Docker; it needs no jq and no gh. It never
 # prints a key. It removes its container, its volume, and its temporary directory on each exit path.
 #
 # Output (stdout, key: value), one line per check, then one result line:
 #   check: <name> status: passed|failed|skipped [detail: ...]
 #   result: passed|failed exit: <code>
-# Checks: download, checksum <asset>, version <target>, pull, latest, health, start-version.
+# Checks: download, checksum <asset>, version <target>, notices <target>, pull, latest, health,
+#   start-version, notices image.
 # Exit codes: 0 every check passed or is skipped with a stated reason, 1 a check failed, 2 bad usage,
 #   3 a required tool is missing, 4 a download or a pull failed.
 # Reference: docs/specification/release.md, section Verify a release.
@@ -32,6 +35,10 @@ IMAGE="ghcr.io/desek/agentloupe"
 BASE_IMAGE="debian:bookworm-slim"
 TARGETS="aarch64-apple-darwin x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu"
 HEALTH_CAP_SECS=30
+NOTICES=THIRD-PARTY-NOTICES
+# The part titles that release.notices.sh writes; a copy without them is not the complete file.
+LITELLM_MARK="Part 2: LiteLLM"
+FONTS_MARK="Part 3: Geist fonts"
 
 human=0; dry_run=0; version=""; dir=""; keep=0
 [ -t 1 ] && human=1
@@ -91,6 +98,7 @@ if [ $dry_run -eq 1 ]; then
   if [ $human -eq 1 ]; then echo "Would pull $IMAGE:$version with no login, start it on 127.0.0.1, and poll /healthz for $HEALTH_CAP_SECS seconds."; else
     echo "plan: image $IMAGE:$version login: none"
     echo "plan: health url: http://127.0.0.1:<free port>/healthz cap_secs: $HEALTH_CAP_SECS"
+    echo "plan: notices file: $NOTICES copies: $TARGETS image"
   fi
   exit 0
 fi
@@ -98,8 +106,8 @@ fi
 # Tools: curl and a SHA-256 tool are required; Docker is optional and its checks are skipped without it.
 command -v curl >/dev/null || die "curl is not installed, so the assets cannot be downloaded. Fix: install curl (macOS has it at /usr/bin/curl). Verify: curl --version." 3
 command -v tar >/dev/null || die "tar is not installed, so the archive cannot be unpacked. Fix: install tar. Verify: tar --version." 3
-if command -v shasum >/dev/null; then sha_check() { shasum -a 256 -c "$1"; }
-elif command -v sha256sum >/dev/null; then sha_check() { sha256sum -c "$1"; }
+if command -v shasum >/dev/null; then sha_check() { shasum -a 256 -c "$1"; }; sha_of() { shasum -a 256 "$1" | awk '{print $1}'; }
+elif command -v sha256sum >/dev/null; then sha_check() { sha256sum -c "$1"; }; sha_of() { sha256sum "$1" | awk '{print $1}'; }
 else die "neither shasum nor sha256sum is installed, so the checksums cannot be verified. Fix: use the shasum of macOS or install coreutils. Verify: shasum -a 256 --version." 3; fi
 docker_ok=0
 if command -v docker >/dev/null && docker info >/dev/null 2>&1; then docker_ok=1; fi
@@ -170,11 +178,32 @@ for t in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu; do
   if [ "$out" = "loupe $version" ]; then report "version $t" passed "$out on $platform"; else report "version $t" failed "printed '$out' on $platform, expected 'loupe $version'"; fi
 done
 
+# 4b. The notices of each archive: present, not empty, both parts, and one digest over every copy. The
+# first copy that passes sets the reference digest; check_notices reports one line per copy.
+notices_ref=""
+check_notices() {
+  local name="$1" file="$2" d
+  if [ ! -s "$file" ]; then report "notices $name" failed "$NOTICES is absent or empty"; return; fi
+  if ! grep -q "^$LITELLM_MARK" "$file" || ! grep -q "^$FONTS_MARK" "$file"; then
+    report "notices $name" failed "$NOTICES lacks the LiteLLM part or the Geist part"; return
+  fi
+  d="$(sha_of "$file")"
+  [ -n "$notices_ref" ] || notices_ref="$d"
+  if [ "$d" = "$notices_ref" ]; then report "notices $name" passed "sha256 $d"; else
+    report "notices $name" failed "sha256 $d differs from the other copies ($notices_ref)"; fi
+}
+for t in $TARGETS; do
+  if [ "${verified#* $t }" = "$verified" ]; then report "notices $t" skipped "its checksum failed, so it is not unpacked"; continue; fi
+  [ -d "$tmp/x/$t" ] || unpack "$t"
+  check_notices "$t" "$tmp/x/$t/loupe-$tag-$t/$NOTICES"
+done
+
 if [ $docker_ok -eq 0 ]; then
   report pull skipped "Docker is absent or not running"
   report latest skipped "Docker is absent or not running"
   report health skipped "Docker is absent or not running"
   report start-version skipped "Docker is absent or not running"
+  report "notices image" skipped "Docker is absent or not running"
   finish "$failed"
 fi
 
@@ -234,5 +263,12 @@ if echo "$first" | grep -q "\"version\":\"$version\""; then
   report start-version passed "the first log line holds version $version"
 else
   report start-version failed "the first log line holds no version $version"
+fi
+
+# 7. The notices of the image: the same file as in the archives.
+if docker run --rm --entrypoint cat "$IMAGE:$version" "/app/$NOTICES" >"$tmp/image.notices" 2>"$tmp/notices.err"; then
+  check_notices image "$tmp/image.notices"
+else
+  report "notices image" failed "cat /app/$NOTICES in the image failed: $(tr '\n' ' ' <"$tmp/notices.err")"
 fi
 finish "$failed"

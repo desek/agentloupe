@@ -5,7 +5,7 @@ This file describes how `loupe` builds one record for each day with activity, st
 
 ## Day boundaries
 
-A day is a calendar date in the time zone `LOUPE_TZ`. The default is `Europe/Stockholm`. A day starts at 00:00 local time. It ends before 00:00 of the next local date. Thus a day with a change for daylight saving time has 23 or 25 hours.
+A day is a calendar date in the time zone `LOUPE_TZ`. The default is `UTC`. An install that sets `LOUPE_TZ` keeps its value. A change of the default does not move, rebuild, or migrate a stored day. A day starts at 00:00 local time. It ends before 00:00 of the next local date. Thus a day with a change for daylight saving time has 23 or 25 hours.
 
 The binary carries its own time zone database, so the container works with no `/usr/share/zoneinfo`. The binary uses the `chrono-tz` crate, version 0.10. A read of the installed source of `chrono-tz` 0.10.4 confirmed that its build script compiles the time zone files of its `tz` directory into the binary.
 
