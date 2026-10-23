@@ -15,6 +15,7 @@ import * as footer from './section.footer.js';
 import * as states from './section.state.js';
 import { el } from './dom.el.js';
 import { mount } from './live.section.js';
+import { mount as mountScheme } from './scheme.control.js';
 
 const doc = document;
 const main = doc.getElementById('main');
@@ -58,4 +59,5 @@ for (const b of doc.querySelectorAll('#ranges button')) {
 }
 addEventListener('hashchange', () => { if (resp) draw(); });
 footer.render(doc);
+mountScheme(doc, window);
 start();

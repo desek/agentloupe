@@ -1,14 +1,15 @@
-/* @agents-index Layout and component styles of the dashboard: header, headline, cards, charts, heatmap, log, states. */
+/* @agents-index Layout and component styles of the dashboard: header with the range and scheme groups, headline, cards, charts, heatmap, log, states. */
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--color-bg); color: var(--color-text); font-family: var(--font-sans); font-size: var(--size-body); }
 a { color: var(--color-link); }
 a:hover { color: var(--color-link-hover); }
 .wrap { max-width: var(--max-width); margin: 0 auto; padding: 32px 16px 48px; display: flex; flex-direction: column; gap: var(--space-card-gap); }
 .header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px 20px; min-height: 48px; }
-.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+/* The brand takes the free space, so the range group and the scheme control sit together at the right; a group that does not fit wraps to the next line. */
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; margin-right: auto; }
 .logo { width: 44px; height: 44px; flex: none; display: block; }
 .wordmark { margin: 0; font-size: 20px; line-height: 1; font-weight: 600; letter-spacing: -0.02em; }
-.ranges { display: flex; gap: 6px; }
+.ranges, .schemes { display: flex; gap: 6px; }
 .pill { font-family: var(--font-mono); font-size: var(--size-text); font-weight: 500; padding: 0 16px; min-height: 44px; border-radius: var(--radius-pill); cursor: pointer; background: transparent; color: var(--color-text-body); border: 1px solid var(--color-border); }
 .pill[aria-pressed="true"] { background: var(--color-text); color: var(--color-ink-inverse); border-color: var(--color-text); }
 .pill:focus-visible, .button:focus-visible { outline: 2px solid var(--color-link); outline-offset: 2px; }

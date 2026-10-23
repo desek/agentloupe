@@ -1,4 +1,4 @@
-//! @agents-index Integration tests of the static routes: page, site title, content types, path checks, ETag, headers, method, cookies.
+//! @agents-index Integration tests of the static routes: page, site title, content types, path checks, ETag, headers, method, cookies, the scheme script, and the private page without it.
 
 #[path = "common/loupe.rs"]
 mod loupe;
@@ -243,4 +243,54 @@ async fn footer_sentence_has_price_commit() {
     assert!(body.contains(&sentence), "{body}");
     assert!(body.contains(r#"<template id="price-note">"#));
     assert!(!body.contains("{{price_commit}}"));
+}
+
+/// The scheme script is a same-origin classic script in the head, before the first stylesheet link,
+/// so the color scheme is on the root element before the first paint, under the unchanged policy.
+#[tokio::test(flavor = "multi_thread")]
+async fn index_has_scheme_boot_before_styles() {
+    let l = start(&[]);
+    let body = reqwest::get(l.url("/"))
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    let head = &body[..body.find("</head>").unwrap()];
+    // The exact tag: same origin, and no async, no defer, and no type="module".
+    let tag = r#"<script src="/assets/js/scheme.boot.js"></script>"#;
+    let script = head.find(tag).expect("the scheme script is in the head");
+    let style = head.find(r#"rel="stylesheet""#).unwrap();
+    assert!(
+        script < style,
+        "the scheme script comes before the first stylesheet link"
+    );
+    assert!(body.contains(r#"role="group" aria-label="Color scheme" id="schemes""#));
+    let res = reqwest::get(l.url("/assets/js/scheme.boot.js"))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), 200);
+    assert_eq!(
+        res.headers()["content-type"],
+        "text/javascript; charset=utf-8"
+    );
+}
+
+/// The private page stays dark: it has no scheme script and no scheme control.
+#[tokio::test(flavor = "multi_thread")]
+async fn private_page_has_no_scheme_control() {
+    let admin = "adm1nTokenForTestsOnly-0123456789abcdefXY";
+    let l = start(&[("LOUPE_ADMIN_TOKEN", admin)]);
+    let res = reqwest::Client::new()
+        .get(l.url("/private/"))
+        .bearer_auth(admin)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), 200);
+    let body = res.text().await.unwrap();
+    assert!(body.contains("/assets/css/tokens.css"), "{body}");
+    assert!(!body.contains("scheme.boot.js"), "{body}");
+    assert!(!body.contains("Color scheme"), "{body}");
+    assert!(!body.contains("data-scheme"), "{body}");
 }
