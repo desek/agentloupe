@@ -608,7 +608,7 @@ When the Worker receives GET /S
 Then it answers 204 with no body
 And the row for S has count 2, the same firstseen, and lastseen equal to the UTC date
 And the table holds one row for S
-And the Worker ran one statement for the request
+And the Worker source runs one D1 statement for a valid request and none for a refused request
 ```
 
 ### AC-18: The Worker refuses each other request
@@ -629,6 +629,7 @@ Given the migration under telemetry/migrations/
 Then the table starts has exactly the columns sha, firstseen, lastseen, and count
 And the Worker source writes no IP address, User-Agent, header, query, or time of day
 And the Worker source writes no request data to a log
+And the Worker source answers 503 with no body when the D1 statement fails
 And the wrangler configuration turns observability off and names no Logpush and no tail consumer
 And the wrangler configuration names the Worker agentloupe-telemetry, the D1 database agentloupe-telemetry, the workers.dev subdomain, and no route or custom domain
 And no request reads a row
@@ -649,6 +650,7 @@ Then the script exits 4 with an error that names wrangler login
 When the script runs for real twice with the owner's consent
 Then the second run makes no second database, applies no migration, prints the same host, and exits 0
 And no workflow and no pipeline script runs telemetry.deploy.sh
+And the script stores no Cloudflare credential, does not set the repository variable, and prints the host and the command that sets LOUPE_TELEMETRY_HOST
 ```
 
 ### AC-21: The deployed endpoint counts the starts of a build
@@ -766,7 +768,7 @@ Medium: `build.rs`, one new module, two small changes in the start and in `loupe
 
 ## Decision Outcome
 
-Approved on 2026-10-23 by a reviewer agent in a Pi session through the proxy, separate from the author. Amended on 2026-10-23 with three decisions of the owner (see "Notes", section "Amendment, 2026-10-23"); the status stays `approved`. The receiving endpoint is decided: the Worker `agentloupe-telemetry` of this repository.
+Approved on 2026-10-23 by a reviewer agent in a Pi session through the proxy, separate from the author. Amended on 2026-10-23 with three decisions of the owner (see "Notes", section "Amendment, 2026-10-23"); the status stays `approved`. The receiving endpoint is decided: the Worker `agentloupe-telemetry` of this repository. Amended and approved again on 2026-10-23 after the second pass.
 
 ## Open Questions
 
@@ -826,3 +828,13 @@ The owner decided three points on 2026-10-23, after the approval. The status sta
 3. **Decision 3, the macOS asset.** The `curl` install path stays, with no Apple signing. Edits: a statement in "Scope Boundaries" (In Scope and Out of Scope), "Current State", "User Impact", and judgement call 27. No requirement and no acceptance criterion.
 
 The opt-out `DO_NOT_TRACK=1` stays undocumented, and the request itself stays documented, as before (requirements 25 to 29, judgement call 6).
+
+### Second review notes, 2026-10-23
+
+A reviewer agent, separate from the author, reviewed the amended CR for blocking findings only, against `build.rs`, `src/config/vars.rs`, `src/serve/mod.rs`, `src/summary/client.rs`, `.github/workflows/release.yml`, `.tool-versions`, and `docs/specification/release.md`. The amendment is consistent in each section: no POST, no body, and no pending endpoint remain outside the history of the notes; the Worker stores only the commit, two dates, and a count; the increment is one atomic statement; the host is the `workers.dev` subdomain `agentloupe-telemetry`; the opt-out stays undocumented and the request stays documented; the CR inlines no code, YAML, or SQL. Edits:
+
+1. **Untestable criterion, one statement per request.** AC-17 checked that "the Worker ran one statement", which the Worker test cannot observe through `wrangler dev`, and non-functional requirement 6 (none for a refused request) had no criterion. Edit: AC-17 checks in the Worker source one D1 statement for a valid request and none for a refused request.
+2. **Requirement without an acceptance criterion, the store error.** Requirement 43 (503 with no body on a store failure) had no criterion. Edit: AC-19 checks the 503 answer in the Worker source.
+3. **Requirement without an acceptance criterion, the deploy boundaries.** Requirement 51 (no stored credential, no write of the repository variable, the printed host and command) had no criterion. Edit: AC-20 checks these three points.
+
+No blocking finding stays open. The status stays `approved`.

@@ -2,7 +2,7 @@
 name: "CR-0025 Supply chain assurance"
 description: "Add three supply chain controls to the release machinery of CR-0022 and CR-0024: a CycloneDX SBOM and a signed build provenance attestation for each release asset and for the image, with a verify step in release.check.sh; a hosted verdict that reuses a prior full green verdict of the identical git tree, read-only and fail closed; and a daily advisory response that checks the Cargo.lock of each published release, makes a draft security advisory, adds a warning note to the affected release, opens one security issue, and moves the image tag latest only to a fixed version, with no deleted asset. A fourth part, added on 2026-10-23, sets the Cargo release profile of the binary (strip, fat LTO, one codegen unit, panic abort, no debug info) after a check that no code path relies on unwinding, as build hygiene with no secrecy claim."
 id: "CR-0025"
-status: "proposed"
+status: "approved"
 date: 2026-10-23
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, release manager), reviewer agent (approver)
@@ -83,7 +83,7 @@ The facts of Part 4 below were read on 2026-10-23 at the commit `2561b8e` of `ma
 * `release.build.sh` builds with `cargo build --release --locked --bin loupe`. The `Dockerfile` builds with `cargo build --release --locked --bin loupe` in its build stage. `pipeline.image.sh` builds that `Dockerfile`, so the image stage of each verdict compiles the release profile. The bench and scenario scripts (`api.bench.sh`, `proxy.latency.sh`, `web.render.sh`, and 12 others) also build with `--release`. No `[[bench]]` target exists.
 * The artifact check `.agents/explore/2026-10-23-release-artifacts-check.md` (commit `d93de7d`) measured these values with `release.build.sh`: macOS arm64 on the host, binary 14,402,208 bytes and archive 4,645,682 bytes; Linux x86_64 in `rust:1.97.1-bookworm` under emulation, binary 16,834,544 bytes and archive 5,118,180 bytes; Linux arm64 in `rust:1.97.1-bookworm`, binary 16,341,728 bytes and archive 5,069,279 bytes. The three byte counts of O4 are the `binary_bytes` values. The cold macOS build took 33.3 s. The check recorded 0.35 s from the start to the first answer of `/healthz` on macOS, but not the time to the line `listening`.
 * `loupe serve` writes the info line with the message `listening` after the bind (`src/serve/mod.rs`). Each log line is JSON with a `time` field in milliseconds.
-* A grep of `src` for `catch_unwind`, `resume_unwind`, `UnwindSafe`, `set_hook`, and `take_hook` gives 0 hits. Code that only acts after a panic of other code still exists: 13 recoveries of a poisoned lock (`unwrap_or_else(|p| p.into_inner())`) in 9 files, one match on the result of `tokio::task::spawn_blocking` whose error arm logs a warning (`src/live/route.rs`), and one ignored result of a thread join (`src/serve/mod.rs`). The server runs its handlers in tokio tasks and its workers in threads. Today a panic in one handler task or one worker thread ends that task or thread, and the process goes on.
+* A grep of `src` for `catch_unwind`, `resume_unwind`, `UnwindSafe`, `set_hook`, and `take_hook` gives 0 hits. Code that only acts after a panic of other code still exists: 13 recoveries of a poisoned lock (the recovery that takes the inner value of the poisoned guard) in 9 files, one match on the result of `tokio::task::spawn_blocking` whose error arm logs a warning (`src/live/route.rs`), and one ignored result of a thread join (`src/serve/mod.rs`). The server runs its handlers in tokio tasks and its workers in threads. Today a panic in one handler task or one worker thread ends that task or thread, and the process goes on.
 * The store opens SQLite in WAL mode (`src/store/open.rs`). `compose.yaml` sets `restart: unless-stopped`.
 * The image job of the verdict run 39998277995 took 3 min 34 s, and its test job 6 min 32 s.
 
@@ -218,9 +218,9 @@ sequenceDiagram
 **Part 1: build provenance (O1)**
 
 15. The job `publish` **MUST** make one build provenance attestation with `actions/attest-build-provenance` whose subjects are the three archives and the five SBOM files. It **MUST** make it before the upload of requirement 14. When the attestation fails, the job **MUST** fail and upload nothing.
-16. `release.image.sh merge` **MUST** push the index with the tag `<version>` only. It **MUST** write the index digest as a `key=value` line to a file that the new flag `--output-file` names, so the workflow passes the digest to the next step as a step output.
-17. The job `publish` **MUST** then make one build provenance attestation with `actions/attest-build-provenance` for the subject `ghcr.io/desek/agentloupe` with the index digest, and push the attestation to the registry.
-18. A new mode `release.image.sh promote --tag <tag>` **MUST** move the tag `latest` to the index digest of the tag `<version>`. The job `publish` **MUST** call it only after the attestation of requirement 17 passes. This replaces the move of `latest` in CR-0022, requirement 40. The mode **MUST** refuse a move to a version that is older than the version that `latest` points to, with exit code 1 (judgement call 21).
+16. `release.image.sh merge` **MUST** push the index with the tag `<version>` only. It **MUST** write the image name and the index digest as two `key=value` lines to a file that the new flag `--output-file` names, so the workflow passes both to the next step as step outputs and states no image name (CR-0022, requirement 20).
+17. The job `publish` **MUST** then make one build provenance attestation with `actions/attest-build-provenance` for the subject name and the index digest that the step outputs of requirement 16 give (the image `ghcr.io/desek/agentloupe`), and push the attestation to the registry.
+18. A new mode `release.image.sh promote --tag <tag>` **MUST** move the tag `latest` to the index digest of the tag `<version>`. The job `publish` **MUST** call it only after the attestation of requirement 17 passes. This replaces the move of `latest` in CR-0022, requirement 40. The mode **MUST** refuse a move to a version that is older than the version that `latest` points to, with exit code 1 (judgement call 21). The mode `promote` **MUST NOT** require that the checked-out commit is the tag commit, because the advisory workflow of requirement 47 calls it from a checkout of the default branch; it **MUST** still stop with exit code 4 when the tag is absent or when the version in `Cargo.toml` at the tag differs from the tag version.
 19. Only the job `publish` **MUST** have the permissions `id-token: write` and `attestations: write`. The job keeps `contents: write` and `packages: write`. The other jobs of each workflow **MUST NOT** get `id-token: write` or `attestations: write`.
 20. Each use of `actions/attest-build-provenance` **MUST** be pinned by its full 40-character commit SHA, with the release tag in a comment (CR-0022, requirement 21).
 21. A manual start of the release workflow for a tag **MUST** make the attestations again with no error, and **MUST** move `latest` only per requirement 18.
@@ -268,7 +268,7 @@ sequenceDiagram
 46. A new script `.agents/scripts/advisory.respond.sh` **MUST** hold all the logic of the advisory response. It **MUST** follow `agent_first_cli`, with `--dry-run`.
 47. A new workflow `.github/workflows/advisory-response.yml` **MUST** start on a daily schedule (judgement call 15) and on `workflow_dispatch`. It **MUST** be a thin caller per CR-0022, requirements 19 to 22: it checks out the default branch with all tags and no persisted credential, installs the Rust toolchain from `rust-toolchain.toml` and cargo-deny from `.tool-versions`, sets up Docker Buildx, logs in to `ghcr.io`, and makes exactly one call of `advisory.respond.sh`.
 48. The workflow **MUST** have one concurrency group for all its runs, and a new run **MUST NOT** cancel an active run. Its job **MUST** have a timeout (judgement call 13).
-49. The workflow **MUST** request these permissions of the `GITHUB_TOKEN`, and no others: `contents: write` (the release notes), `issues: write` (the issue and the label), and `packages: write` (the move of `latest`). The draft advisory **MUST** use the token of parameter P3, given to the script step only.
+49. The workflow **MUST** request these permissions of the `GITHUB_TOKEN`, and no others: `contents: write` (the release notes), `issues: write` (the issue and the label), and `packages: write` (the move of `latest`). The draft advisory **MUST** use the token of parameter P3, given to the script step only. This extends CR-0022, requirement 22, by the one repository secret of parameter P3, for the script step of this workflow only.
 50. The script **MUST** list the published releases of the repository whose tag has the form `v<major>.<minor>.<patch>`. It **MUST** skip a draft release and a pre-release.
 51. For each such release, the script **MUST** export the tree of its tag with `git archive` into a temporary directory and run `cargo deny check advisories` there against the `Cargo.lock` of the tag. It **MUST** use the `deny.toml` of the checked-out default branch, or the file that the flag `--deny-config` names (judgement call 17). It **MUST NOT** change the working tree, the index, or the branches of the clone.
 52. The script **MUST** fetch the advisory database one time in a run, then check each release offline against that database. When the fetch or the read of the database fails, the script **MUST** stop with exit code 5 and claim no clean result (fail closed).
@@ -288,7 +288,7 @@ sequenceDiagram
 
 **Documentation**
 
-66. `docs/specification/release.md` **MUST** change in these sections: "Release flow" (the order of the job `publish`), "Release assets" (the 16 files), "Container image" (the attestation, the promote step, and the BuildKit attestations off), "Verify a release" (the SBOM and attestation checks and `--skip-supply-chain`), and "Pinned actions" (the new action). It **MUST** get two new sections: "Supply chain" (the SBOM tools and format, the attestation subjects, the verify commands with `gh attestation verify`, and the cosign decision) and "Advisory response" (requirements 46 to 65, the marker, the no-delete rule and its reason, and the limit of requirement 65). The section of Part 4 is stated in requirement 82.
+66. `docs/specification/release.md` **MUST** change in these sections: "Release flow" (the order of the job `publish`), "Release assets" (the 16 files), "Container image" (the attestation, the promote step, and the BuildKit attestations off), "Verify a release" (the SBOM and attestation checks and `--skip-supply-chain`), "Pinned actions" (the new action), and "Release token" (the secret of parameter P3 next to `RELEASE_PLEASE_TOKEN`, so the section no longer states that `RELEASE_PLEASE_TOKEN` is the only repository secret). It **MUST** get two new sections: "Supply chain" (the SBOM tools and format, the attestation subjects, the verify commands with `gh attestation verify`, and the cosign decision) and "Advisory response" (requirements 46 to 65, the marker, the no-delete rule and its reason, and the limit of requirement 65). The section of Part 4 is stated in requirement 82.
 67. `docs/specification/operations.md` **MUST** change in these sections: "Hosted workflows" (the job `reuse`, the new permissions, the attestation as platform work, the advisory workflow and its timeout, and the timeout table), "Fingerprints and the verdict cache" (a new subsection "Hosted verdict reuse" for requirements 29 to 45), "Stage inputs and toolchain" (requirement 44), and "Release targets" (the new rows of Parts 1 to 3 of the section "Measurable Targets"). Part 4 does not change `operations.md`; its measured values go to `release.md` (requirement 82).
 68. `SECURITY.md` **MUST** get at most five lines on the advisory response for published releases and the limit of requirement 65.
 69. `.taxonomy` **MUST** get rows for the terms "SBOM", "build provenance attestation", "verdict reuse", "source run", "advisory response", and "fix release".
@@ -619,6 +619,17 @@ And no file lists a development dependency
 And the build log line of each asset names the SBOM file and its component count
 Given the SBOM step fails on one runner
 Then release.build.sh exits with code 1 and the release gets no file from that run
+Given release.sbom.sh
+When it runs with --help
+Then it prints the purpose, the usage, the parameters, and the exit codes
+And --dry-run prints the plan and writes no file
+When the mode asset runs on a commit that is not the tag commit
+Then it exits with code 4
+When Cargo.lock changes during the run
+Then it exits with code 1
+When the mode asset runs two times on one commit
+Then both files have the same set of components by name, version, package URL, and hash
+And no file holds a path of the build machine
 ```
 
 ### AC-2: Each image platform has a CycloneDX SBOM (requirements 8 to 11)
@@ -630,6 +641,8 @@ Then the release holds loupe-v<version>-image-linux-amd64.cdx.json and loupe-v<v
 And each lists the operating system packages and the loupe binary of its platform image
 And the pushed platform images hold no BuildKit provenance or SBOM attestation
 And .tool-versions pins cargo-cyclonedx and syft and no workflow file states a tool version
+Given the SBOM step of release.image.sh build fails
+Then release.image.sh build exits with code 1
 ```
 
 ### AC-3: The release has 16 files with checksums (requirements 12 to 14)
@@ -654,6 +667,9 @@ And each use of attest-build-provenance is pinned by a 40-character commit SHA w
 Given a copy of an archive with one changed byte
 When the user runs gh attestation verify on the copy
 Then the exit code is not 0
+And release.yml states no image name; the image subject comes from the output file of release.image.sh merge
+Given a release run in which the attestation of the files fails
+Then the publish job fails and the release gets none of the 16 files from that run
 ```
 
 ### AC-5: latest moves only after the image attestation (requirements 16 to 18, 21)
@@ -693,7 +709,7 @@ Then a sbom line has status failed and the exit code is 1
 Given release.md after this CR
 When a reader opens the section Supply chain
 Then it names cargo-cyclonedx and syft, the CycloneDX format, the attestation subjects, the gh attestation verify commands, and the cosign decision
-And the sections Release flow, Release assets, Container image, Verify a release, and Pinned actions state the changes of requirement 66
+And the sections Release flow, Release assets, Container image, Verify a release, Pinned actions, and Release token state the changes of requirement 66
 ```
 
 ### AC-8: A squash merge of a green pull request reuses the verdict (requirements 29 to 32, 36, 39, 40)
@@ -718,6 +734,7 @@ Or it is older than 72 hours
 Or its head repository is a fork
 Or its event is not push or pull_request
 Or it is a pull_request run whose head does not contain the base commit
+Or it is the current run
 Then verdict.reuse.sh lookup gives the decision miss with the reason novel
 And the five stage jobs run in full
 ```
@@ -734,6 +751,10 @@ And with no decision file the exit code is 4, different from the exit code 1 of 
 And with a decision file the exit code is 0 and the file holds the decision and the reason
 And the lookup made no call with a method other than GET
 And no cache, artifact, or status was written
+Given the job reuse fails, is skipped, or gives no decision
+Then the jobs format, test, web, and image run in full
+When verdict.reuse.sh runs with --help
+Then it prints the modes lookup and judge, their inputs, the variable GH_TOKEN, and the exit codes
 ```
 
 ### AC-11: The judge passes only in the two stated cases (requirements 36 and 41)
@@ -769,6 +790,7 @@ Then the test stage fails
 And pipeline.test.sh --inputs lists .github/workflows
 And git diff of pipeline.verdict.sh and of the fingerprint script is empty
 And the job reuse has only contents read and actions read
+And the job reuse checks out the head commit, makes exactly one call of verdict.reuse.sh lookup, and has a timeout
 ```
 
 ### AC-14: The advisory workflow is a thin caller with the stated permissions (requirements 46 to 49)
@@ -807,6 +829,7 @@ And the draft is not published and no CVE is requested
 And the notes of v0.1.0 start with a warning note that names A, the crate, the upstream link, and the issue
 And the earlier notes text follows unchanged, with the marker holding A
 And one open issue with the label security links A and the draft, lists 0.1.0, and states the fix path of CR-0023
+And the label security exists after the run, made by the script when it was absent
 When the script runs again with no change
 Then it makes no new draft, no second note, and no second issue
 ```
@@ -819,6 +842,7 @@ When advisory.respond.sh runs
 Then latest points to 0.1.1
 And the note of v0.1.0, the draft, and the issue name 0.1.1 as the fixed version
 And the issue is closed with a comment that holds the run link
+And release.image.sh promote ran from the checkout of the default branch with no tag commit error
 Given A affects v0.1.1, v0.1.0 has no hit, and no newer release exists
 When advisory.respond.sh runs
 Then latest does not move
@@ -1156,9 +1180,9 @@ Verify that the pinned cargo-nextest 0.9.149 accepts `--cargo-profile release`. 
 
 ## Decision Outcome
 
-Pending. The status is `proposed`. A reviewer agent, separate from the author, reviews the CR, and the owner decides parameter P3.
+Approved on 2026-10-23 by a reviewer agent in a Pi session through the proxy, separate from the author. Implementation after v0.1.0.
 
-Proposed approach: "SBOM files and signed provenance in the existing publish job, a read-only exact-tree reuse of full green verdict runs with lint always in full, a daily advisory response that marks and never deletes, and a release profile with fat LTO and panic abort after an unwinding check", because it answers the three questions of the owner and the request for Part 4, keeps every workflow a thin caller, keeps the safety invariant of the fast feedback loop, keeps every published version available, and makes the release binary smaller with no secrecy claim.
+Chosen approach: "SBOM files and signed provenance in the existing publish job, a read-only exact-tree reuse of full green verdict runs with lint always in full, a daily advisory response that marks and never deletes, and a release profile with fat LTO and panic abort after an unwinding check", because it answers the three questions of the owner and the request for Part 4, keeps every workflow a thin caller, keeps the safety invariant of the fast feedback loop, keeps every published version available, and makes the release binary smaller with no secrecy claim.
 
 ## Related Items
 
@@ -1210,3 +1234,17 @@ Map of the sources to the requirements:
 On 2026-10-23 the owner asked for a fourth part, O4: the release build profile of the binary. This amendment adds Part 4 to each section: the summary, the motivation (O4), a change driver, the current state of the profile, the unwinding sites, and the baseline, both diagrams, item 8 of the proposed change, requirements 71 to 83, the amended requirements 66 and 67 and non-functional requirement 8, ten rows of "Measurable Targets", the affected and not changed files, the scope, five alternatives, the impact, step 8 of the implementation and phase 5 of its flow, three command checks, Part D of the scenario (steps 23 to 32), AC-23 to AC-28, the quality standards, risks 10 to 13, a dependency, the effort, parameter P6, judgement calls 27 to 34 and the note on Part 4 in judgement call 25, the decision outcome, the related items, and this map. The status stays `proposed`. The frontmatter keeps the date and the source commit of the first draft; the Part 4 facts of the section "Current State" were read at `2561b8e`.
 
 The three byte counts of O4 are the binary sizes (`binary_bytes`) of the artifact check, not the archive sizes. Part 4 measures both, with the owner's counts as the binary baseline (judgement call 32).
+
+### Review notes, 2026-10-23
+
+Reviewer: a reviewer agent in a Pi session through the proxy, separate from the author. Scope: blocking findings only. Each edit below is the smallest change for one finding.
+
+1. Contradiction with the repository: requirement 49 adds the secret of parameter P3, but CR-0022, requirement 22, lets a workflow read only the `GITHUB_TOKEN` or `RELEASE_PLEASE_TOKEN`, and `release.md` (Release token) states that `RELEASE_PLEASE_TOKEN` is the only repository secret. Requirement 49 now states the extension of CR-0022, requirement 22; requirement 66 adds the section "Release token"; AC-7 checks it.
+2. Project value in a workflow: requirement 17 made the workflow name the subject `ghcr.io/desek/agentloupe`, but CR-0022, requirement 20, and `operations.md` (Hosted workflows) forbid an image name in a workflow file. Requirement 16 now makes `release.image.sh merge` write the image name and the index digest to the output file, requirement 17 takes both from the step outputs, and AC-4 checks that `release.yml` states no image name.
+3. Step that cannot work as stated: `release.image.sh` stops with exit code 4 when the checked-out commit is not the tag commit, but the advisory workflow (requirement 47) checks out the default branch and calls `release.image.sh promote` (requirement 58). Requirement 18 now exempts the mode `promote` from the tag commit check and keeps the tag and version checks; AC-17 checks it.
+4. Requirements without an acceptance criterion: requirements 2, 4, and 5 (the interface, the exit codes, and the stability of `release.sbom.sh`), 10 (exit code 1 of the image SBOM step), 15 (no upload when the attestation fails), 29 and 39 (the interface of `verdict.reuse.sh`, and the full run when the job `reuse` fails), 32 item 8 (the current run), 37 (one call and the timeout of the job `reuse`), and 57 (the label `security`). AC-1, AC-2, AC-4, AC-9, AC-10, AC-13, and AC-16 now hold a line for each.
+5. Layer 1 breach: the section "Current State" quoted a Rust expression of `src`. It now describes the recovery in words.
+
+No open blocking finding stays. Part 2 was checked against the fast feedback loop rules (content proved once, exact tree equality, fail closed, lint never reused, head checkout, read-only lookup, no fork source and no writer on a fork pull request) with no finding. Part 3 deletes no asset, release, tag, image tag, or package version.
+
+Non-blocking remarks, not edited: syft lists a Rust binary as a component only when it finds build metadata in it (for example from cargo-auditable), so the "loupe binary" part of requirement 9 can need a syft file cataloger setting or a reworded check at the implementation; `gh attestation verify` needs a `gh` login, so requirement 25 fails rather than skips when `gh` is present but logged out; the refusal of requirement 18 makes a manual rerun of an older tag end as failed after its attestations; requirement 71 names the five profile values in key form, which this review reads as values of the owner's request and not as file content.
