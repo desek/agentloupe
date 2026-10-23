@@ -1,6 +1,6 @@
 ---
 name: "CR-0020 Light mode"
-description: "The dashboard gets a light color scheme from design tokens. The system preference selects the scheme, and a three-state control in the header (System, Light, Dark) overrides it. The browser keeps the override in localStorage. The page paints the correct scheme from the first frame, and text and chart colors meet the contrast thresholds on the light surface."
+description: "The dashboard gets a light color scheme from design tokens. The system preference selects the scheme, and a toggle switch \"Dark mode\" in the header overrides it. A click sets the other scheme; when the new scheme equals the system preference, the click removes the stored override, so the page follows the system again. The browser keeps the override in one localStorage key. The page paints the correct scheme from the first frame, and text and chart colors meet the contrast thresholds on the light surface."
 id: "CR-0020"
 status: "implemented"
 date: 2026-10-23
@@ -60,9 +60,9 @@ flowchart LR
 1. Add a light value for each color token. The light values use the same token names as the dark values.
 2. Resolve the scheme from two inputs: the override in `localStorage`, and the system preference.
 3. Set the resolved scheme on the root element before the first paint. Use a small same-origin classic script in the head that runs before the stylesheets apply. The content security policy does not change.
-4. Add a control with three states, System, Light, and Dark, to the header directly after the range group. The brand stays at the left, and the range group and the control group sit together at the right.
-5. When the reader selects Light or Dark, keep the choice in `localStorage`. When the reader selects System, remove the stored choice.
-6. When the control is in the state System, follow a change of the system preference while the page is open.
+4. Add one toggle switch to the header directly after the range group: a button with the role `switch`, the accessible name "Dark mode", and a track of 44 by 24 px with a knob. The switch is checked when the resolved scheme is dark. The brand stays at the left, and the range group and the switch sit together at the right.
+5. A click on the switch sets the other scheme. When the new scheme equals the system preference, remove the stored key, so the page follows the system preference again. Else write the new scheme to the key. The switch has no third state.
+6. While no key is stored, follow a change of the system preference while the page is open.
 7. Keep the private reports page dark.
 
 ### Proposed State Diagram
@@ -75,7 +75,7 @@ flowchart LR
   M --> R
   R --> T["tokens.css: dark values or light values"]
   T --> D["Dashboard: every section and state"]
-  C["Header control: System, Light, Dark"] --> K
+  C["Header switch: Dark mode, checked when dark"] --> K
   C --> R
   T --> P["Private page: dark values only"]
 ```
@@ -92,19 +92,40 @@ flowchart TD
   D -->|"no preference or no matchMedia"| F
 ```
 
-### Control States
+### Switch States
+
+The switch has two visible states, checked (dark) and unchecked (light). The stored key decides whether the page follows the system preference. There is no third state.
 
 ```mermaid
 stateDiagram-v2
-  [*] --> System: no stored value
-  [*] --> Light: stored light
-  [*] --> Dark: stored dark
-  System --> Light: select Light
-  System --> Dark: select Dark
-  Light --> Dark: select Dark
-  Light --> System: select System
-  Dark --> Light: select Light
-  Dark --> System: select System
+  state "Light, follows the system (no key)" as FL
+  state "Dark, follows the system (no key)" as FD
+  state "Light, stored light" as SL
+  state "Dark, stored dark" as SD
+  [*] --> FL: no key, system light
+  [*] --> FD: no key, system dark or no preference
+  [*] --> SL: key light
+  [*] --> SD: key dark
+  FL --> FD: system preference changes to dark
+  FD --> FL: system preference changes to light
+  FL --> SD: click, dark differs from the system, write dark
+  FD --> SL: click, light differs from the system, write light
+  SL --> FD: click, system dark, remove the key
+  SD --> FL: click, system light, remove the key
+  SL --> SD: click, system light, write dark
+  SD --> SL: click, system dark, write light
+```
+
+### Click Rule
+
+```mermaid
+flowchart TD
+  A["Click on the switch"] --> B["New scheme: the other scheme"]
+  B --> C{"New scheme equals the system preference?"}
+  C -->|"yes"| D["Remove the key: the page follows the system again"]
+  C -->|"no"| E["Write the new scheme to the key"]
+  D --> F["Set the scheme on the root element and aria-checked"]
+  E --> F
 ```
 
 ### Load Sequence
@@ -121,7 +142,7 @@ sequenceDiagram
   B->>C: apply the token values of the scheme
   B->>B: first paint in the resolved scheme
   B->>A: run the module after parse
-  A->>B: draw the sections and the header control
+  A->>B: draw the sections and set aria-checked of the header switch
 ```
 
 ## Requirements
@@ -139,7 +160,7 @@ sequenceDiagram
 
 5. When no valid override is stored, the page **MUST** use the scheme of `prefers-color-scheme`.
 6. When the browser reports no preference, or has no `matchMedia`, the page **MUST** use the dark scheme.
-7. When the control is in the state System and the system preference changes while the page is open, the page **MUST** change to the new scheme with no reload.
+7. When no valid override is stored and the system preference changes while the page is open, the page **MUST** change to the new scheme with no reload. When a valid override is stored, the page **MUST NOT** follow the change.
 
 **Manual override in the header**
 
@@ -147,14 +168,14 @@ sequenceDiagram
 9. The switch **MUST** come directly after the range group. The range group and the switch **MUST** sit together at the right end of the header row, with the brand at the left, in the same row at 1440 px.
 10. The switch **MUST** have `aria-checked="true"` when the resolved scheme is dark, and `aria-checked="false"` when it is light. A click **MUST** set the other scheme. When the new scheme equals the system preference, the click **MUST** remove the scheme key, so the page follows the system preference again. Else the click **MUST** write the new scheme to the key. With no preference or no `matchMedia`, the system preference counts as dark.
 11. The keyboard **MUST** reach the switch with Tab and set the other scheme with Space and with Enter. The switch **MUST** show a track of 44 by 24 px with a knob.
-12. A selection of Light or Dark **MUST** write the value `light` or `dark` to one `localStorage` key. A selection of System **MUST** remove that key.
-13. A selection **MUST** change the scheme of the full page at once, with no reload, no new request to `/v1/days`, and no close of the live socket.
-14. A selection **MUST NOT** change the URL fragment. The range stays in the fragment as before.
-15. After a reload, the page **MUST** show the scheme and the pressed button of the stored value.
+12. The override **MUST** use one `localStorage` key with the value `light` or `dark`. Requirement 10 alone decides when a click writes the key and when it removes the key. The switch has no state that removes the key apart from that rule.
+13. A click on the switch **MUST** change the scheme of the full page at once, with no reload, no new request to `/v1/days`, and no close of the live socket.
+14. A click on the switch **MUST NOT** change the URL fragment. The range stays in the fragment as before.
+15. After a reload, the page **MUST** show the scheme of the stored value, and the switch **MUST** have the `aria-checked` value of that scheme.
 
 **Fall-back to the system preference**
 
-16. When the stored value is not `light` or `dark`, the page **MUST** ignore it, use the system preference, and show the state System.
+16. When the stored value is not `light` or `dark`, the page **MUST** ignore it, use the system preference, and set `aria-checked` of the switch from the resolved scheme.
 17. When the browser blocks `localStorage` or the access throws an error, the page **MUST** use the system preference, show no error, and still let the reader change the scheme for the current page view.
 
 **No flash of the wrong scheme**
@@ -181,7 +202,7 @@ sequenceDiagram
 
 **Scope of the scheme**
 
-31. The private reports page **MUST** stay in the dark scheme. It **MUST NOT** follow `prefers-color-scheme` or the stored value, and it **MUST NOT** show the control.
+31. The private reports page **MUST** stay in the dark scheme. It **MUST NOT** follow `prefers-color-scheme` or the stored value, and it **MUST NOT** show the switch.
 
 ### Non-Functional Requirements
 
@@ -200,7 +221,7 @@ sequenceDiagram
 |---|---|---|---|
 | Code size | `.agents/scripts/web.size.sh` prints `code_kib` | 65.6 KiB at `446f065`, after CR-0021 (64.8 KiB at `ac55e2a`) | at most 100 KiB |
 | Added scheme code | the increase of `page_kib` from the baseline; `.agents/scripts/web.size.sh` prints `page_kib`, the bytes of `web/` minus `web/assets/fonts/`, `web/private/`, and `web/test/` | 47.7 KiB at `446f065`, after CR-0021 | at most 6.0 KiB |
-| Draw time, each scheme | `.agents/scripts/web.render.sh --days 400 --scheme light` and `--scheme dark` print `draw_ms` | measured at the start of implementation, dark only | at most 500 ms in each scheme |
+| Draw time, each scheme | `.agents/scripts/web.render.sh --days 400 --scheme light` and `--scheme dark` print `draw_ms` | measured after the implementation, not at the start: 58.2 ms, dark only, at `446f065` in a worktree (see Notes, 2026-10-23) | at most 500 ms in each scheme |
 | Remote requests, each scheme | `.agents/scripts/web.render.sh --days 400 --scheme light` and `--scheme dark` print `remote_requests` | 0, dark only | 0 in each scheme |
 | Headline above the fold | `.agents/scripts/web.render.sh --days 400 --scheme light` prints `headline_above_fold_360` and `headline_above_fold_1440` | true at both widths, with no control | true at both widths, with the control |
 | Headline ratio | `.agents/scripts/web.render.sh` prints `headline_ratio` | 2.12 | at least 2.0 |
@@ -217,12 +238,12 @@ sequenceDiagram
 ## Affected Components
 
 * `web/assets/css/tokens.css`: the light values, `color-scheme` for each scheme, and the selector that only the dashboard activates.
-* `web/assets/css/page.css`: the style of the control group, its place beside the range group at the right of the header row, and the wrap of the header at 360 px.
+* `web/assets/css/page.css`: the style of the switch (the 44 by 24 px track and the knob), its place beside the range group at the right of the header row, and the wrap of the header at 360 px.
 * `web/assets/css/live.css`: the muted style of the paused state, if the contrast of requirement 29 is not met.
-* `web/index.html`: the boot script in the head, before the stylesheet links, and the control group in the header.
-* `web/assets/js/`: one new classic boot script, one new module for the control, and the pure resolve rule.
-* `web/assets/js/section.header.js`, or the new control module: the pressed state of the scheme buttons.
-* `web/assets/js/app.js`: the mount of the control.
+* `web/index.html`: the boot script in the head, before the stylesheet links, and the switch in the header.
+* `web/assets/js/`: one new classic boot script, one new module for the switch, and the pure resolve rule.
+* `web/assets/js/section.header.js`, or the new switch module: `aria-checked` of the switch.
+* `web/assets/js/app.js`: the mount of the switch.
 * `web/private/index.html` and `web/private/assets/css/private.css`: only if a change is necessary to keep the dark scheme.
 * `.agents/scripts/web.render.sh` and `.agents/scripts/web.render.cdp.mjs`: the flags `--scheme` and `--stored` and the new outputs.
 * Node tests under `web/test/`.
@@ -237,7 +258,7 @@ sequenceDiagram
 ### In Scope
 
 * The light values of the color tokens and the selection of the scheme.
-* The header control, the stored override, and the fall-back.
+* The header switch, the stored override, and the fall-back.
 * The boot script that prevents a flash of the wrong scheme.
 * The contrast of text and of the chart colors in the light scheme.
 * The readability of each section and each state in both schemes.
@@ -256,26 +277,27 @@ sequenceDiagram
 
 ## Alternative Approaches Considered
 
-* **A two-state toggle, Light and Dark.** Rejected. After the first click, the reader cannot go back to the system preference without a clear of the site data. The owner asks for a fall-back to the system preference.
+* **A toggle switch, "Dark mode", checked when dark.** Chosen. A click that lands on the scheme of the system preference removes the stored key, so the reader gets back to the system preference with no third state and no clear of the site data.
+* **A group of three buttons, System, Light, and Dark.** Rejected. The owner asked for a switch on 2026-10-23. The CR was first approved and implemented with this group; the switch replaced it after the implementation.
 * **Only `prefers-color-scheme`, with no control.** Rejected. The owner asks for a manual override.
 * **A media query in CSS only, and the control applied after `app.js` runs.** Rejected. A reader with a stored override that differs from the system sees a flash of the wrong scheme, because the module runs after the first paint.
 * **An inline script in the head.** Rejected. The policy has `script-src 'self'` with no hash or nonce. A change of the policy is out of scope.
 * **A cookie and a server-side scheme in `index.html`.** Rejected. The static routes do not read or set a cookie (spec section "No credentials"). The `etag` of `index.html` would also depend on the request.
 * **New token names with a prefix, for example `--light-color-bg`.** Rejected. Every rule of `page.css`, `live.css`, and the SVG attributes would need a change. The same names with a second set of values change no section module.
-* **One button that cycles System, Light, Dark.** Rejected. The reader cannot see all states, and the next state is not clear. A group of three buttons uses the pattern of the range group.
+* **One button that cycles System, Light, Dark.** Rejected. The reader cannot see all states, and the next state is not clear. The switch has two states, and its checked state shows the scheme.
 
 ## Impact Assessment
 
 ### User Impact
 
-A reader with a light system appearance gets a light page with no action. A reader can select Light or Dark in the header, and the page keeps the choice on that browser. A reader who does nothing with a dark system appearance sees the page of today, plus the control.
+A reader with a light system appearance gets a light page with no action. A reader can click the switch "Dark mode" in the header, and the page keeps the other scheme on that browser; a second click returns to the system preference. A reader who does nothing with a dark system appearance sees the page of today, plus the switch.
 
 ### Technical Impact
 
 * One new classic script and one new module. The section modules do not change, because they use tokens.
 * The page now uses `localStorage` for one key. The spec section "Page technology" changes to permit this one key.
 * The page now has one classic script. The spec section "Page technology" changes to permit this one file.
-* The header grows by one control group at the right, after the range group. At 360 px the range buttons already take a second line (CR-0021), and the control group can wrap to a third line.
+* The header grows by one switch at the right, after the range group. At 360 px the range buttons already take a second line (CR-0021), and the switch comes after them, on their line or on the next line.
 * The render script gets two flags and three outputs.
 
 ### Business Impact
@@ -289,7 +311,7 @@ The page is readable in more places and follows the system of the reader. The co
 3. Add the light token values and the contrast node test. Adjust the values until the test passes.
 4. Add the resolve rule and its node test.
 5. Add the boot script to the head, and the static test of its place.
-6. Add the control group to the header and its module.
+6. Add the switch to the header and its module.
 7. Check the private page, and keep it dark.
 8. Add `--scheme`, `--stored`, and the new outputs to the render script.
 9. Run the render and the size scripts in both schemes, and run the scenario.
@@ -324,11 +346,11 @@ flowchart LR
 | `web/test/tokens.contrast.test.js` | `no_color_literal_outside_tokens` | Searches the CSS and JS files of `web/assets/` outside `tokens.css` for hex, `rgb(`, and `hsl(` color values | the files | no match |
 | `web/test/scheme.resolve.test.js` | `resolve_table` | Calls the resolve rule with each row of the table of AC-2 | stored value, system preference | the scheme of the table |
 | `web/test/scheme.resolve.test.js` | `storage_error_falls_back` | Calls the boot logic with a fake storage that throws | throwing storage, preference light | `light`, no error |
-| `web/test/scheme.control.test.js` | `select_writes_and_removes_key` | Drives the control module with a fake document and a fake storage | select Light, then System | the key is `light`, then the key is absent; the pressed button follows |
-| `web/test/scheme.control.test.js` | `system_follows_preference_change` | Fires a change event of a fake `matchMedia` in the state System, then in the state Dark | preference dark to light | the scheme changes in System, and does not change in Dark |
+| `web/test/scheme.control.test.js` | `click_stores_the_override_and_a_system_value_removes_it` | Drives the switch module with a fake document and a fake storage | an invalid stored value with the system preference dark, then two clicks | the key is `light`, then the key is absent because dark is the system preference; `aria-checked` follows the scheme; the URL fragment does not change |
+| `web/test/scheme.control.test.js` | `system_is_followed_only_without_an_override` | Fires a change event of a fake `matchMedia` with no key, then after a click that stores `dark` | preference dark to light | the scheme changes with no key, and does not change with the key `dark` |
 | `web/test/scheme.control.test.js` | `only_scheme_key_used` | Records each storage call during the tests | the calls | only the one scheme key |
 | `tests/web.serve.rs` | `index_has_scheme_boot_before_styles` | Gets `/` and checks the head | the served page | a same-origin classic script with no `async`, `defer`, or `type="module"` before the first stylesheet link |
-| `tests/web.serve.rs` | `private_page_has_no_scheme_control` | Gets the private page and checks for the control and the boot script | the served private page | neither is present |
+| `tests/web.serve.rs` | `private_page_has_no_scheme_control` | Gets the private page and checks for the switch and the boot script | the served private page | neither is present |
 
 ### Tests to Modify
 
@@ -348,18 +370,18 @@ The change has a user surface: the dashboard page. A model drives it with the br
 1. Seed 400 days with `.agents/scripts/days.seed.sh` on a scratch data directory, as `web.render.sh` does.
 2. Start `loupe serve` on that data directory.
 3. Set the emulated system preference to light. Clear the scheme key.
-4. Open the page at 1440 px on the range 6M. Check that the first frame and the loaded page are light, and that the button "System" is pressed.
+4. Open the page at 1440 px on the range 6M. Check that the first frame and the loaded page are light, and that the switch "Dark mode" has `aria-checked="false"`.
 5. Check each section: the headline, the live section, the totals row, the pull request card, the tokens-per-day card, the token share bar, the cost cards, the heatmap and its legend, the daily log, and the footer. Read `min_text_contrast` and `min_graphic_contrast`.
 6. Take the screenshot `dashboard.light-mode.light.1440.png`.
-7. Select "Dark". Check that the page is dark at once, that no new request to `/v1/days` goes out, and that the live socket stays open.
+7. Click the switch. Check that the page is dark at once, that the switch has `aria-checked="true"`, that the scheme key holds `dark`, that no new request to `/v1/days` goes out, and that the live socket stays open.
 8. Take the screenshot `dashboard.light-mode.dark.1440.png`.
-9. Reload. Check that the first frame is dark and that the button "Dark" is pressed.
-10. Select "System". Check that the page is light and that the scheme key is absent.
-11. Set the scheme key to an invalid value and reload. Check that the page follows the system preference and that "System" is pressed.
+9. Reload. Check that the first frame is dark and that the switch has `aria-checked="true"`.
+10. Click the switch. Check that the page is light and that the scheme key is absent, because light is the system preference.
+11. Set the scheme key to an invalid value and reload. Check that the page follows the system preference and that the switch has `aria-checked="false"`.
 12. Set the emulated system preference to dark with no key. Check that the page changes to dark with no reload.
-13. Repeat steps 3 to 12 at 360 px. Check that the header control is visible, that the headline is above the fold, and that the page has no horizontal scroll. Take the screenshots `dashboard.light-mode.light.360.png` and `dashboard.light-mode.dark.360.png`.
+13. Repeat steps 3 to 12 at 360 px. Check that the header switch is visible, that the headline is above the fold, and that the page has no horizontal scroll. Take the screenshots `dashboard.light-mode.light.360.png` and `dashboard.light-mode.dark.360.png`.
 14. In each scheme, show the states: the empty state (seed 0 days), the error state (stop the server, then reload), "GitHub not connected" (seed with `--github none`), and the live paused state (close the socket). Check the contrast of each state.
-15. Open the private reports page with the preference light. Check that it is dark and has no control.
+15. Open the private reports page with the preference light. Check that it is dark and has no switch.
 16. Stop the server and the browser.
 
 Success condition: each check passes at both widths and in both schemes, in at least 2 of 2 runs. The four screenshots are in `.agents/scenarios/`.
@@ -549,7 +571,7 @@ Then the switch is visible after the range group
 
 **Likelihood:** medium
 **Impact:** medium
-**Mitigation:** Non-functional requirement 4 and the render output `headline_above_fold_360`. At 360 px the range buttons already take a second header line (CR-0021). The control can wrap to a third line below them, and the button text stays short.
+**Mitigation:** Non-functional requirement 4 and the render output `headline_above_fold_360`. At 360 px the range buttons already take a second header line (CR-0021). The switch comes after them, on their line or on the next line, and it has no visible text.
 
 ### Risk 2: A chart color passes 3 to 1 but loses its hue identity
 
@@ -594,18 +616,18 @@ None. The owner asked for a light mode. The layout details are judgement calls.
 
 1. Control form: one toggle switch, a button with the role `switch`, `aria-checked="true"` when the scheme is dark, and the accessible name "Dark mode". A click sets the other scheme. When the new scheme equals the system preference, the click removes the stored key, so the page follows the system again; else the key holds the scheme. Reason: the owner chose a switch on 2026-10-23, after the implementation. The rule keeps the way back to the system preference with no third state.
 2. Control place: in the header, directly after the range group, so the range group and the switch sit together at the right of the one product row, and the brand stays at the left. In the same row at 1440 px. At 360 px the switch comes after the range buttons, on their line or on the next line. The switch has the accessible name "Dark mode".
-3. Button text: words, not icons. Reason: no icon file and no icon font, and the text is clear without a tooltip.
+3. Switch label: the accessible name "Dark mode", with no visible text. The track is 44 by 24 px with a knob, inside the 48 px header row. Reason: the supervisor replaced the earlier call "words, not icons" and its 44 px minimum height on 2026-10-23 (see Notes); the switch form makes the checked state visible, and the 24 px track fits the header row.
 4. Token names: the light scheme uses the same token names as the dark scheme. The spec table "Design tokens" gets a second value column for the light values. No new color token name.
-5. Storage: one `localStorage` key, `dashboard.scheme`, with the value `light` or `dark`. The state System removes the key. The key does not depend on the site title, which an operator can change with `LOUPE_SITE_TITLE`, so a change of the title keeps the stored choice.
+5. Storage: one `localStorage` key, `dashboard.scheme`, with the value `light` or `dark`. A click that sets the scheme of the system preference removes the key. The key does not depend on the site title, which an operator can change with `LOUPE_SITE_TITLE`, so a change of the title keeps the stored choice.
 6. Invalid or blocked storage: an unknown value is ignored, and a storage error falls back to the system preference with no message.
 7. No preference: when the browser reports no preference or has no `matchMedia`, the page is dark, the scheme of today.
 8. Light palette: the implementer chooses the values with the contrast test. Each series keeps the hue family of its dark value: blue for input, amber for output, green for positive, violet for cache read, and teal for cache write. The heatmap is a green ramp that gets darker from level 1 to level 4. `--color-surface` is lighter than `--color-bg`, so the cards stand out as in the dark scheme.
 9. Exempt colors: `--heat-0`, `--color-border`, and `--color-rule` are not chart colors for the 3 to 1 threshold. `--heat-0` shows a day with no value, and the borders and rules only separate areas. Each cell has a `title` with the value.
 10. Text use of chart colors: `--color-positive` and `--color-output` get the text threshold 4.5 to 1, because the pull request footer line uses them as text.
 11. Paused state: the kept figures get the large text threshold of 3 to 1 in both schemes, and the paused message gets 4.5 to 1. The muted style can change to meet this.
-12. Follow of the system: in the state System, the page follows a change of the system preference with no reload. In the states Light and Dark, it does not.
+12. Follow of the system: while no key is stored, the page follows a change of the system preference with no reload. While the key holds `light` or `dark`, it does not.
 13. No flash mechanism: a same-origin classic script in the head, before the stylesheet links, sets the scheme on the root element. The policy does not change.
-14. Private page: it stays dark and shows no control. The light scheme of the private page is out of scope.
+14. Private page: it stays dark and shows no switch. The light scheme of the private page is out of scope.
 15. URL fragment: the scheme does not go in the fragment, so a shared link uses the scheme of the reader.
 16. Scheme switch: no redraw and no new request. The charts follow the tokens through `var()`.
 17. Code budget: the added page code is at most 6.0 KiB of `page_kib`, the page files without the fonts, the private page, and the node tests. `code_kib`, which also counts the node tests, stays inside its budget of 100 KiB.
@@ -663,3 +685,18 @@ Two decisions of the owner and of the supervisor, taken after the implementation
    * The target "Code size" does not change: `code_kib` at most 100 KiB. It was 75.3 KiB at `e88f5bd`, passed.
 3. This note does not change the other text of the CR that names the three buttons or the state System: the description, Proposed Change items 4 to 6, the diagrams, functional requirements 7, 12, 15, and 16, the alternative "A two-state toggle", and judgement calls 3 and 12. Functional requirement 10 and the spec section "Color scheme" give the rule of the switch.
 4. Verification, 2026-10-23: `node --test web/test/*.test.js` passed 43 of 43 tests, `cargo nextest run --test web_serve` passed 15 of 15, and `.agents/scripts/pipeline.verdict.sh` exited 0 in 972.9 seconds (format, lint, test, web, and image `status: passed`). The scenario `.agents/scenarios/dashboard.light-mode.md` passed 35 of 35 checks in 2 of 2 runs with the switch. The measured values of every target are in `docs/specification/operations.md`. The quality checks of the reviewer agent and of the commit title stay open.
+
+### Record notes, 2026-10-23, the scheme switch in every section
+
+The CR is implemented. This edit is a record of the implemented switch, not a change of scope. Item 3 of the review notes above left the text that named the three buttons or the state System; this edit replaces it in every section.
+
+1. Changed to the switch: the description, Proposed Change items 4 to 6, the Proposed State diagram, the state diagram (now "Switch States", with the new "Click Rule" flow), the Load Sequence, functional requirements 7, 12 to 16, and 31, the Measurable Targets row "Draw time, each scheme", Affected Components, In Scope, Alternative Approaches Considered, User Impact, Technical Impact, Implementation Approach step 6, the Tests to Add rows of `scheme.control.test.js` (now with the names of the implemented tests) and `private_page_has_no_scheme_control`, Model-Based Testing steps 4, 7, 9 to 11, 13, and 15, Risk 1, and judgement calls 3, 5, 12, and 14.
+2. Functional requirements 12 and 10: requirement 12 said that a selection of System removes the key, and requirement 10 said that a click removes the key when the new scheme equals the system preference. Resolved in favour of the switch rule: requirement 12 now names only the key and its values, and requirement 10 alone decides when a click writes or removes the key.
+3. The alternative "A two-state toggle" is now the chosen form. The three buttons System, Light, and Dark are the rejected alternative, because the owner asked for a switch on 2026-10-23.
+
+Decisions of the supervisor, 2026-10-23:
+
+1. Judgement call 3 (words, not icons) is replaced by the accessible name "Dark mode" with no visible text. The 44 px minimum height of the control becomes a track of 24 px height (44 by 24 px) inside the 48 px header row.
+2. Draw time baseline: 58.2 ms, dark only, measured after the implementation in a worktree at `446f065`. Accepted, because no baseline was recorded at the start of the implementation (Implementation Approach step 1).
+3. The `.taxonomy` row "scheme override" was updated together with the row "scheme control" to describe the switch and its click rule (`3c6122c`). Accepted.
+4. The first test run of the verdict of the light mode verification took 798.6 seconds under the macOS scan of freshly linked test binaries. It is recorded in `docs/specification/operations.md` under the target of the scan ("Test stage, first run after a Rust edit"), not under this CR.
