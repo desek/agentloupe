@@ -28,7 +28,7 @@ and `checkpoint`. The commit types decide the version bump and the release notes
 The work of a change request is a series of `checkpoint(<id>)` commits. One implemented commit
 carries the change request into the release notes: a `feat`, `fix`, or `feat!` commit whose summary
 is the title of the change request with its id in parentheses, for example
-`feat(release): Release governance (CR-0022)`.
+`feat(release): Release governance (<id>)`, where `<id>` is the id of the change request.
 [`docs/specification/release.md`](docs/specification/release.md), section "Commit rule for a change
 request", states the full rule.
 

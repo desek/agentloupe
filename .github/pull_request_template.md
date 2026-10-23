@@ -4,7 +4,7 @@
 
 ## Linked change request or issue
 
-<!-- For example: docs/cr/CR-0000-title.md, or Closes #123. -->
+<!-- For example: the change request file under docs/cr/, or Closes #123. -->
 
 ## Checklist
 
