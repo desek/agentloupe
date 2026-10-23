@@ -107,28 +107,28 @@ Each range ends on the `to` value of the response. Both ends are in the range. T
 
 The page has two color schemes, dark and light. The two schemes use the same design token names with different values (section "Design tokens").
 
-1. The scheme override is the choice of the reader in the scheme control: Light or Dark. The browser keeps it in `localStorage` under the key `dashboard.scheme`, with the value `light` or `dark`. When no override is stored, the control is in the state System.
-2. The page selects the scheme by this rule:
+1. The scheme override is the scheme that the reader sets with the scheme control, light or dark, when it is not the scheme of the system preference. The browser keeps it in `localStorage` under the key `dashboard.scheme`, with the value `light` or `dark`. When no override is stored, the page follows the system preference.
+2. The page selects the scheme by this rule. The column "Switch" gives the value of `aria-checked` of the scheme control.
 
-   | Stored value | System preference | Scheme | Pressed button |
+   | Stored value | System preference | Scheme | Switch |
    |---|---|---|---|
-   | none | light | light | System |
-   | none | dark | dark | System |
-   | none | no preference, or no `matchMedia` | dark | System |
-   | `light` | any | light | Light |
-   | `dark` | any | dark | Dark |
-   | a different value | light | light | System |
-   | a storage error | light | light | System |
+   | none | light | light | false |
+   | none | dark | dark | true |
+   | none | no preference, or no `matchMedia` | dark | true |
+   | `light` | any | light | false |
+   | `dark` | any | dark | true |
+   | a different value | light | light | false |
+   | a storage error | light | light | false |
 
    The page ignores a stored value that is not `light` or `dark`, and uses the system preference. When the browser blocks `localStorage` or an access throws an error, the page uses the system preference and shows no error. The reader can then still change the scheme for the current page view.
 3. The system preference is the value of the media feature `prefers-color-scheme`.
 4. The resolved scheme is on the root element before the first paint. The first frame of the page shows the page background of the resolved scheme. The scheme script sets it (section "Page technology", items 1 and 5).
 5. The CSS property `color-scheme` of the root element is `light` or `dark`, the same as the resolved scheme. Thus the scrollbars and the native controls follow the scheme.
-6. A selection of Light or Dark in the scheme control writes `light` or `dark` to the key. A selection of System removes the key.
-7. A selection changes the scheme of the full page at once. It does not reload the page, does not send a new request to `/v1/days`, and does not close the live socket. The charts follow the tokens, so the page draws nothing again.
-8. A selection does not change the URL fragment. The scheme is not in the fragment, so a shared link uses the scheme of the reader.
-9. In the state System, the page follows a change of the system preference while it is open, with no reload. In the states Light and Dark, a change of the system preference does not change the page.
-10. After a reload, the page shows the scheme and the pressed button of the stored value.
+6. A click on the scheme control sets the other scheme: dark when the page is light, and light when the page is dark. When the new scheme is the scheme of the system preference, the click removes the key, and the page follows the system preference again. When the new scheme is not the scheme of the system preference, the click writes the new scheme, `light` or `dark`, to the key. With no preference, or with no `matchMedia`, the scheme of the system preference is dark.
+7. A click changes the scheme of the full page at once. It does not reload the page, does not send a new request to `/v1/days`, and does not close the live socket. The charts follow the tokens, so the page draws nothing again.
+8. A click does not change the URL fragment. The scheme is not in the fragment, so a shared link uses the scheme of the reader.
+9. When no override is stored, the page follows a change of the system preference while it is open, with no reload. When an override is stored, a change of the system preference does not change the page.
+10. After a reload, the page shows the scheme and the switch state of the stored value.
 11. The scheme applies only to the dashboard. The private page stays dark (`private-reports.md`).
 
 ## Missing days and fields
@@ -173,14 +173,14 @@ The live section is directly below the headline. `live.md` gives the live route.
 
 ### Header
 
-1. The header is one row. The brand is on the left. The range group and the scheme control sit together on the right, with the scheme control directly after the range group. At 1440 px the brand, the range group, and the scheme control are in the same row. When the row does not fit the width, the range buttons go to a second line, and the scheme control can go to a third line, below the range buttons.
+1. The header is one row. The brand is on the left. The range group and the scheme control sit together on the right, with the scheme control directly after the range group. At 1440 px the brand, the range group, and the scheme control are in the same row. When the row does not fit the width, the range buttons go to a second line, and the scheme control comes after them, on the same line or on the next line.
 2. The brand is the mark and the wordmark. The mark is inline SVG of 44 by 44 px: a loupe ring and handle in the text color, and three bars in `--color-input` inside the lens. Assistive technology does not read the mark.
 3. The wordmark is the site title in the `h1` of the page, at 20 px.
 4. The range selector has the buttons `1M`, `3M`, `6M`, and `1Y`. The selected button has `aria-pressed="true"`. The keyboard can reach and use each button.
 5. The header does not show the time of the last update. The last row of the daily log shows the latest published day.
-6. The scheme control is one group with the accessible name "Color scheme" and three buttons with the text "System", "Light", and "Dark". The buttons have the pill style of the range buttons, and they show text, not icons.
-7. The button of the current state has `aria-pressed="true"`. The other two buttons have `aria-pressed="false"`. In the state System, the button "System" is pressed, not the button of the resolved scheme.
-8. The keyboard can reach each button of the scheme control and select it with Enter and with Space. Each button is at least 44 px high, as the range buttons are.
+6. The scheme control is one switch: a button with the role `switch` and the accessible name "Dark mode". It shows a track of 44 by 24 px with a round knob, and no text. When the switch is off, the track has the color `--color-text-faint` and the knob is at the left. When the switch is on, the track has the color `--color-text` and the knob is at the right. The knob has the color `--color-bg`. When the reader prefers reduced motion, the knob moves with no transition.
+7. The switch has `aria-checked="true"` when the page is dark, and `aria-checked="false"` when the page is light. It shows the resolved scheme, also when the page follows the system preference. The rule of a click is item 6 of the section "Color scheme".
+8. The keyboard reaches the switch with Tab, and Space or Enter sets the other scheme, as a click does. The switch has the focus outline of the range buttons.
 9. With the scheme control in the header, the headline stays visible with no scroll at 360 px and at 1440 px, and the page has no horizontal scroll at 360 px, in each scheme.
 
 ### Totals row
@@ -357,7 +357,7 @@ The tokens below are the same in both schemes.
 | `--radius-bar` | `3px` | top corners of a bar |
 | `--max-width` | `1200px` | width of the content column |
 | `--radius-cell` | `2px` | heatmap cell and legend swatch |
-| `--radius-pill` | `999px` | range buttons, scheme control buttons |
+| `--radius-pill` | `999px` | range buttons, track of the scheme control |
 
 The page contains no file of the mockup support script and no file of the mockup vendor directory.
 
