@@ -1,25 +1,27 @@
-// @agents-index The header scheme control: System, Light, Dark; keeps the override in the one key and follows the system in the state System.
+// @agents-index The header scheme switch: checked is dark; a choice that equals the system preference removes the stored key, so the page follows the system again.
 
 import { KEY, resolve } from './scheme.resolve.js';
 
-/** Wires the buttons of #schemes; a blocked storage keeps the choice for this page view only. */
+/** Wires the switch #scheme-switch; a blocked storage keeps the choice for this page view only. */
 export function mount(doc, win) {
   const store = (f) => { try { return f(win.localStorage); } catch { return null; } };
   let mq = null;
   try { mq = win.matchMedia('(prefers-color-scheme: light)'); } catch { /* no matchMedia: dark */ }
-  let state = resolve(store((s) => s.getItem(KEY))).state;
-  const buttons = doc.querySelectorAll('#schemes button');
+  const system = () => (mq?.matches ? 'light' : 'dark');
+  let stored = resolve(store((s) => s.getItem(KEY))).state;
+  const sw = doc.getElementById('scheme-switch');
   const apply = () => {
-    doc.documentElement.dataset.scheme = resolve(state, mq?.matches ? 'light' : null).scheme;
-    for (const b of buttons) b.setAttribute('aria-pressed', String(b.dataset.choice === state));
+    const scheme = resolve(stored, system()).scheme;
+    doc.documentElement.dataset.scheme = scheme;
+    sw.setAttribute('aria-checked', String(scheme === 'dark'));
   };
-  for (const b of buttons) {
-    b.addEventListener('click', () => {
-      state = b.dataset.choice;
-      store((s) => (state === 'system' ? s.removeItem(KEY) : s.setItem(KEY, state)));
-      apply();
-    });
-  }
+  sw.addEventListener('click', () => {
+    const next = resolve(stored, system()).scheme === 'dark' ? 'light' : 'dark';
+    // The same value as the system preference means no override: the key goes, and the system rules again.
+    stored = next === system() ? 'system' : next;
+    store((s) => (stored === 'system' ? s.removeItem(KEY) : s.setItem(KEY, stored)));
+    apply();
+  });
   mq?.addEventListener('change', apply);
   apply();
 }

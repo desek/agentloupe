@@ -9,10 +9,16 @@ a:hover { color: var(--color-link-hover); }
 .brand { display: flex; align-items: center; gap: 10px; min-width: 0; margin-right: auto; }
 .logo { width: 44px; height: 44px; flex: none; display: block; }
 .wordmark { margin: 0; font-size: 20px; line-height: 1; font-weight: 600; letter-spacing: -0.02em; }
-.ranges, .schemes { display: flex; gap: 6px; }
+.ranges { display: flex; gap: 6px; }
+/* The scheme switch: checked is dark. The track uses the faint text color off and the text color on, so the knob keeps 3 to 1 in both schemes. */
+.switch { position: relative; width: 44px; height: 24px; padding: 0; border: none; border-radius: var(--radius-pill); background: var(--color-text-faint); cursor: pointer; flex: none; }
+.switch[aria-checked="true"] { background: var(--color-text); }
+.switch-knob { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--color-bg); transition: transform 0.15s; }
+.switch[aria-checked="true"] .switch-knob { transform: translateX(20px); }
+@media (prefers-reduced-motion: reduce) { .switch-knob { transition: none; } }
 .pill { font-family: var(--font-mono); font-size: var(--size-text); font-weight: 500; padding: 0 16px; min-height: 44px; border-radius: var(--radius-pill); cursor: pointer; background: transparent; color: var(--color-text-body); border: 1px solid var(--color-border); }
 .pill[aria-pressed="true"] { background: var(--color-text); color: var(--color-ink-inverse); border-color: var(--color-text); }
-.pill:focus-visible, .button:focus-visible { outline: 2px solid var(--color-link); outline-offset: 2px; }
+.pill:focus-visible, .button:focus-visible, .switch:focus-visible { outline: 2px solid var(--color-link); outline-offset: 2px; }
 .headline { display: flex; flex-direction: column; gap: 8px; }
 .eyebrow { font-family: var(--font-mono); font-size: var(--size-label); color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .headline-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 24px; }

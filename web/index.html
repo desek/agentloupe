@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- @agents-index The dashboard page shell: head, the product header with the wordmark, the range buttons, and the scheme control, the main area, and the footer. -->
+<!-- @agents-index The dashboard page shell: head, the product header with the wordmark, the range buttons, and the scheme switch, the main area, and the footer. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -31,11 +31,7 @@
 <button type="button" class="pill" data-range="6M" aria-pressed="false">6M</button>
 <button type="button" class="pill" data-range="1Y" aria-pressed="false">1Y</button>
 </div>
-<div class="schemes" role="group" aria-label="Color scheme" id="schemes">
-<button type="button" class="pill" data-choice="system">System</button>
-<button type="button" class="pill" data-choice="light">Light</button>
-<button type="button" class="pill" data-choice="dark">Dark</button>
-</div>
+<button type="button" class="switch" id="scheme-switch" role="switch" aria-checked="false" aria-label="Dark mode"><span class="switch-knob"></span></button>
 </header>
 <main id="main" aria-live="polite"></main>
 <template id="price-note"><p class="footnote">* <a href="https://github.com/BerriAI/litellm" rel="noopener noreferrer">LiteLLM</a> list prices at <code>{{price_commit}}</code>, not money paid.</p></template>

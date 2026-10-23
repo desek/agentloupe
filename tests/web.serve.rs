@@ -265,7 +265,9 @@ async fn index_has_scheme_boot_before_styles() {
         script < style,
         "the scheme script comes before the first stylesheet link"
     );
-    assert!(body.contains(r#"role="group" aria-label="Color scheme" id="schemes""#));
+    assert!(body.contains(
+        r#"id="scheme-switch" role="switch" aria-checked="false" aria-label="Dark mode""#
+    ));
     let res = reqwest::get(l.url("/assets/js/scheme.boot.js"))
         .await
         .unwrap();
@@ -291,6 +293,6 @@ async fn private_page_has_no_scheme_control() {
     let body = res.text().await.unwrap();
     assert!(body.contains("/assets/css/tokens.css"), "{body}");
     assert!(!body.contains("scheme.boot.js"), "{body}");
-    assert!(!body.contains("Color scheme"), "{body}");
+    assert!(!body.contains("scheme-switch"), "{body}");
     assert!(!body.contains("data-scheme"), "{body}");
 }
