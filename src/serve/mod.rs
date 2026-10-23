@@ -1,4 +1,4 @@
-//! @agents-index Runs the HTTP server: migrates the store, bootstrap token, starts capture, parser, summary, ping, publisher, retention workers, binds, serves.
+//! @agents-index Runs the HTTP server: migrates the store, bootstrap token, starts capture, parser, summary, ping, publisher, retention workers, binds, serves, then the start telemetry.
 
 mod health;
 pub mod router;
@@ -155,6 +155,8 @@ pub fn run(cfg: &Config, upstreams: Upstreams) -> Result<(), Box<dyn Error>> {
         let listener = tokio::net::TcpListener::bind(cfg.listen).await?;
         // The bound address, not the configured one: a configured port 0 gets a free port from the kernel.
         tracing::info!(listen = %listener.local_addr()?, "listening");
+        // After the line listening: the state line, and in the state sent one GET in its own task.
+        crate::telemetry::start();
         shutdown::serve_until_signal(listener, router::router(state, api, site, private, live))
             .await
     })?;

@@ -2,7 +2,7 @@
 name: "CR-0026 Start telemetry"
 description: "A release build of loupe sends one HTTP GET of https://<host>/<commit-sha> at the start of loupe serve, with the version and the target triple in the User-Agent header and no body. The host is fixed at build time from LOUPE_TELEMETRY_HOST; a build without it holds no host and sends nothing, and DO_NOT_TRACK=1 stops the request at run time. The receiver is a Cloudflare Worker in telemetry/ with a D1 store that keeps per commit a first date, a last date, and a count, deployed by telemetry.deploy.sh on a workers.dev subdomain."
 id: "CR-0026"
-status: "approved"
+status: "implemented"
 date: 2026-10-23
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, release manager, owner of the Cloudflare account), reviewer agent (approver), users of the release assets and the image (readers of the privacy statement)
@@ -838,3 +838,12 @@ A reviewer agent, separate from the author, reviewed the amended CR for blocking
 3. **Requirement without an acceptance criterion, the deploy boundaries.** Requirement 51 (no stored credential, no write of the repository variable, the printed host and command) had no criterion. Edit: AC-20 checks these three points.
 
 No blocking finding stays open. The status stays `approved`.
+
+### Implementation notes, 2026-10-23
+
+1. The endpoint is deployed: the Worker `agentloupe-telemetry` on `agentloupe-telemetry.daniel-95c.workers.dev` and the D1 database `agentloupe-telemetry` (ID in `telemetry/wrangler.toml`). The repository variable `LOUPE_TELEMETRY_HOST` holds the host; the repository still has 1 secret.
+2. The measured values are in `docs/specification/operations.md` (Start telemetry targets) and the runs in `.agents/scenarios/telemetry.start.md`.
+3. `build.rs` watches only the git files that exist; a watch of an absent `packed-refs` made cargo run the build script at each build.
+4. `.agents/scripts/pipeline.test.sh` hid a failed test: its run function sat in an `if`, where `set -e` does not apply, so the stage passed with a failed test. The function now returns on failure and the stage prints the output of each failed test. Two tests that this hid on the Linux runners now pass: the mode helper of `tests/scripts/agent.connect.test.sh` tries GNU `stat` first, and `every_stage_prints_its_toolchain` checks that the image toolchain fails when a base image is absent.
+5. `.agents/scripts/telemetry.probe.py` is the fake endpoint and the start delay measurement of the scenario.
+6. `SECURITY.md` does not change (judgement call 7).

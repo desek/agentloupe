@@ -187,6 +187,10 @@ const NOT_READ: &[(&str, &str)] = &[
         "pipeline.fingerprint.rs",
         "docs/specification/operations.md",
     ),
+    // The name of the config show line and of the start log line, not the directory telemetry/.
+    ("telemetry.built_out.rs", "telemetry"),
+    ("telemetry.send.rs", "telemetry"),
+    ("private_config.rs", "telemetry"),
 ];
 
 #[test]
@@ -226,14 +230,36 @@ fn tests_read_only_declared_inputs() {
 
 #[test]
 fn every_stage_prints_its_toolchain() {
-    for stage in STAGES {
+    for stage in STAGES.iter().filter(|s| **s != "image") {
         let out = lines(stage, "--toolchain");
         assert!(!out.is_empty(), "{stage}");
     }
-    let image = lines("image", "--toolchain");
     let docker = std::fs::read_to_string(root().join("Dockerfile")).unwrap();
-    for from in docker.lines().filter_map(|l| l.strip_prefix("FROM ")) {
-        let img = from.split_whitespace().next().unwrap();
+    let bases: Vec<&str> = docker
+        .lines()
+        .filter_map(|l| l.strip_prefix("FROM "))
+        .map(|f| f.split_whitespace().next().unwrap())
+        .collect();
+    // The image toolchain reads the local base images and pulls nothing. On a host that lacks one,
+    // for example a runner of the test job, it must fail, so the verdict runs the image stage in full.
+    let present = |img: &str| {
+        Command::new("docker")
+            .args(["image", "inspect", img])
+            .output()
+            .is_ok_and(|o| o.status.success())
+    };
+    if !bases.iter().all(|b| present(b)) {
+        let out = Command::new("bash")
+            .arg(root().join(".agents/scripts/pipeline.image.sh"))
+            .arg("--toolchain")
+            .current_dir(root())
+            .output()
+            .unwrap();
+        assert_ne!(out.status.code(), Some(0), "an absent base image must fail");
+        return;
+    }
+    let image = lines("image", "--toolchain");
+    for img in bases {
         assert!(
             image
                 .iter()

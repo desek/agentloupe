@@ -14,7 +14,9 @@
 # loupe --version of the host archive and of each Linux archive in a debian:bookworm-slim container of its
 # platform, pulls ghcr.io/desek/agentloupe:<version> with no login (and compares latest when the version is
 # the newest release), then starts the image with two keys from its own loupe gen-key on 127.0.0.1 and a free
-# port, polls GET /healthz for at most 30 seconds, and reads the version in the first log line. It checks
+# port, polls GET /healthz for at most 30 seconds, reads the version in the first log line, and checks that
+# the line telemetry has the state disabled or built-out. Each binary and each container starts with the
+# run-time opt-out of the start request set, so a check never counts as a start of a user. It checks
 # THIRD-PARTY-NOTICES in each archive and in the image: present, not empty, with the LiteLLM part and the
 # Geist part, and with one SHA-256 digest over all four copies. It runs with
 # the bash 3.2 of macOS, the default tools of macOS, curl, and Docker; it needs no jq and no gh. It never
@@ -24,11 +26,13 @@
 #   check: <name> status: passed|failed|skipped [detail: ...]
 #   result: passed|failed exit: <code>
 # Checks: download, checksum <asset>, version <target>, notices <target>, pull, latest, health,
-#   start-version, notices image.
+#   start-version, telemetry, notices image.
 # Exit codes: 0 every check passed or is skipped with a stated reason, 1 a check failed, 2 bad usage,
 #   3 a required tool is missing, 4 a download or a pull failed.
 # Reference: docs/specification/release.md, section Verify a release.
 set -euo pipefail
+# The run-time opt-out of the start request, for the host binary; each docker run passes it too.
+export DO_NOT_TRACK=1
 
 REPO="desek/agentloupe"
 IMAGE="ghcr.io/desek/agentloupe"
@@ -174,7 +178,7 @@ for t in x86_64-unknown-linux-gnu aarch64-unknown-linux-gnu; do
   if [ $docker_ok -eq 0 ]; then report "version $t" skipped "Docker is absent or not running"; continue; fi
   if [ "${verified#* $t }" = "$verified" ]; then report "version $t" skipped "its checksum failed, so it does not run"; continue; fi
   [ -d "$tmp/x/$t" ] || unpack "$t"
-  out="$(docker run --rm --platform "$platform" -v "$tmp/x/$t:/x:ro" "$BASE_IMAGE" "/x/loupe-$tag-$t/loupe" --version 2>&1 | tail -n 1 || true)"
+  out="$(docker run --rm --platform "$platform" -e DO_NOT_TRACK=1 -v "$tmp/x/$t:/x:ro" "$BASE_IMAGE" "/x/loupe-$tag-$t/loupe" --version 2>&1 | tail -n 1 || true)"
   if [ "$out" = "loupe $version" ]; then report "version $t" passed "$out on $platform"; else report "version $t" failed "printed '$out' on $platform, expected 'loupe $version'"; fi
 done
 
@@ -203,6 +207,7 @@ if [ $docker_ok -eq 0 ]; then
   report latest skipped "Docker is absent or not running"
   report health skipped "Docker is absent or not running"
   report start-version skipped "Docker is absent or not running"
+  report telemetry skipped "Docker is absent or not running"
   report "notices image" skipped "Docker is absent or not running"
   finish "$failed"
 fi
@@ -230,18 +235,20 @@ else
 fi
 
 # 6. Start the image with two fresh keys of its own gen-key; the keys pass by name, never on a command line.
-LOUPE_DATA_KEY="$(docker run --rm "$IMAGE:$version" gen-key 2>/dev/null | tr -d '\r\n')"
-LOUPE_ACCOUNT_KEY="$(docker run --rm "$IMAGE:$version" gen-key 2>/dev/null | tr -d '\r\n')"
+LOUPE_DATA_KEY="$(docker run --rm -e DO_NOT_TRACK=1 "$IMAGE:$version" gen-key 2>/dev/null | tr -d '\r\n')"
+LOUPE_ACCOUNT_KEY="$(docker run --rm -e DO_NOT_TRACK=1 "$IMAGE:$version" gen-key 2>/dev/null | tr -d '\r\n')"
 export LOUPE_DATA_KEY LOUPE_ACCOUNT_KEY
 if [ -z "$LOUPE_DATA_KEY" ] || [ -z "$LOUPE_ACCOUNT_KEY" ]; then
   report health failed "loupe gen-key of the image printed no key"
   report start-version skipped "the image did not start"
+  report telemetry skipped "the image did not start"
   finish 1
 fi
 container="loupe-release-check-$$"
-if ! docker run -d --name "$container" -p 127.0.0.1::8787 -e LOUPE_DATA_KEY -e LOUPE_ACCOUNT_KEY "$IMAGE:$version" >/dev/null 2>"$tmp/run.err"; then
+if ! docker run -d --name "$container" -p 127.0.0.1::8787 -e DO_NOT_TRACK=1 -e LOUPE_DATA_KEY -e LOUPE_ACCOUNT_KEY "$IMAGE:$version" >/dev/null 2>"$tmp/run.err"; then
   report health failed "docker run failed: $(tr '\n' ' ' <"$tmp/run.err")"
   report start-version skipped "the image did not start"
+  report telemetry skipped "the image did not start"
   finish 1
 fi
 unset LOUPE_DATA_KEY LOUPE_ACCOUNT_KEY
@@ -264,9 +271,15 @@ if echo "$first" | grep -q "\"version\":\"$version\""; then
 else
   report start-version failed "the first log line holds no version $version"
 fi
+tline="$(docker logs "$container" 2>&1 | grep '"message":"telemetry"' | head -n 1 || true)"
+if echo "$tline" | grep -qE '"state":"(disabled|built-out)"'; then
+  report telemetry passed "the line telemetry has the state $(echo "$tline" | sed -n 's/.*"state":"\([a-z-]*\)".*/\1/p')"
+else
+  report telemetry failed "no line telemetry with the state disabled or built-out"
+fi
 
 # 7. The notices of the image: the same file as in the archives.
-if docker run --rm --entrypoint cat "$IMAGE:$version" "/app/$NOTICES" >"$tmp/image.notices" 2>"$tmp/notices.err"; then
+if docker run --rm -e DO_NOT_TRACK=1 --entrypoint cat "$IMAGE:$version" "/app/$NOTICES" >"$tmp/image.notices" 2>"$tmp/notices.err"; then
   check_notices image "$tmp/image.notices"
 else
   report "notices image" failed "cat /app/$NOTICES in the image failed: $(tr '\n' ' ' <"$tmp/notices.err")"

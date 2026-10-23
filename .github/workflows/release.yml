@@ -76,7 +76,14 @@ jobs:
             ~/.cargo/git
             target
           key: cargo-release-${{ matrix.runner }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
-      - run: .agents/scripts/release.build.sh --tag "$TAG" --out "$RUNNER_TEMP/assets"
+      # The host is a repository variable, not a secret; the commit is the tag commit, not the event commit.
+      - name: Build the release asset
+        env:
+          LOUPE_TELEMETRY_HOST: ${{ vars.LOUPE_TELEMETRY_HOST }}
+        run: |
+          LOUPE_BUILD_COMMIT="$(git rev-parse "refs/tags/$TAG^{commit}")"
+          export LOUPE_BUILD_COMMIT
+          .agents/scripts/release.build.sh --tag "$TAG" --out "$RUNNER_TEMP/assets"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: assets-${{ matrix.runner }}
@@ -112,7 +119,13 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - run: .agents/scripts/release.image.sh build --tag "$TAG" --digest-dir "$RUNNER_TEMP/digests"
+      - name: Build and push the platform image
+        env:
+          LOUPE_TELEMETRY_HOST: ${{ vars.LOUPE_TELEMETRY_HOST }}
+        run: |
+          LOUPE_BUILD_COMMIT="$(git rev-parse "refs/tags/$TAG^{commit}")"
+          export LOUPE_BUILD_COMMIT
+          .agents/scripts/release.image.sh build --tag "$TAG" --digest-dir "$RUNNER_TEMP/digests"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: digests-${{ matrix.runner }}

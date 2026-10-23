@@ -384,3 +384,11 @@ path = "tests/common.poll.rs"
 [[test]]
 name = "cli_version"
 path = "tests/cli.version.rs"
+
+[[test]]
+name = "telemetry_send"
+path = "tests/telemetry.send.rs"
+
+[[test]]
+name = "telemetry_built_out"
+path = "tests/telemetry.built_out.rs"

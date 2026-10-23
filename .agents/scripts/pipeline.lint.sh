@@ -15,6 +15,8 @@
 # Full tool output of both steps goes to .agents/logs/pipeline.lint.log.
 # Exit codes: 0 passed, 1 stage failed, 2 bad usage, 3 required tool missing.
 set -euo pipefail
+# The verdict builds with no telemetry host, so a value in the shell of a developer never changes it.
+unset LOUPE_TELEMETRY_HOST LOUPE_BUILD_COMMIT
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LOG="$ROOT/.agents/logs/pipeline.lint.log"

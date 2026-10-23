@@ -22,8 +22,9 @@ fn shown(e: &Entry) -> String {
     }
 }
 
-/// The derived lines after the variables: the price commit, the size of the price index, and
-/// each subscription with the total. A subscription that is not valid prints as invalid.
+/// The derived lines after the variables: the price commit, the size of the price index, the
+/// telemetry build state, and each subscription with the total. A subscription that is not valid
+/// prints as invalid.
 fn derived(cfg: &Loaded) -> Vec<(String, String, &'static str)> {
     let mut out = vec![
         (
@@ -34,6 +35,12 @@ fn derived(cfg: &Loaded) -> Vec<(String, String, &'static str)> {
         (
             "price_entries".to_string(),
             crate::price::index::Index::embedded().len().to_string(),
+            "build",
+        ),
+        // The build state only; the line reads no run-time variable.
+        (
+            "telemetry".to_string(),
+            crate::telemetry::build_state(),
             "build",
         ),
     ];
@@ -220,6 +227,7 @@ mod tests {
         };
         assert_eq!(value("price_commit"), crate::price::embed::PRICE_COMMIT);
         assert!(value("price_entries").parse::<usize>().unwrap() > 4000);
+        assert_eq!(value("telemetry"), crate::telemetry::build_state());
         assert_eq!(value("subscription_total_per_month"), "0");
         assert_eq!(value("summary_provider"), "anthropic");
         assert_eq!(

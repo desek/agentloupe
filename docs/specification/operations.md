@@ -1,11 +1,11 @@
-<!-- @agents-index How the loupe binary runs: subcommands, logging, storage, health, shutdown, container, and the local pipeline verdict. -->
+<!-- @agents-index How the loupe binary runs: subcommands, logging, storage, health, the provider ping, the start request, shutdown, container, and the local pipeline verdict. -->
 # Operations
 
 ## Subcommands
 
 | Subcommand | Behaviour |
 |---|---|
-| `loupe serve` | Loads the configuration, opens the database, applies the migrations, then listens on `LOUPE_LISTEN`. |
+| `loupe serve` | Loads the configuration, opens the database, applies the migrations, then listens on `LOUPE_LISTEN`. After the listener is bound and the line `listening` is written, it decides the telemetry state, writes the line `telemetry`, and in the state `sent` starts the one start request in its own task. See "Start request". |
 | `loupe gen-key` | Prints one new random 32-byte key in standard base64 with padding, then a newline. The key comes from the random source of the operating system. The subcommand stores nothing. |
 | `loupe config show` | Prints the effective configuration. See `configuration.md`. |
 | `loupe backfill` | Reads the session logs of Claude Code or Pi into the calls and the sessions. See `backfill.md`. |
@@ -19,6 +19,8 @@ Each subcommand has a complete `--help`.
 The binary writes each log event as one line to stderr and to `<LOUPE_DATA_DIR>/logs/loupe.log`. Each line in the file is one JSON object. Each line has the time in UTC, the level, the source location as `path/file.rs:LINE`, and the message with its key fields. No log line contains a secret value. A normal start with valid configuration logs no warning and no error.
 
 The first log line of `loupe serve` holds the key field `version` with the version from `Cargo.toml`. Like each line, it goes to stderr and to the log file.
+
+After the line `listening`, `loupe serve` writes one info line `telemetry` at each start. Its key field `state` is `sent`, `disabled`, or `built-out`. In the states `sent` and `disabled`, the key field `host` holds the host of the start request, and nothing else of the URL. The line never holds the scheme, the port, the path, the commit, the query, or the `user-agent` value. The line is at info level, so a normal start still logs no warning and no error. The result of the start request goes to one line at debug level only. `telemetry.md` gives the rules.
 
 ## Storage
 
@@ -42,6 +44,26 @@ The ping worker keeps a provider status for each known provider. It runs in its 
 4. A `2xx` gives `ok`. A `401` or a `403` gives `unauthorized`. A network error, a timeout, or a different status gives `unreachable`. A provider with no credential gives `not_configured` and the worker sends no request.
 5. Each status has the time `checked_at`, in UTC, RFC 3339.
 6. The worker keeps the status in a cache. A read of the status uses the cache and never starts a ping. `GET /private/api/providers` (`private-reports.md`) shows the status.
+
+## Start request
+
+A binary that holds a telemetry host sends one start request at each start of `loupe serve`. A release build holds the host. A build from source and a local image build do not. `telemetry.md` gives the full rules of the request and of its receiver.
+
+1. The request is one `GET` of `https://<host>/<commit>`, with the full 40-character lowercase hex commit of the build as the path. The scheme is `http` only for the host `127.0.0.1` or `localhost`. The URL has no query. The URL is the schema.
+2. The request has no body. The header `user-agent` has the form `agentloupe/<version> (<target triple>)`, with the version from `Cargo.toml` and the target triple of the build.
+3. The request starts after the listener is bound and after the line `listening`. It runs in its own task. The bind, the line `listening`, and the first answer of `GET /healthz` do not wait for it.
+4. The request has one attempt, a timeout of 5 seconds, and no retry. It follows no redirect. A status code, a network error, or a timeout gives one log line at debug level only, and does not change the start or the run.
+5. The request uses its own HTTP client. It never goes through the proxy routes, and the capture, the database, the live feed, the dashboard, and the public API never see it.
+6. A shutdown does not wait for an open start request.
+7. The line `telemetry` names the state:
+
+| State | Condition |
+|---|---|
+| `built-out` | The binary holds no host. The start path sends nothing. |
+| `disabled` | The binary holds a host and a run-time opt-out is set. The start path sends nothing. |
+| `sent` | The binary holds a host and the request started. |
+
+The run-time environment cannot give a host to a `built-out` binary, and cannot change the host of a `built-in` binary.
 
 ## Shutdown
 
@@ -340,3 +362,30 @@ The targets of the release and the hosted workflows. `release.md` states the rel
 | Owner paths and mockup | `git grep -nE "/Users/[d]esek"`, `git grep -n "Repo/[d]esek" -- .agents/scripts`, and `git ls-files brainstorm` | 5 matches, 1 match, 2 archives | 0, 0, only `brainstorm/agent-ledger.zip` | |
 | Remote branches | `git ls-remote --heads origin` | `main`, the release-please branch, and one stale feature branch of the earlier release work | no stale feature branch | |
 | Default time zone | `loupe config show` with no `LOUPE_TZ` set | `Europe/Stockholm` | `UTC` with the source default | |
+
+### Start telemetry targets
+
+The targets of the start request and of the telemetry endpoint. `telemetry.md` states the behaviour. The column Measured holds the values of the implementation, measured on 2026-10-23 on macOS arm64 (`.agents/scenarios/telemetry.start.md`). A "fake endpoint" is a local HTTP server on `127.0.0.1` that records each request with its method, its path, its headers, and its body.
+
+| Metric | Method | Baseline | Threshold | Measured |
+|---|---|---|---|---|
+| Requests per start, state `sent` | count of the GET requests at the fake endpoint after one start of a binary built with the host of the fake endpoint | 0, no feature | exactly 1 || 1 in 2 of 2 scenario runs, and 1 in `telemetry_sends_one_get` |
+| Requests per start, state `disabled` | the same, with the run-time opt-out set | 0 | 0 || 0 in 2 of 2 scenario runs |
+| Requests per start, state `built-out` | the same, with a binary built with no telemetry host | 0 | 0 || 0 in 2 of 2 scenario runs and in `telemetry_built_out_state` |
+| Retries after an error or a timeout | count of the requests at a fake endpoint that answers 500, and at a fake endpoint that holds the request open | 0 | no request after the first attempt || 500: 1 request on 1 connection; held open: 1 request on 1 connection; refused: 1 debug line; redirect target: 0 requests |
+| Time to give up | `cargo test telemetry_gives_up_after_timeout` | none | the send ends in at most 5.5 seconds || 5.03 s (5.028 s in the verdict) |
+| Start delay added | the time from the process start to the first 200 of `GET /healthz`, median of 5 starts with a fake endpoint that holds the request open, against the median of 5 starts with the run-time opt-out set | measured at the start of the implementation | a difference of at most 50 ms || baseline 146.5 ms; held open 142.5 and 142.9 ms against 144.1 and 145.0 ms with the opt-out: a difference of -1.6 and -2.1 ms |
+| Request shape | the method, the path, the body size, and the query of the request at the fake endpoint | none | `GET`; `/` and 40 lowercase hex characters equal to the commit of the build; 0 bytes; no query || `GET`; `/` and the 40-character commit of `HEAD`; 0 bytes; no query (2 of 2 runs) |
+| User agent | the `user-agent` header at the fake endpoint | none | exactly `agentloupe/<version of Cargo.toml> (<target triple of the build>)` || `agentloupe/0.1.0 (aarch64-apple-darwin)`, equal to the expected value |
+| Host in a built-out binary | count of the matches of a random marker host name in a binary built with no telemetry host, after an earlier build with the marker as the host | none | 0 matches || 0 matches (2 of 2 runs), and 0 matches of the commit |
+| Telemetry rows in the product data | count of the rows in the exchange table and of the live events after a start in the state `sent` | 0 | 0 || 0 exchanges; 0 live events (one `snapshot` with `calls` 0 and `in_flight` 0 while the request was open) |
+| Worker response time | the total time of each of 10 GETs of the deployed host with a test commit, from the owner's machine | none, no endpoint | median at most 500 ms, each at most 2 s || median 82 ms, each at most 109 ms |
+| Rows after N starts of one build | count of the rows for the commit of the build in the remote database `agentloupe-telemetry`, read with `wrangler`, after N starts | 0, no store | exactly 1 row, and `count` equals N || 1 row and `count` 2 after 2 starts, for 2 of 2 builds |
+| Count increment per start | `count`, `firstseen`, and `lastseen` of the row before and after one more start, read with `wrangler` | none | `count` exactly 1 more, `firstseen` unchanged, `lastseen` the UTC date of the start || `count` +1, `firstseen` unchanged, `lastseen` `2026-10-23`, the UTC date |
+| Writes by a refused request | the row count and each `count` before and after the refused requests of the Worker test | none | unchanged, and each answer 404 || unchanged; 8 of 8 refused requests of the Worker test and 3 of 3 on the deployed host answer 404 |
+| Stored columns | the column list of the table `starts` | none | exactly 4: `sha`, `firstseen`, `lastseen`, `count` || 4: `sha`, `firstseen`, `lastseen`, `count` |
+| New tests | count of the eight Rust tests of the start request that pass in the verdict, and of the Worker test cases that pass with `telemetry.deploy.sh --test` | 0 | 8 of 8 Rust tests, 3 of 3 Worker cases || 8 of 8 Rust tests, 3 of 3 Worker cases |
+| Deploy idempotence | a second run of `telemetry.deploy.sh` directly after the first | none | exit code 0, 1 database of the name, 0 migrations applied, the same host || exit 0, 1 database of the name, 0 migrations applied, the same host |
+| Dry-run changes | the database list of the account and the git status of the repository, before and after `telemetry.deploy.sh --dry-run` | none | no difference || no difference |
+| Repository secrets | count of the secrets in the repository settings | 1 | 1 || 1 |
+| Opt-out name in the user documentation | count of the matches of the name of the run-time opt-out variable in `README.md`, the files under `docs/specification/`, `.env.example`, `compose.yaml`, `.taxonomy`, the files under `telemetry/`, and the output of `loupe config show` | 0 | 0 || 0 |

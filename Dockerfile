@@ -18,6 +18,10 @@ COPY src ./src
 COPY migrations ./migrations
 COPY tests ./tests
 COPY examples ./examples
+# The host and the commit of the start request, in the build stage only; each is empty by default, so a
+# local image build is built-out. release.image.sh passes both for a release; the context holds no .git.
+ARG LOUPE_TELEMETRY_HOST=""
+ARG LOUPE_BUILD_COMMIT=""
 RUN cargo build --release --locked --bin loupe
 
 # debian slim has bash, so the HEALTHCHECK can use /dev/tcp and the image needs no curl.

@@ -2,3 +2,4 @@ nodejs 22.20.0
 aqua:nextest-rs/nextest/cargo-nextest 0.9.149
 aqua:EmbarkStudios/cargo-deny 0.20.2
 github:EmbarkStudios/cargo-about 0.9.2
+npm:wrangler 4.100.0

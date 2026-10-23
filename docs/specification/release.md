@@ -1,4 +1,4 @@
-<!-- @agents-index Specification of the release: version rules, bump rules, tag forms, release flow with release-please, release assets, third-party notices, commit rule, release token, repository settings, and the release check. -->
+<!-- @agents-index Specification of the release: version rules, bump rules, tag forms, release flow with release-please, release assets, third-party notices, commit rule, release token, repository settings, the release check, and the telemetry endpoint. -->
 # Release
 
 This file is the one source of the version rules of the project. It states what a version is, how a version changes, how a release is made, what a release publishes, which repository settings protect the release, and how a user verifies a release.
@@ -25,6 +25,8 @@ The `target-version` field of a change request is an internal plan. It is not a 
 The first log line of `loupe serve` holds the key field `version` with the same value. `operations.md` (Logging) states the line.
 
 The body of `GET /healthz` does not hold the version. The dashboard does not show the version.
+
+A build with a telemetry host also holds the full commit of the build and the target triple of the build. The binary uses them only in the start request (`telemetry.md`). `loupe --version` and the first log line do not show them. A build with no telemetry host holds no commit of the project.
 
 ## Bump rules
 
@@ -110,6 +112,8 @@ A release publishes these assets.
 6. The script prints one machine line for each asset with the archive name, the size of the archive, the size of the binary, and the digest. `--dry-run` prints the plan and builds nothing.
 7. The Linux binaries build on runner images with glibc 2.35. A Linux host needs glibc 2.35 or newer. The runtime image `debian:bookworm-slim` has glibc 2.36.
 8. The macOS binary is not signed and not notarized. A browser download can get the quarantine attribute. `README.md` (Install) states the command that removes it.
+9. The build job passes the repository variable `LOUPE_TELEMETRY_HOST` and the full commit of the checked-out tag as `LOUPE_BUILD_COMMIT` to the script, and the script passes both to the build. The commit is the tag commit, not the commit of the workflow event, because a manual run starts from the default branch. Thus each release asset is `built-in` and sends the start request. A build from source with no `LOUPE_TELEMETRY_HOST` is `built-out` and sends nothing.
+10. The machine output of the script names the telemetry state of each build: `built-in` with the host, or `built-out`. When the repository variable is not set, the release does not fail, and each build is `built-out`.
 
 ### Container image
 
@@ -124,7 +128,10 @@ A release publishes these assets.
 3. The script pushes each platform image by digest. Then it merges the two digests into one multi-platform image index with the tags `<version>` and `latest`. The tag `latest` moves only when both platform builds pass.
 4. The image name is one constant in this script and in this file.
 5. `--dry-run` prints the commands and runs nothing.
-6. The image carries the OCI labels in the table below. The script sets them at build time.
+6. The `Dockerfile` accepts `LOUPE_TELEMETRY_HOST` and `LOUPE_BUILD_COMMIT` as build arguments in the build stage only, each with an empty default. The image job passes the repository variable and the full commit of the tag to the script, and the script passes both to the build. The runtime stage does not get them. Thus the release image is `built-in` and sends the start request. The build context holds no git data, so the commit comes only from the build argument.
+7. A local image build with no build argument, by the image stage or by `docker compose up -d --build`, is `built-out` and sends nothing.
+8. The machine output of the script names the telemetry state of the image: `built-in` with the host, or `built-out`.
+9. The image carries the OCI labels in the table below. The script sets them at build time.
 
 | Label | Value |
 |---|---|
@@ -202,6 +209,7 @@ release-please uses a fine-grained personal access token. GitHub does not start 
 2. The token is stored only as the repository secret `RELEASE_PLEASE_TOKEN`. It is the only repository secret of the project. No file holds its value.
 3. The release-please workflow names the secret in one place.
 4. The release pull request and the tag show the owner of the token as the author.
+5. The host of the start request is the repository variable `LOUPE_TELEMETRY_HOST`, not a secret. The host is visible in each release binary, so it is not secret. The variable does not change the count of repository secrets. No workflow holds a Cloudflare token.
 
 Check the expiry date of the token before each release. To rotate the token, do these steps:
 
@@ -286,6 +294,8 @@ The script does these checks:
 7. It checks the third-party notices. It prints one check line `notices <target>` for each of the three archives and one check line `notices image` for the image. A check passes when the file `THIRD-PARTY-NOTICES` is present and not empty, holds the LiteLLM section and the Geist section, and has the same SHA-256 digest as the other copies. When Docker is absent, `notices image` reports `skipped` with the reason.
 8. It stops and removes the container and the temporary directory on each exit path.
 
+The script starts each binary and the image with the run-time opt-out of the start request set, so a release check sends no start request and does not count as a start of a user. In the image start check, it checks that the log holds the line `telemetry` with the state `disabled` or `built-out`.
+
 The script never prints a key that it makes. It prints one machine line for each check, with `status: passed`, `status: failed`, or `status: skipped`, and `--human` gives the friendly view.
 
 | Exit code | Meaning |
@@ -297,3 +307,14 @@ The script never prints a key that it makes. It prints one machine line for each
 | 4 | A download or a pull failed. |
 
 The release check uses the network. It is not part of the verdict.
+
+## Telemetry endpoint
+
+The release builds send the start request to the telemetry endpoint. `telemetry.md` gives the full rules.
+
+1. The endpoint is the Cloudflare Worker `agentloupe-telemetry` on its `workers.dev` subdomain of the owner's account, with no route and no custom domain. Its source is under `telemetry/`.
+2. The Worker has one route: a `GET` of `/` and a commit of 40 lowercase hex characters. It answers 204 with no body after one atomic insert-or-update, 404 for each other path or method with no write, and 503 with no body when the store fails.
+3. The store is the D1 database `agentloupe-telemetry` with one table `starts` of four columns: `sha`, `firstseen`, `lastseen`, and `count`. The dates are UTC dates.
+4. The Worker stores no IP address, no `user-agent`, no header, no query, no time of day, and no country. Its logs are off. It has no read route.
+5. `.agents/scripts/telemetry.deploy.sh` tests and deploys the Worker through `wrangler`, which `.tool-versions` pins as `npm:wrangler 4.100.0`. Only the owner runs the script, with the owner's consent. No workflow runs it.
+6. The owner sets the repository variable `LOUPE_TELEMETRY_HOST` to the host that the deploy script prints. The release builds read it (see "Binary archives" and "Container image"). Until the owner sets it, each release is `built-out`.

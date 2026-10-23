@@ -13,7 +13,8 @@ setup() {
   printf 'lpt_test\n' > "$H/token"
 }
 result() { if [ "$2" -eq 0 ]; then echo "test: $1 status: passed"; else echo "test: $1 status: failed"; failed=1; fi; rm -rf "$H"; }
-mode() { stat -f '%Lp' "$1" 2>/dev/null || stat -c '%a' "$1"; }
+# GNU stat first: its -f reads the file system and exits 0, so the BSD form must come second.
+mode() { stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1"; }
 # snap lists every path under the global agent dirs with its mode and checksum.
 snap() { (cd "$H" && find .claude .pi | sort | while read -r f; do echo "$f $(mode "$f") $( [ -f "$f" ] && cksum < "$f")"; done); }
 PIDIR=".local/state/agentloupe/pi-agent"

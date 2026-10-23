@@ -17,9 +17,14 @@
 # release.notices.sh writes before the build (it needs cargo about of .tool-versions). The checksum file holds
 # one line in the format of sha256sum, which shasum -a 256 -c and sha256sum -c accept.
 #
+# Telemetry: the environment value LOUPE_TELEMETRY_HOST (the repository variable in the release workflow)
+# and LOUPE_BUILD_COMMIT (default: the tag commit) pass to the build. With a host the binary is built-in and
+# sends the start request; with no host or an empty host it is built-out, and the release does not fail.
+#
 # Output (stdout, key: value), one line per asset:
 #   asset: <archive> archive_bytes: <n> binary_bytes: <n> sha256: <hex> checksum_file: <archive>.sha256 dir: <out>
-# With --dry-run: plan lines (plan: tag, plan: notices, plan: build, plan: archive, plan: checksum).
+#     telemetry: built-in host: <host> | telemetry: built-out
+# With --dry-run: plan lines (plan: tag, plan: notices, plan: build, plan: telemetry, plan: archive, plan: checksum).
 # Full cargo output goes to .agents/logs/release.build.log.
 # Exit codes: 0 built (or planned), 1 notices, build, or archive failed, 2 bad usage, 3 required tool missing,
 #   4 tag check failed (tag absent, tag version differs from Cargo.toml, or HEAD is not the tag commit).
@@ -86,17 +91,24 @@ target="$(rustc -vV | sed -n 's/^host: //p')"
 [[ -n "$target" ]] || fail "rustc -vV printed no host target. Fix: run rustup show in the repository so the pinned toolchain installs. Verify: rustc -vV prints a host line." 3
 name="loupe-v$version-$target"
 archive="$name.tar.gz"
-build=(cargo build --release --locked --bin loupe)
+# The telemetry values of the build; white space at the start and the end does not count.
+telemetry_host="${LOUPE_TELEMETRY_HOST:-}"
+telemetry_host="${telemetry_host#"${telemetry_host%%[![:space:]]*}"}"
+telemetry_host="${telemetry_host%"${telemetry_host##*[![:space:]]}"}"
+build_commit="${LOUPE_BUILD_COMMIT:-${tag_commit:-$head_commit}}"
+if [[ -n "$telemetry_host" ]]; then telemetry="built-in host: $telemetry_host"; else telemetry="built-out"; fi
+build=(env "LOUPE_TELEMETRY_HOST=$telemetry_host" "LOUPE_BUILD_COMMIT=$build_commit" cargo build --release --locked --bin loupe)
 notices=("$ROOT/.agents/scripts/release.notices.sh")
 files="loupe upstreams.toml config/ LICENSE README.md THIRD-PARTY-NOTICES"
 
 if [[ $dry_run -eq 1 ]]; then
   if [[ $human -eq 1 ]]; then
-    echo "Plan for $tag on $target: check passed at $at; write THIRD-PARTY-NOTICES with release.notices.sh; run '${build[*]}'; pack $archive with $files; write $archive.sha256 into $out. Nothing was built."
+    echo "Plan for $tag on $target: check passed at $at; write THIRD-PARTY-NOTICES with release.notices.sh; run '${build[*]}' (telemetry $telemetry); pack $archive with $files; write $archive.sha256 into $out. Nothing was built."
   else
     echo "plan: tag $tag version: $version check: passed at: $at"
     echo "plan: notices command: .agents/scripts/release.notices.sh file: THIRD-PARTY-NOTICES"
     echo "plan: build command: ${build[*]} target: $target"
+    echo "plan: telemetry state: $telemetry"
     echo "plan: archive name: $archive files: $files dir: $out"
     echo "plan: checksum name: $archive.sha256 format: sha256sum"
   fi
@@ -135,7 +147,7 @@ archive_bytes="$(wc -c <"$out/$archive" | tr -d ' ')"
 binary_bytes="$(wc -c <"$bin" | tr -d ' ')"
 digest="$(awk '{print $1}' "$out/$archive.sha256")"
 if [[ $human -eq 1 ]]; then
-  echo "Built $archive ($archive_bytes bytes, binary $binary_bytes bytes), SHA-256 $digest, in $out."
+  echo "Built $archive ($archive_bytes bytes, binary $binary_bytes bytes), SHA-256 $digest, in $out; telemetry $telemetry."
 else
-  echo "asset: $archive archive_bytes: $archive_bytes binary_bytes: $binary_bytes sha256: $digest checksum_file: $archive.sha256 dir: $out"
+  echo "asset: $archive archive_bytes: $archive_bytes binary_bytes: $binary_bytes sha256: $digest checksum_file: $archive.sha256 dir: $out telemetry: $telemetry"
 fi

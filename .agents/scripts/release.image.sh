@@ -22,8 +22,13 @@
 # created is the commit time of the tag in UTC, so two builds of one tag get the same label. The caller logs
 # in to ghcr.io before a real run.
 #
+# Telemetry: the environment value LOUPE_TELEMETRY_HOST (the repository variable in the release workflow)
+# and LOUPE_BUILD_COMMIT (default: the tag commit) pass to the image build as build arguments. With a host
+# the image is built-in; with no host it is built-out, and the release does not fail.
+#
 # Output (stdout, key: value):
 #   build: image: <name> platform: <os/arch> digest: <sha256:...> version: <version> revision: <commit>
+#     telemetry: built-in host: <host> | telemetry: built-out
 #   merge: image: <name> tags: <version>,latest digest: <index digest> platforms: linux/amd64,linux/arm64
 #   With --dry-run: command: <the command that a real run would run>, one line each.
 # Full docker output goes to .agents/logs/release.image.log.
@@ -102,6 +107,14 @@ if [[ -n "$tag_commit" && "$tag_commit" != "$head_commit" ]]; then
 fi
 created="$(TZ=UTC git log -1 --date=format-local:%Y-%m-%dT%H:%M:%SZ --format=%cd "$commit")"
 
+# The telemetry values of the image build; white space at the start and the end does not count.
+telemetry_host="${LOUPE_TELEMETRY_HOST:-}"
+telemetry_host="${telemetry_host#"${telemetry_host%%[![:space:]]*}"}"
+telemetry_host="${telemetry_host%"${telemetry_host##*[![:space:]]}"}"
+build_commit="${LOUPE_BUILD_COMMIT:-$commit}"
+if [[ -n "$telemetry_host" ]]; then telemetry="built-in host: $telemetry_host"; else telemetry="built-out"; fi
+build_args=(--build-arg "LOUPE_TELEMETRY_HOST=$telemetry_host" --build-arg "LOUPE_BUILD_COMMIT=$build_commit")
+
 # The labels of docs/specification/release.md, set at build time so the Dockerfile does not change.
 labels=(
   --label "org.opencontainers.image.source=$SOURCE"
@@ -144,14 +157,14 @@ do_build() {
   local notices=("$ROOT/.agents/scripts/release.notices.sh")
   # The first build loads the image into Docker for the file check; the second build pushes the same
   # layers from the build cache by digest, so nothing reaches the registry before the check passes.
-  local load=(docker buildx build --platform "$platform" "${labels[@]}" --load --tag "$check_tag" --file Dockerfile .)
+  local load=(docker buildx build --platform "$platform" "${labels[@]}" "${build_args[@]}" --load --tag "$check_tag" --file Dockerfile .)
   local check=(docker run --rm --platform "$platform" --entrypoint /bin/sh "$check_tag" -c "for f in $REQUIRED_FILES; do test -s \$f || { echo missing \$f; exit 1; }; done")
-  local cmd=(docker buildx build --platform "$platform" "${labels[@]}"
+  local cmd=(docker buildx build --platform "$platform" "${labels[@]}" "${build_args[@]}"
     --output "type=image,name=$IMAGE,push-by-digest=true,name-canonical=true,push=true"
     --metadata-file "$meta" --file Dockerfile .)
   if [[ $dry_run -eq 1 ]]; then
     show .agents/scripts/release.notices.sh; show "${load[@]}"; show "${check[@]}"; show "${cmd[@]}"
-    echo "command: write the digest to $dir/<os>-<arch>"; return 0
+    echo "command: write the digest to $dir/<os>-<arch>"; echo "telemetry: $telemetry"; return 0
   fi
   mkdir -p "$(dirname "$LOG")" "$dir"
   if ! "${notices[@]}" >>"$LOG" 2>&1; then
@@ -176,8 +189,8 @@ do_build() {
   rm -f "$meta"
   [[ -n "$digest" ]] || fail "the build wrote no image digest. Fix: update Docker buildx so it writes containerimage.digest to the metadata file. Verify: re-run the build." 1
   echo "$digest" >"$dir/$(platform_key "$platform")"
-  if [[ $human -eq 1 ]]; then echo "Pushed $IMAGE@$digest for $platform ($version)."; else
-    echo "build: image: $IMAGE platform: $platform digest: $digest version: $version revision: $commit"; fi
+  if [[ $human -eq 1 ]]; then echo "Pushed $IMAGE@$digest for $platform ($version), telemetry $telemetry."; else
+    echo "build: image: $IMAGE platform: $platform digest: $digest version: $version revision: $commit telemetry: $telemetry"; fi
 }
 
 do_merge() {

@@ -12,6 +12,8 @@
 # This script only calls the stage entry points and pipeline.fingerprint.sh; it owns the list and the order of the stages.
 # Exit codes: 0 every stage passed, 1 one or more stages failed, 2 bad usage.
 set -uo pipefail
+# The verdict builds with no telemetry host, so a value in the shell of a developer never changes it.
+unset LOUPE_TELEMETRY_HOST LOUPE_BUILD_COMMIT
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 STAGES=(format lint test web image)

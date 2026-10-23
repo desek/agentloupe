@@ -15,6 +15,8 @@
 # Full tool output goes to .agents/logs/pipeline.test.log.
 # Exit codes: 0 passed, 1 stage failed, 2 bad usage, 3 required tool missing or cargo-nextest below the pin.
 set -euo pipefail
+# The verdict builds with no telemetry host, so a value in the shell of a developer never changes it.
+unset LOUPE_TELEMETRY_HOST LOUPE_BUILD_COMMIT
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LOG="$ROOT/.agents/logs/pipeline.test.log"
@@ -63,9 +65,10 @@ toolchain="$(sed -n 's/^channel *= *"\(.*\)"/\1/p' "$ROOT/rust-toolchain.toml")"
 now() { perl -MTime::HiRes=time -e 'printf "%.1f\n", time'; }
 mkdir -p "$(dirname "$LOG")"
 
+# Each step returns on failure: the call sits in an if, where set -e does not stop the function.
 run() {
-  cargo nextest run --locked --no-fail-fast
-  if grep -rqE '^[[:space:]]*//[/!].*```' src; then cargo test --locked --doc; fi
+  cargo nextest run --locked --no-fail-fast || return 1
+  if grep -rqE '^[[:space:]]*//[/!].*```' src; then cargo test --locked --doc || return 1; fi
 }
 
 start="$(now)"
@@ -78,6 +81,8 @@ else
   echo "stage: test status: $status seconds: $seconds toolchain: $toolchain runner: cargo-nextest $have log: .agents/logs/pipeline.test.log"
 fi
 if [[ $status == failed ]]; then
+  # The output of each failed test first, so a hosted run with no log artifact shows the cause.
+  awk '/^ +FAIL \[/ && !/Summary/ {p = 1} /^ +(PASS|SIGTERM|TIMEOUT) \[/ || /^ +Summary \[/ {p = 0} p' "$LOG" | head -n 300 >&2
   tail -n 30 "$LOG" >&2
   echo "error: the test stage failed. Fix: read the failing test in the log and correct the code or the test. Reference: docs/specification/operations.md, section Pipeline. Verify: re-run pipeline.test.sh and see 'status: passed'." >&2
   exit 1

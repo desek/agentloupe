@@ -23,5 +23,6 @@ pub mod session;
 pub mod store;
 pub mod subscription;
 pub mod summary;
+pub mod telemetry;
 pub mod token;
 pub mod web;

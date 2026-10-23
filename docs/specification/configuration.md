@@ -1,4 +1,4 @@
-<!-- @agents-index How the loupe binary resolves, validates, and shows its configuration values and their sources. -->
+<!-- @agents-index How the loupe binary resolves, validates, and shows its configuration values and their sources, and the build variables of the start request. -->
 # Configuration
 
 ## Precedence
@@ -96,8 +96,28 @@ The subcommand also prints these lines:
 8. The next due publish time, in `LOUPE_TZ` and in UTC.
 9. `site_title: <value>`, the effective site title.
 10. `live_enabled`, `live_allowed_origin`, `live_max_rate`, `live_max_connections`, and `live_buffer`, each with its source.
+11. `telemetry`, with the source `build`. The value is `built-out` when the binary holds no telemetry host, and `built-in host=<host>` when the binary holds a telemetry host. The line shows the build state only. It reads no run-time variable.
 
 `GET /private/api/config` returns the same entries as `loupe config show`, from the same render. `private-reports.md` gives the rules.
+
+## Build variables
+
+The build reads two variables of its own at build time: `LOUPE_TELEMETRY_HOST` and `LOUPE_BUILD_COMMIT`. The binary never reads them at run time. They are not in the table "Variables", and `loupe config show` does not list them as variables. A value of one of them in the environment of `loupe serve` has no effect. A change of either value at build time builds the binary again. `telemetry.md` gives the use of the values.
+
+`LOUPE_TELEMETRY_HOST` is the host of the start request.
+
+1. When the variable is absent, or empty after the removal of white space at the start and the end, the binary holds no telemetry host. The build state is `built-out`.
+2. A set value is a host name with an optional port, for example `example.workers.dev`, `127.0.0.1:8899`, or `localhost`. The value has no scheme, no path, no query, no fragment, no user name, no password, and no empty label.
+3. The scheme of the request is `https`. It is `http` only when the host is `127.0.0.1` or `localhost`, for a local fake endpoint. This follows the loopback rule of the provider base URLs.
+4. A value that is not valid stops the build with an actionable error. The error names `LOUPE_TELEMETRY_HOST`, the rule, and the fix. It does not print the full value.
+
+`LOUPE_BUILD_COMMIT` is the commit of the build. The build reads it only when `LOUPE_TELEMETRY_HOST` is set. It finds the commit in this order:
+
+1. `LOUPE_BUILD_COMMIT`, when it holds exactly 40 lowercase hex characters. Any other value counts as absent.
+2. The commit of `HEAD` from git in the source tree, when git and the repository exist and the result is 40 lowercase hex characters. A new commit builds the binary again with the new commit.
+3. Else the build stops with an actionable error that names `LOUPE_BUILD_COMMIT`, the rule of 40 lowercase hex characters, and the fix.
+
+When `LOUPE_TELEMETRY_HOST` is set, the build also puts the target triple of the build, as cargo gives it, into the binary. A `built-out` build needs no commit. The build does not mark a tree with local changes.
 
 ## Provider credentials
 
