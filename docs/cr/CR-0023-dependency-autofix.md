@@ -999,3 +999,10 @@ Decision of the supervisor: the wait of requirement 26 gets a fallback. Iteratio
 3. The item line records `rebase: dependabot_no_response` in that case. Before, the item waited with `release_pending` and `wait: rebase`.
 4. Tests: `behind_pr_is_rebased_then_merged` (Dependabot answers) stays; `behind_pr_no_rebase_green_merges` and `behind_pr_no_rebase_red_goes_to_claude` cover no answer with a green and a red check. The shell tests are now 27.
 5. `docs/specification/dependencies.md` states the rebase cap in "Limits" and the fallback in item 1 of "Dependabot pull requests".
+
+Run notes, 2026-10-24, the first real runs on the private repository:
+
+1. Run 1 (40079095615): three green Dependabot pull requests merged with squash, the release pull request held, two Claude Code runs failed because the package that mise installs on the runner lacks its native binary. Fixed by the script that runs the postinstall.
+2. Run 2 (40082089632): lost on the disk of the runner, "No space left on device", after the verdict build and one Claude Code rebuild. Fixed by the script that frees the preinstalled software of the runner, 13.1 to 38.3 GiB free.
+3. Run 3 (40084691983): exit 0. Both red pull requests fixed by Claude Code on claude-sonnet-5-5 in 19 and 14 turns, the autofix pull request 20 opened and merged after a green verdict, the two Dependabot pull requests closed with a link, the issue closed, the release pull request held. 63 min 31 s.
+4. Before the runs, the first attempt showed that Dependabot does not always answer a rebase request; the five minute cap with the fallback to the current head came from that.
