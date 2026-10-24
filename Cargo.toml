@@ -192,7 +192,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 chrono-tz = "0.10"
 clap = { version = "4", features = ["derive"] }
 futures-util = "0.3"
-getrandom = "0.3"
+getrandom = "0.4"
 hex = "0.4"
 hmac = "0.12"
 reqwest = { version = "0.12", default-features = false, features = ["stream", "rustls-tls", "json", "blocking"] }
