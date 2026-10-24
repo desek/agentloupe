@@ -1,7 +1,7 @@
 //! @agents-index The admin session cookie: the value (expiry and HMAC-SHA-256), its check, and the Set-Cookie flags.
 
 use axum::http::{HeaderMap, header};
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
 
 pub const NAME: &str = "loupe_admin";

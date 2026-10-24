@@ -18,7 +18,7 @@ pub fn seal(key: &[u8; 32], id: &str, part: &str, body: &[u8]) -> Result<Vec<u8>
     let aad = aad(id, part);
     let ct = Aes256Gcm::new(key.into())
         .encrypt(
-            Nonce::from_slice(&nonce),
+            &Nonce::from(nonce),
             Payload {
                 msg: body,
                 aad: &aad,
@@ -38,9 +38,11 @@ pub fn open(key: &[u8; 32], id: &str, part: &str, blob: &[u8]) -> Result<Vec<u8>
         return Err("the blob is not a version 1 sealed body".into());
     }
     let aad = aad(id, part);
+    let nonce = Nonce::try_from(&blob[1..1 + NONCE_LEN])
+        .map_err(|_| "the nonce has the wrong length".to_string())?;
     Aes256Gcm::new(key.into())
         .decrypt(
-            Nonce::from_slice(&blob[1..1 + NONCE_LEN]),
+            &nonce,
             Payload {
                 msg: &blob[1 + NONCE_LEN..],
                 aad: &aad,

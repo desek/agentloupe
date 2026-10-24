@@ -184,7 +184,7 @@ name = "api_allowlist"
 path = "tests/api.allowlist.rs"
 
 [dependencies]
-aes-gcm = "0.10"
+aes-gcm = "0.11"
 axum = { version = "0.8", features = ["ws"] }
 base64 = "0.23"
 bytes = "1"
@@ -194,13 +194,13 @@ clap = { version = "4", features = ["derive"] }
 futures-util = "0.3"
 getrandom = "0.4"
 hex = "0.4"
-hmac = "0.12"
+hmac = "0.13"
 reqwest = { version = "0.12", default-features = false, features = ["stream", "rustls-tls", "json", "blocking"] }
 rusqlite = { version = "0.37", features = ["bundled"] }
 rust_decimal = { version = "1.43.0", features = ["serde-with-str"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-sha2 = "0.10"
+sha2 = "0.11"
 subtle = "2"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync", "io-util"] }
 toml = "1.1"

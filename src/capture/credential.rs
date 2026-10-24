@@ -1,7 +1,7 @@
 //! @agents-index HMAC-SHA256 under the account key of the request credential and of the account ID header.
 
 use axum::http::HeaderMap;
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
 
 /// A hash in lowercase hex and the lowercase header name it came from.

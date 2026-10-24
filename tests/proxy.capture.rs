@@ -10,7 +10,7 @@ use loupe::Loupe;
 #[path = "../src/capture/seal.rs"]
 mod seal;
 
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 
 fn hmac_hex(input: &[u8]) -> String {
     let mut m = Hmac::<sha2::Sha256>::new_from_slice(&loupe::KEY_BYTES).unwrap();
