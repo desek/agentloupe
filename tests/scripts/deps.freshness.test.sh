@@ -594,6 +594,7 @@ step() { job "$1" | awk '/^      - / {s = ""} {s = s $0 "\n"} /run: \.agents\/sc
   && job update | grep -qx '    timeout-minutes: 330' && job assess | grep -qx '    timeout-minutes: 180' \
   && [ "$(job update | grep -c 'run: .agents/scripts/deps.freshness.sh update')" -eq 1 ] && [ "$(job assess | grep -c 'run: .agents/scripts/deps.freshness.sh assess')" -eq 1 ] \
   && [ "$(grep -c 'run: .agents/scripts/claude.ensure.sh' "$W")" -eq 2 ] && [ "$(grep -c 'persist-credentials: false' "$W")" -eq 2 ] \
+  && [ "$(grep -c 'run: .agents/scripts/runner.space.sh' "$W")" -eq 1 ] \
   && [ "$(grep -c 'uses: actions/upload-artifact@' "$W")" -eq 2 ] && [ "$(grep -c 'retention-days: 30' "$W")" -eq 2 ] \
   && [ "$(grep -c 'secrets.CLAUDE_CODE_OAUTH_TOKEN' "$W")" -eq 2 ] && [ "$(grep -c 'secrets.RELEASE_PLEASE_TOKEN' "$W")" -eq 1 ] \
   && step update | grep -q 'secrets.CLAUDE_CODE_OAUTH_TOKEN' && step update | grep -q 'secrets.RELEASE_PLEASE_TOKEN' \

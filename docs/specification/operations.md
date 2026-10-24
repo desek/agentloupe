@@ -493,6 +493,9 @@ The baseline of the latest versions, from the crates.io API on 2026-10-24, holds
 
 ### Start telemetry targets
 
+The first hosted dry run of the weekly workflow on 2026-10-24 (run 40093437564, after the merge of the change) scanned 37 direct dependencies in 29 and 35 seconds on the runner, with 25 fresh, 3 stale, and 9 aged, and planned 3 update runs and 9 assessment issues, 2 of them keep for cryptography. The workflow is disabled until the repository is public.
+
+
 The targets of the start request and of the telemetry endpoint. `telemetry.md` states the behaviour. The column Measured holds the values of the implementation, measured on 2026-10-23 on macOS arm64 (`.agents/scenarios/telemetry.start.md`). A "fake endpoint" is a local HTTP server on `127.0.0.1` that records each request with its method, its path, its headers, and its body.
 
 | Metric | Method | Baseline | Threshold | Measured |
