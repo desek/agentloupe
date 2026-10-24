@@ -17,6 +17,10 @@ on:
         description: Plan only, with no write (true or false)
         type: boolean
         default: false
+      retry_failed:
+        description: End the hold time of the failed items for this run (true or false)
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -50,6 +54,8 @@ jobs:
         uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
         with:
           install_args: nodejs aqua:nextest-rs/nextest/cargo-nextest aqua:EmbarkStudios/cargo-deny npm:@anthropic-ai/claude-code
+      - name: Make the Claude Code binary runnable
+        run: .agents/scripts/claude.ensure.sh
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -64,4 +70,5 @@ jobs:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           DRY_RUN: ${{ inputs.dry_run == true && '--dry-run' || '' }}
-        run: .agents/scripts/deps.autofix.sh --repo "$GITHUB_REPOSITORY" --run-url "$RUN_URL" $DRY_RUN
+          RETRY_FAILED: ${{ inputs.retry_failed == true && '--retry-failed' || '' }}
+        run: .agents/scripts/deps.autofix.sh --repo "$GITHUB_REPOSITORY" --run-url "$RUN_URL" $DRY_RUN $RETRY_FAILED

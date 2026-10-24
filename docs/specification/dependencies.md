@@ -32,7 +32,7 @@ The file `.github/dependabot.yml` declares the version updates. Dependabot secur
 
 The workflow `.github/workflows/deps-autofix.yml` is a thin caller (`operations.md`, Hosted workflows).
 
-1. It starts each day at 04:17 UTC and on a manual start. A manual start can ask for a dry run, and the workflow then passes the dry-run flag to the script, so the run plans and writes nothing. The time is before the working day of the owner and off the full hour, where GitHub delays scheduled runs.
+1. It starts each day at 04:17 UTC and on a manual start. A manual start can ask for a dry run, and the workflow then passes the dry-run flag to the script, so the run plans and writes nothing. A manual start can also end the hold time of the failed items, and the workflow then passes the retry flag. The time is before the working day of the owner and off the full hour, where GitHub delays scheduled runs.
 2. It does not start on a push or on a pull request. Thus its own merges do not start it again.
 3. It has one concurrency group for all its runs. At most one run is active. A new run waits and does not cancel the active run.
 4. Its one job has a timeout of 180 minutes. This timeout is the one limit in the workflow file.
@@ -291,7 +291,7 @@ Before the script writes a log extract to an issue, it removes each match of the
 
 ## Install of Claude Code
 
-`.tool-versions` pins Claude Code by its npm package, and mise installs it like the other tools. The workflow states no version. Dependabot does not update this pin. The owner updates it by hand.
+`.tool-versions` pins Claude Code by its npm package, and mise installs it like the other tools. The install on a hosted runner runs the package scripts off, so the platform binary of Claude Code is missing after it; one repository script runs the postinstall of the package when `claude --version` fails, and the workflow calls that script in one step before the autofix script. The workflow states no version. Dependabot does not update this pin. The owner updates it by hand.
 
 ## Known gap: the proxy
 

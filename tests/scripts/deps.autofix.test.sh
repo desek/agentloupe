@@ -469,6 +469,7 @@ step="$(awk '/^      - / {s = ""} {s = s $0 "\n"} /^        run: \.agents\/scrip
   && [ "$perms" = "actions:read checks:read contents:write issues:write pull-requests:write security-events:read " ] \
   && [ "$(grep -c 'runs-on:' "$W")" -eq 1 ] && grep -qx '    timeout-minutes: 180' "$W" && grep -qx '          persist-credentials: false' "$W" \
   && [ "$(grep -c 'run: .agents/scripts/deps.autofix.sh' "$W")" -eq 1 ] && [ "$(grep -c 'secrets.CLAUDE_CODE_OAUTH_TOKEN' "$W")" -eq 1 ] \
+  && [ "$(grep -c 'run: .agents/scripts/claude.ensure.sh' "$W")" -eq 1 ] \
   && echo "$step" | grep -q 'secrets.CLAUDE_CODE_OAUTH_TOKEN' && echo "$step" | grep -q 'secrets.RELEASE_PLEASE_TOKEN' \
   && [ "$(grep -E '^ *(- )?uses:' "$W" | grep -vcE 'uses: [^@ ]+@[0-9a-f]{40} # v[0-9]')" -eq 0 ] \
   && ! sed -E 's/(^| )#.*$//' "$W" | grep -qiE 'sonnet|haiku|opus|deps/autofix|dependencies|--max|[0-9]+\.[0-9]+\.[0-9]+' \
