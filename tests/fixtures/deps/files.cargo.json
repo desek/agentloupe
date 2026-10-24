@@ -1,0 +1,9 @@
+[
+  {
+    "filename": "Cargo.lock",
+    "status": "modified",
+    "additions": 2,
+    "deletions": 2,
+    "patch": "@@ -1500,8 +1500,8 @@\n [[package]]\n name = \"smallvec\"\n-version = \"1.13.2\"\n+version = \"1.13.3\"\n source = \"registry+https://github.com/rust-lang/crates.io-index\"\n-checksum = \"3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67\"\n+checksum = \"9a4f2b9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c68\""
+  }
+]

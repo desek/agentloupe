@@ -1,0 +1,47 @@
+# @agents-index Dependabot configuration: weekly version updates for cargo at the root, npm in prototype, and the pinned GitHub Actions, with Conventional Commit titles.
+#
+# The commit message prefix gives each pull request title its type: fix(deps) for cargo (a patch release),
+# chore(deps) for the prototype (hidden, not shipped), and ci(deps) for the action pins (hidden). The minor and
+# patch updates of one ecosystem come in one grouped pull request each week; each major update has its own.
+# Dependabot security updates stay off: the daily dependency autofix fixes the alerts.
+# docs/specification/dependencies.md (Dependabot configuration) states the rules.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:00"
+      timezone: Etc/UTC
+    commit-message:
+      prefix: fix(deps)
+    groups:
+      cargo-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /prototype
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:00"
+      timezone: Etc/UTC
+    commit-message:
+      prefix: chore(deps)
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:00"
+      timezone: Etc/UTC
+    commit-message:
+      prefix: ci(deps)
+    groups:
+      actions-minor-patch:
+        update-types: [minor, patch]

@@ -2,7 +2,7 @@
 name: "CR-0023 Dependency autofix"
 description: "A daily GitHub Actions workflow calls one repository script that finds the open Dependabot security alerts and the open Dependabot pull requests, lets Claude Code in headless mode fix each alert on one branch, merges each green fix as a fix(deps) commit, and merges the release pull request of CR-0022 when it is green, so that a dependency fix becomes a release with no human step."
 id: "CR-0023"
-status: "approved"
+status: "implemented"
 date: 2026-10-23
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, release manager), reviewer agent (approver)
@@ -952,3 +952,32 @@ CR-0024 (Public release readiness, approved on 2026-10-23) amends this CR before
 4. **Frozen workflows.** The verdict workflow, the release-please workflow, and the release workflow that non-functional requirement 2 freezes are the workflows after CR-0024, with its job timeouts, the empty permissions of the `GITHUB_TOKEN` of the release-please workflow, and its tool installs.
 5. **Tools of the workflow.** The workflow of requirement 9 also installs cargo-deny from `.tool-versions`, because the verdict that `deps.autofix.sh` runs calls the dependency check `deps.deny.sh` in the lint stage.
 6. **Changed items.** Requirements 1, 2, 9, 24, 33, and 45, non-functional requirement 2, judgement call 13, AC-1, and AC-13.
+
+### Implementation notes, 2026-10-24
+
+The implementation covers the parts that a private repository can complete (the specification commit `156daaa`): requirements 1 and 2 with the amendment, 4 to 44 in code and tests, 46 to 50 (in the specification commit), and the non-functional requirements 1, 2, and 6. The run log is `.agents/scenarios/deps.autofix.md` with `.agents/scenarios/deps.autofix.dryrun.log`; the measured values are in `docs/specification/operations.md` (Dependency autofix targets), and the results of the checks at implementation in `docs/specification/dependencies.md` (Checks at implementation).
+
+Parts that wait:
+
+1. The public repository (D3): requirement 45 through `repo.settings.sh` (the main ruleset, auto-merge, and the Dependabot alerts), which applies only on the public repository.
+2. Requirement 3 and the alert list: the Dependabot alerts are off on the private repository. The script stops with exit code 4 and the error that names the setting; the dry run against `desek/agentloupe` records that answer. The tests use the recorded alert lists of `tests/fixtures/deps/`.
+3. The secret `CLAUDE_CODE_OAUTH_TOKEN` (requirement 10, parameter P5): the owner has not created it. Until then a run of the workflow ends with exit code 3 and names the secret. The permissions "Dependabot alerts: read" and, when needed, "Workflows: write" of `RELEASE_PLEASE_TOKEN` (parameters P1 and P2) wait with it.
+4. The first real run (Model-Based Testing, Parts A on a real alert, B, C, D, and E), and with it AC-3 (the concurrency on GitHub), AC-11 to AC-22 on GitHub, AC-24, AC-27, AC-28, the hosted time targets, the credentials target over real run logs, the 14 first scheduled runs, and parameters P4, P6, and P7.
+
+Decisions at the implementation:
+
+1. Parameter P3: Claude Code 2.1.310 has `--max-budget-usd` and the turn flag `--max-turns` for `claude -p`, and reads `BASH_DEFAULT_TIMEOUT_MS` and `BASH_MAX_TIMEOUT_MS`. The script uses them, and also sums `total_cost_usd` against the cap of one workflow run.
+2. Judgement call 3: the registry of mise resolves the npm package; `mise ls-remote npm:@anthropic-ai/claude-code` lists 2.1.310, and `.tool-versions` pins `npm:@anthropic-ai/claude-code 2.1.310`. Each existing workflow installs named tools only, so the verdict jobs do not install it (review remark on the blanket `mise install`).
+3. Parameter P4 waits, so the script uses item 2 of "Merge rule": a wait for the green check `verdict`, then a squash merge. The constant `MERGE_MODE` of the script selects auto-merge after the check.
+4. The tokens: the workflow gives the script `GH_TOKEN` (the workflow token, for the reads and the issue), `RELEASE_TOKEN` (the secret `RELEASE_PLEASE_TOKEN`, named in one place of the script, for the alert read, the push, the pull requests, the rebase command, and the merges), and `CLAUDE_CODE_OAUTH_TOKEN`. The `claude -p` process and the verdict of the script run with `env -i` and a fixed allowlist of variables. git gets the release token only for the fetch and the push of the script, through a credential helper that reads it from its environment. A non-dry run stops with exit code 3 when the git configuration holds an `extraheader`.
+5. The dry run needs no `claude`, `cargo`, `corepack`, or `CLAUDE_CODE_OAUTH_TOKEN`, and reads with the release token when it is set, else with the `gh` login, so the owner can run it on the private repository. A non-dry run stops on a dirty work tree with exit code 2.
+6. A disabled alert list ends with exit code 4 (a GitHub API answer); the specification names no code for it.
+7. A held item counts as a failed item that the issue holds: exit code 1, and the issue stays open. A run with nothing open still merges a green release pull request whose changelog lists a `fix(deps)` change (requirement 37); it makes no issue, so a `1.0.0` release pull request in such a run is reported as waiting with `release_needs_human`.
+8. The script reports six item reasons that the specification table did not list: `claude_failed`, `no_change`, `verdict_failed`, `prototype_failed`, `run_cap`, and `budget_cap`. `dependencies.md` now lists them.
+9. The fixture mode is the flag `--fixtures DIR`: the fake `gh` and `claude` of the test are first on `PATH` and read DIR; the script polls with no delay, reads the date and a lower process timeout from DIR, and refuses a git remote that is not a local path. The shell tests are `tests/scripts/deps.autofix.test.sh` (24 tests), run by `tests/deps.autofix.rs` in four parallel groups; the longest group took 46 seconds in the local test stage.
+10. The test file named in AC-6 checks that the error names the verdict workflow file and the release governance, not a CR identifier, because the code holds no CR identifier; the specification diff states the same.
+11. The cost of the item line comes from the totals per model of the result with the base price fields; `dependencies.md` (Cost and free plan bounds) states the reason of a difference from `total_cost_usd`.
+12. The workflow restores the cache with the key of the verdict test job, and has no gate on the visibility, which the specification does not state.
+
+Hosted verdict of the pull request <https://github.com/desek/agentloupe/pull/7> before this commit: run 40045426258 on `ea826b2`, `success` in 7 minutes 8 seconds (the test job passed `stage: test status: passed seconds: 318.9`).
+

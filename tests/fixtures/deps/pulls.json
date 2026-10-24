@@ -1,0 +1,35 @@
+[
+  {
+    "number": 21,
+    "state": "open",
+    "title": "fix(deps): bump smallvec from 1.13.2 to 1.13.3",
+    "body": "Bumps [smallvec](https://github.com/servo/rust-smallvec) from 1.13.2 to 1.13.3.",
+    "user": { "login": "dependabot[bot]", "type": "Bot" },
+    "head": { "ref": "dependabot/cargo/smallvec-1.13.3", "sha": "2121212121212121212121212121212121212121" },
+    "base": { "ref": "main", "sha": "0000000000000000000000000000000000000001" },
+    "html_url": "https://github.com/desek/agentloupe/pull/21",
+    "created_at": "2026-10-19T03:05:00Z"
+  },
+  {
+    "number": 22,
+    "state": "open",
+    "title": "ci(deps): bump actions/checkout from 7.0.1 to 7.1.0",
+    "body": "Bumps [actions/checkout](https://github.com/actions/checkout) from 7.0.1 to 7.1.0.",
+    "user": { "login": "dependabot[bot]", "type": "Bot" },
+    "head": { "ref": "dependabot/github_actions/actions/checkout-7.1.0", "sha": "2222222222222222222222222222222222222222" },
+    "base": { "ref": "main", "sha": "0000000000000000000000000000000000000001" },
+    "html_url": "https://github.com/desek/agentloupe/pull/22",
+    "created_at": "2026-10-19T03:06:00Z"
+  },
+  {
+    "number": 23,
+    "state": "open",
+    "title": "fix(deps): bump the cargo-minor-patch group with 2 updates",
+    "body": "Bumps the cargo-minor-patch group with 2 updates: [serde](https://github.com/serde-rs/serde) and [tokio](https://github.com/tokio-rs/tokio).\n\nUpdates `serde` from 1.0.200 to 1.0.201\n\nUpdates `tokio` from 1.40.0 to 1.40.1\n",
+    "user": { "login": "dependabot[bot]", "type": "Bot" },
+    "head": { "ref": "dependabot/cargo/cargo-minor-patch-0123456789", "sha": "2323232323232323232323232323232323232323" },
+    "base": { "ref": "main", "sha": "0000000000000000000000000000000000000001" },
+    "html_url": "https://github.com/desek/agentloupe/pull/23",
+    "created_at": "2026-10-19T03:07:00Z"
+  }
+]

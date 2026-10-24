@@ -1,0 +1,73 @@
+<!-- @agents-index Recorded dry runs of deps.autofix.sh: two on the recorded fixtures and two read-only against desek/agentloupe, with the gh call log. -->
+# Dry run log of the dependency autofix, 2026-10-24
+# Script: .agents/scripts/deps.autofix.sh at the commit of this log. Machine: macOS arm64, bash 3.2 (/bin/bash) for the fixture runs, bash 5 for the real runs, gh 2.83.1.
+
+# Part 1: fixture dry runs. The recorded alert list (tests/fixtures/deps/alerts.json: 3 alerts), the Dependabot pull request list (pulls.json: 3), and the release pull request 0.1.1, served by the fake gh of tests/scripts/deps.autofix.test.sh; date 2026-10-24.
+# fixture dry run 1: exit 0; write calls 0; claude -p runs 0; tree clean yes; branches on origin 1 (main only)
+repo: o/r visibility: private mode: dry-run
+count: alerts: 3 pull_requests: 3
+item: pr:21 path: pull_request package: smallvec ecosystem: cargo status: planned number: 21 head: 212121212121 check: success behind: 0 target: 1.13.3 files: Cargo.lock ghsa: GHSA-aaaa-bbbb-cccc alerts: alert:11 plan: merge
+action: merge target: pr:21 status: planned detail: squash merge after a green check verdict of the head commit
+action: branch target: deps/autofix-2026-10-24 status: planned detail: from the head of main
+item: alert:12 path: alert package: esbuild ecosystem: npm status: planned number: 12 ghsa: GHSA-dddd-eeee-ffff severity: medium range: <=0.24.2 patched: 0.25.0 manifest: prototype/pnpm-lock.yaml plan: claude
+action: claude target: alert:12 status: planned detail: package=esbuild ecosystem=npm range=<=0.24.2 patched=0.25.0 manifest=prototype/pnpm-lock.yaml advisory=GHSA-dddd-eeee-ffff model=sonnet max_turns=30 budget_usd=5 timeout_min=40
+action: commit target: alert:12 status: planned detail: chore(deps): bump esbuild to 0.25.0 (GHSA-dddd-eeee-ffff)
+item: alert:13 path: alert package: idna ecosystem: cargo status: planned reason: no_patched_version number: 13 ghsa: GHSA-gggg-hhhh-jjjj severity: low range: <9.9.9 patched: none manifest: Cargo.lock plan: record in the issue, no claude -p run
+item: pr:22 path: pull_request package: actions/checkout ecosystem: github-actions status: planned reason: pin_not_sha number: 22 head: 222222222222 check: success behind: 0 target: 7.1.0 files: .github/workflows/verdict.yml plan: no merge, record in the issue
+item: pr:23 path: pull_request package: serde,tokio ecosystem: cargo status: planned number: 23 head: 232323232323 check: failure behind: 0 target: 1.0.201,1.40.1 files: Cargo.lock plan: claude
+action: claude target: pr:23 status: planned detail: package=serde,tokio ecosystem=cargo target=1.0.201,1.40.1 pull_request=23 model=sonnet max_turns=30 budget_usd=5 timeout_min=40
+action: commit target: pr:23 status: planned detail: fix(deps): bump serde,tokio to 1.0.201,1.40.1
+action: pull_request target: deps/autofix-2026-10-24 status: planned detail: open or update one pull request to main
+action: merge target: deps/autofix-2026-10-24 status: planned detail: squash merge after a green check verdict of the head commit, wait up to 30 minutes
+item: release:2 path: release package: 0.1.1 ecosystem: - status: planned check: success plan: merge
+action: release target: #2 status: planned detail: squash merge chore(release): release 0.1.1 after a green check verdict of the head commit
+action: issue target: autofix-issue status: planned detail: open "Dependency autofix: failed items" with the label dependencies; 2 items to record, and each claude -p run that fails
+result: alerts: 3 pull_requests: 3 fixed: 0 merged: 0 failed: 0 held: 0 waiting: 0 claude_runs: 0 exit: 0
+# fixture dry run 2: exit 0; write calls 0; claude -p runs 0; tree clean yes; branches on origin 1 (main only)
+repo: o/r visibility: private mode: dry-run
+count: alerts: 3 pull_requests: 3
+item: pr:21 path: pull_request package: smallvec ecosystem: cargo status: planned number: 21 head: 212121212121 check: success behind: 0 target: 1.13.3 files: Cargo.lock ghsa: GHSA-aaaa-bbbb-cccc alerts: alert:11 plan: merge
+action: merge target: pr:21 status: planned detail: squash merge after a green check verdict of the head commit
+action: branch target: deps/autofix-2026-10-24 status: planned detail: from the head of main
+item: alert:12 path: alert package: esbuild ecosystem: npm status: planned number: 12 ghsa: GHSA-dddd-eeee-ffff severity: medium range: <=0.24.2 patched: 0.25.0 manifest: prototype/pnpm-lock.yaml plan: claude
+action: claude target: alert:12 status: planned detail: package=esbuild ecosystem=npm range=<=0.24.2 patched=0.25.0 manifest=prototype/pnpm-lock.yaml advisory=GHSA-dddd-eeee-ffff model=sonnet max_turns=30 budget_usd=5 timeout_min=40
+action: commit target: alert:12 status: planned detail: chore(deps): bump esbuild to 0.25.0 (GHSA-dddd-eeee-ffff)
+item: alert:13 path: alert package: idna ecosystem: cargo status: planned reason: no_patched_version number: 13 ghsa: GHSA-gggg-hhhh-jjjj severity: low range: <9.9.9 patched: none manifest: Cargo.lock plan: record in the issue, no claude -p run
+item: pr:22 path: pull_request package: actions/checkout ecosystem: github-actions status: planned reason: pin_not_sha number: 22 head: 222222222222 check: success behind: 0 target: 7.1.0 files: .github/workflows/verdict.yml plan: no merge, record in the issue
+item: pr:23 path: pull_request package: serde,tokio ecosystem: cargo status: planned number: 23 head: 232323232323 check: failure behind: 0 target: 1.0.201,1.40.1 files: Cargo.lock plan: claude
+action: claude target: pr:23 status: planned detail: package=serde,tokio ecosystem=cargo target=1.0.201,1.40.1 pull_request=23 model=sonnet max_turns=30 budget_usd=5 timeout_min=40
+action: commit target: pr:23 status: planned detail: fix(deps): bump serde,tokio to 1.0.201,1.40.1
+action: pull_request target: deps/autofix-2026-10-24 status: planned detail: open or update one pull request to main
+action: merge target: deps/autofix-2026-10-24 status: planned detail: squash merge after a green check verdict of the head commit, wait up to 30 minutes
+item: release:2 path: release package: 0.1.1 ecosystem: - status: planned check: success plan: merge
+action: release target: #2 status: planned detail: squash merge chore(release): release 0.1.1 after a green check verdict of the head commit
+action: issue target: autofix-issue status: planned detail: open "Dependency autofix: failed items" with the label dependencies; 2 items to record, and each claude -p run that fails
+result: alerts: 3 pull_requests: 3 fixed: 0 merged: 0 failed: 0 held: 0 waiting: 0 claude_runs: 0 exit: 0
+
+# Part 2: real dry runs, read-only, with the gh login of the owner (no RELEASE_TOKEN, no GH_TOKEN, no CLAUDE_CODE_OAUTH_TOKEN in the environment).
+# real dry run 1 at 2026-10-24T00:22:02Z against desek/agentloupe: exit 4, 1.62 seconds
+## stdout
+repo: desek/agentloupe visibility: private mode: dry-run
+result: alerts: 0 pull_requests: 0 fixed: 0 merged: 0 failed: 0 held: 0 waiting: 0 claude_runs: 0 exit: 4
+## stderr
+error: the Dependabot alerts are off for desek/agentloupe: the alert list answered 'Dependabot alerts are disabled for this repository.'. Fix: turn on the setting Dependabot alerts (Settings, Advanced Security; repo.settings.sh applies it on the public repository). Reference: docs/specification/dependencies.md, Dependabot configuration. Verify: gh api 'repos/desek/agentloupe/dependabot/alerts?state=open' answers a list.
+# real dry run 2 at 2026-10-24T00:22:03Z against desek/agentloupe: exit 4, 1.53 seconds
+## stdout
+repo: desek/agentloupe visibility: private mode: dry-run
+result: alerts: 0 pull_requests: 0 fixed: 0 merged: 0 failed: 0 held: 0 waiting: 0 claude_runs: 0 exit: 4
+## stderr
+error: the Dependabot alerts are off for desek/agentloupe: the alert list answered 'Dependabot alerts are disabled for this repository.'. Fix: turn on the setting Dependabot alerts (Settings, Advanced Security; repo.settings.sh applies it on the public repository). Reference: docs/specification/dependencies.md, Dependabot configuration. Verify: gh api 'repos/desek/agentloupe/dependabot/alerts?state=open' answers a list.
+# gh calls of both runs (every call is a GET of gh api; no --method, no -f)
+api -H Accept: application/vnd.github+json repos/desek/agentloupe
+api -H Accept: application/vnd.github+json repos/desek/agentloupe/actions/workflows/verdict.yml
+api -H Accept: application/vnd.github+json repos/desek/agentloupe/dependabot/alerts?state=open&per_page=100
+api -H Accept: application/vnd.github+json repos/desek/agentloupe
+api -H Accept: application/vnd.github+json repos/desek/agentloupe/actions/workflows/verdict.yml
+api -H Accept: application/vnd.github+json repos/desek/agentloupe/dependabot/alerts?state=open&per_page=100
+
+# repository state after the two real dry runs
+branches: main,release-please--branches--main--components--agent-loupe
+open pull requests: #2 chore(release): release 0.1.0
+issues with the label dependencies: 0
+local work tree: unchanged by the dry runs; the only changed paths are the edits of this session to deps.autofix.sh and its test, committed with this log
+claude processes started by the script: 0 (the dry run checks no claude binary and the gh log above holds no write)

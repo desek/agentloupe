@@ -1,0 +1,7 @@
+verdict: format passed
+verdict: lint passed
+build script output: token sk-ant-oat01-testvalue0000 seen in a test fixture
+remote: ghp_testvalue0000 and github_pat_testvalue0000 were written by a recorded build script
+oauth gho_testvalue0000 and app ghs_testvalue0000 also appear
+the literal run value TEST-RUN-TOKEN-VALUE appears once
+verdict: test failed

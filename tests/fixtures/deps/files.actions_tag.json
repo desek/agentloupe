@@ -1,0 +1,9 @@
+[
+  {
+    "filename": ".github/workflows/verdict.yml",
+    "status": "modified",
+    "additions": 1,
+    "deletions": 1,
+    "patch": "@@ -60,7 +60,7 @@\n     steps:\n-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n+      - uses: actions/checkout@v7.1.0\n         with:"
+  }
+]

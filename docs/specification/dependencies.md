@@ -76,11 +76,11 @@ The script holds all the logic of the flow. A run does these steps in this order
 
 1. **Precondition.** When the verdict workflow is absent from the checked-out tree, or is not active on the repository, the script stops with exit code 5 before any API write and before any `claude -p` run. The error names the file of the verdict workflow and the release governance that adds it.
 2. **Tools and credentials.** When `gh`, `git`, `claude`, `cargo`, or `corepack` is missing, or when `CLAUDE_CODE_OAUTH_TOKEN` or the GitHub token is empty, the script stops with exit code 3 before any run. The error names the missing item and never its value. pnpm comes through corepack, with the version of the `packageManager` field of `prototype/package.json`.
-3. **Alerts on.** The script lists the Dependabot alerts with the alert read token. When the error of the list call names disabled alerts, the script stops with an actionable error that names the setting.
+3. **Alerts on.** The script lists the Dependabot alerts with the alert read token. When the error of the list call names disabled alerts, the script stops with exit code 4 and an actionable error that names the setting.
 4. **Discovery.** The script lists the open alerts and the open pull requests whose author is Dependabot, through `gh`.
    1. For each alert, it reads the alert number, the advisory identifier (GHSA), the ecosystem, the package, the vulnerable version range, the first patched version, the manifest path, and the severity.
    2. For each Dependabot pull request, it reads the number, the head commit, the title, the changed files, and the state of the check `verdict`.
-5. **Nothing open.** When no alert and no Dependabot pull request is open, the script prints one count line with zero alerts and zero pull requests and exits with code 0. It makes no branch, no pull request, and no issue, and starts no `claude -p` run.
+5. **Nothing open.** When no alert and no Dependabot pull request is open, the script prints one count line with zero alerts and zero pull requests and exits with code 0. It makes no branch, no pull request, and no issue, and starts no `claude -p` run. It still does the release step for an open release pull request whose changelog lists a `fix(deps)` change, and closes an open autofix issue.
 6. **No patched version.** An alert with no first patched version starts no `claude -p` run. The script records it in the autofix issue with the reason `no_patched_version`.
 7. **Order and cap.** The script handles the items with the highest severity first, then the oldest. An item above the run cap waits for the next run.
 8. **Autofix branch.** The script makes the autofix branch from the head of `main`, or reuses it when it exists from an earlier run on the same day.
@@ -243,6 +243,8 @@ A failed item starts no new `claude -p` run in a later workflow run until one of
 2. The input of the item changes: a new head commit of the Dependabot pull request, a new patched version of the advisory, or a new commit on `main` that changes the manifest of the item.
 3. A person starts the script with the flag `--retry-failed`, which ends the hold for that run.
 
+A held item keeps its line and its first date in the machine block, and the run prints it with the status `held`. A held item counts as a failed item that the autofix issue holds, so the run ends with exit code 1 and the issue stays open.
+
 ## Credentials and logs
 
 The script never prints `CLAUDE_CODE_OAUTH_TOKEN` or a GitHub token. No token goes to stdout, to stderr, to a log file, to an issue, to a pull request, or to a commit. An error names a missing credential by its name only.
@@ -255,7 +257,7 @@ Before the script writes a log extract to an issue, it removes each match of the
 
 1. The machine output has one `key: value` line for each item and one summary line with the counts.
 2. The item line of a `claude -p` run holds the model, the four token counts `input_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`, and `output_tokens`, and the API-equivalent cost of the result.
-3. With `--dry-run`, the script does the discovery and prints each action that it would do: the item, the path, the branch, the prompt fields, the merge, and the issue action. It starts no `claude -p` run, writes nothing to the tree, pushes nothing, and writes nothing to the GitHub API.
+3. With `--dry-run`, the script does the discovery and prints each action that it would do: the item, the path, the branch, the prompt fields, the merge, and the issue action. It starts no `claude -p` run, writes nothing to the tree, pushes nothing, and writes nothing to the GitHub API. A dry run needs no `claude`, `cargo`, `corepack`, or `CLAUDE_CODE_OAUTH_TOKEN`. It reads with the release token when it is set, and else with the `gh` login of the person who runs it.
 4. An unknown flag gives an actionable error on stderr and exit code 2.
 5. A documented flag for the tests names a fixture directory, which takes the place of the GitHub API and of `claude`. A run in this mode uses no network.
 
@@ -279,6 +281,12 @@ Before the script writes a log extract to an issue, it removes each match of the
 | `claude_auth` | `claude -p` failed with an authentication error. |
 | `release_needs_human` | The release pull request proposes `1.0.0` or a new major version. |
 | `release_pending` | A merge or a check did not come before the wait cap. The next run continues. |
+| `claude_failed` | The structured result has the status `failed`. |
+| `no_change` | The structured result has the status `fixed`, and the diff is empty. |
+| `verdict_failed` | The verdict of the script failed, or the check `verdict` of a pull request that no `claude -p` run may fix is red. |
+| `prototype_failed` | The frozen install or the build of the prototype failed. |
+| `run_cap` | The item waits for the next run, because this run reached its cap of `claude -p` runs. Not a failure. |
+| `budget_cap` | The item waits for the next run, because this run reached its budget. Not a failure. |
 
 ## Install of Claude Code
 
@@ -300,6 +308,8 @@ The flow uses no paid service other than the Claude Code subscription of the own
 6. Each `claude -p` run uses part of the usage limit of the subscription. The budget of one run, the budget of one workflow run, and the run cap limit this use.
 7. The API-equivalent cost of a run follows the rules of `cost.md` and the vendored price file. The script compares it with the field `total_cost_usd` of the result. A difference above 5 percent has a stated reason in this file.
 
+The result of `claude -p` holds the token counts per model only as totals of the run (`modelUsage`), not per call. The script prices each total with the base fields `input_cost_per_token`, `output_cost_per_token`, `cache_read_input_token_cost`, and `cache_creation_input_token_cost`, in binary floating point. It applies no prompt-size tier and no 1-hour cache write field, because a total does not show the prompt size or the cache lifetime of each call. A difference above 5 percent from `total_cost_usd` comes from these two rules.
+
 ## Checks at implementation
 
 These points are checked when the flow is built. Each has a stated rule, so none blocks the flow. The result of each check goes into this file.
@@ -311,3 +321,15 @@ These points are checked when the flow is built. Each has a stated rule, so none
 5. **Lifetime of the subscription token.** The expiry date goes into "Tokens".
 6. **Many fixes in one squash commit.** A check shows whether release-please reads each line of the squash body as its own change. When it does not, a merge with rebase keeps each fix commit, but the merge settings allow only squash. Then the owner decides the method, and this file states it.
 7. **pnpm of the prototype.** A check shows whether Dependabot supports the pnpm version of `prototype/package.json`.
+
+Results on 2026-10-24, on the private repository:
+
+| Check | Result |
+|---|---|
+| 1. Read of the alerts | Not checked yet: the Dependabot alerts are off on the private repository; the list call answers HTTP 403 "Dependabot alerts are disabled for this repository.". The script reads the alerts with the release token, as the rule states. |
+| 2. Write permissions | Not checked yet: the first real run follows the public repository and the secret. |
+| 3. Budget flag | Claude Code 2.1.310 has `--max-budget-usd` and `--max-turns` for `claude -p`, and reads `BASH_DEFAULT_TIMEOUT_MS` and `BASH_MAX_TIMEOUT_MS`. The script passes the budget of one run, the turn limit, and the Bash tool timeout of 20 minutes with them, and also checks the sum of `total_cost_usd` against the budget of one workflow run. |
+| 4. Auto-merge and the bypass | Not checked yet: the ruleset exists only on the public repository. Until the check, the script uses item 2 of "Merge rule": it waits for the green check `verdict` and merges with squash. A constant of the script selects item 1. |
+| 5. Lifetime of the subscription token | Not checked yet: the owner has not made the token. |
+| 6. Many fixes in one squash commit | The release-please documentation states that each Conventional Commit line in the body of one commit becomes its own changelog entry. The script writes the squash body with one fix line per paragraph. Not checked yet on a real release. |
+| 7. pnpm of the prototype | Not checked yet: the first weekly Dependabot run follows the merge of `.github/dependabot.yml`. |
