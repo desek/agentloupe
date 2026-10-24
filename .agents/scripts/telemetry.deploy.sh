@@ -38,7 +38,6 @@ CONFIG="$DIR/wrangler.toml"
 NAME="agentloupe-telemetry"
 REPO="desek/agentloupe"
 LOG="$ROOT/.agents/logs/telemetry.deploy.log"
-PLACEHOLDER="00000000-0000-0000-0000-000000000000"
 ZONE="agentloupe.dev"
 human=0; dry_run=0; test_only=0
 [[ -t 1 ]] && human=1
