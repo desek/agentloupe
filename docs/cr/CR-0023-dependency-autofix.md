@@ -981,3 +981,9 @@ Decisions at the implementation:
 
 Hosted verdict of the pull request <https://github.com/desek/agentloupe/pull/7> before this commit: run 40045426258 on `ea826b2`, `success` in 7 minutes 8 seconds (the test job passed `stage: test status: passed seconds: 318.9`).
 
+Implementation notes, 2026-10-24, decided by the supervisor on the implementer's questions:
+
+1. The Dependabot version update pull requests that opened on the merge stay open; the autofix handles them after its first real run, and they cost hosted minutes only on a new push.
+2. The daily workflow is disabled with `gh workflow disable` until the secret `CLAUDE_CODE_OAUTH_TOKEN` exists and the repository is public, so it does not fail every day on the missing secret.
+3. The additions to the dependencies specification where the CR was silent (the extra item reasons, exit 4 when alerts are off, a held item as exit 1) are accepted as specification additions.
+4. The parts that wait: the real run, the measured hosted durations, the fourteen runs with a defined end, the cost of a run, and the second repository secret.
