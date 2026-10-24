@@ -291,7 +291,7 @@ Before the script writes a log extract to an issue, it removes each match of the
 
 ## Install of Claude Code
 
-`.tool-versions` pins Claude Code by its npm package, and mise installs it like the other tools. The install on a hosted runner runs the package scripts off, so the platform binary of Claude Code is missing after it; one repository script runs the postinstall of the package when `claude --version` fails, and the workflow calls that script in one step before the autofix script. The workflow states no version. Dependabot does not update this pin. The owner updates it by hand.
+`.tool-versions` pins Claude Code by its npm package, and mise installs it like the other tools. The install on a hosted runner runs the package scripts off, so the platform binary of Claude Code is missing after it; one repository script runs the postinstall of the package when `claude --version` fails, and the workflow calls that script in one step before the autofix script. A hosted runner has about 14 GB of free disk, and one job builds the crate for the verdict and again for each Claude Code run with a changed lock file, which filled the disk in a run of 2026-10-24; one repository script frees the preinstalled software that the project never uses, about 20 GB, at the start of the job, and reports the free space before and after. Off a hosted runner it removes nothing. The workflow states no version. Dependabot does not update this pin. The owner updates it by hand.
 
 ## Known gap: the proxy
 
