@@ -41,7 +41,9 @@
 # deps.autofix.prompt.md; (7) checks each result: the structured result, the allowed paths, no credential in the
 # diff, its own verdict (and the frozen install and build of the prototype), then commits
 # "<type>(deps): bump <package> to <version> (<GHSA id>)" or resets the branch; (8) merges each green Dependabot
-# pull request with squash, after the rebase command of Dependabot when it is behind; refuses a pin update that
+# pull request with squash, after the rebase command of Dependabot when it is behind (when no new head comes
+# within 5 minutes, the run continues with the current head: a green one merges, a red one goes to claude -p, and
+# the item line holds rebase: dependabot_no_response); refuses a pin update that
 # replaces a commit SHA with a tag; (9) pushes the branch, opens or updates its pull request, and squash merges it
 # after a green check verdict; (10) merges the release pull request after a green check verdict when a fix(deps)
 # change is in it, never 1.0.0 or a new major version, and only when the repository is public; (11) opens, comments on, or closes the autofix issue.
@@ -77,6 +79,8 @@ CLAUDE_TIMEOUT_SECS=2400
 BASH_TIMEOUT_MS=1200000
 RUN_CAP=4
 WAIT_CAP_SECS=1800
+# The wait for the new head commit after the rebase command of Dependabot; then the run continues with the current head.
+REBASE_WAIT_CAP_SECS=300
 POLL_SECS=30
 HOLD_DAYS=7
 LOG_LINES=200
@@ -129,11 +133,12 @@ done
 cd "$ROOT" || die "cannot enter $ROOT. Fix: run the script from its checkout. Verify: re-run." 2
 today="$(date -u +%Y-%m-%d)"
 WAIT_CAP_MIN=$((WAIT_CAP_SECS / 60))
+REBASE_WAIT_CAP_MIN=$((REBASE_WAIT_CAP_SECS / 60))
 if [[ -n "$fixtures" ]]; then
   [[ -d "$fixtures" ]] || die "the fixture directory $fixtures does not exist. Fix: pass --fixtures <dir> with the recorded answers. Verify: ls $fixtures." 2
   fixtures="$(cd "$fixtures" && pwd)"
   export DEPS_AUTOFIX_FIXTURES="$fixtures"
-  POLL_SECS=0; WAIT_CAP_SECS=2
+  POLL_SECS=0; WAIT_CAP_SECS=2; REBASE_WAIT_CAP_SECS=1
   [[ -s "$fixtures/today" ]] && today="$(tr -d ' \n' <"$fixtures/today")"
   if [[ -s "$fixtures/claude_timeout_secs" ]]; then
     t="$(tr -d ' \n' <"$fixtures/claude_timeout_secs")"; [[ "$t" =~ ^[0-9]+$ && "$t" -lt $CLAUDE_TIMEOUT_SECS ]] && CLAUDE_TIMEOUT_SECS="$t"
@@ -239,7 +244,8 @@ git_auth() {
     -c 'credential.helper=!f() { test "$1" = get && echo username=x-access-token && echo "password=$GIT_PUSH_TOKEN"; }; f' "$@"
 }
 sleep_poll() { [[ $POLL_SECS -gt 0 ]] && sleep "$POLL_SECS"; return 0; }
-polls() { if [[ $POLL_SECS -gt 0 ]]; then echo $((WAIT_CAP_SECS / POLL_SECS)); else echo "$WAIT_CAP_SECS"; fi; }
+# polls [cap]: the number of polls within the cap (default: the wait cap of a check).
+polls() { local cap="${1:-$WAIT_CAP_SECS}"; if [[ $POLL_SECS -gt 0 ]]; then echo $((cap / POLL_SECS)); else echo "$cap"; fi; }
 # check_state <sha>: success, failure, pending, or none, from the latest check run named verdict.
 check_state() {
   get "repos/$repo/commits/$1/check-runs?check_name=verdict" "$work/checks.json" || { echo none; return; }
@@ -568,7 +574,7 @@ while IFS= read -r it; do
       continue
     fi
     if [[ $dry_run -eq 1 ]]; then
-      [[ "$(jq -r .behind <<<"$it")" -gt 0 ]] && action rebase "$key" planned "comment @dependabot rebase with the release token, wait for the new head commit"
+      [[ "$(jq -r .behind <<<"$it")" -gt 0 ]] && action rebase "$key" planned "comment @dependabot rebase with the release token, wait for the new head commit up to $REBASE_WAIT_CAP_MIN minutes, then continue with the current head"
       case "$state" in
         success) item "$key" "$path" "$pkg" "$eco" planned "" "$extra plan: merge"
           action merge "$key" planned "squash merge after a green check verdict of the head commit"
@@ -581,13 +587,19 @@ while IFS= read -r it; do
       if [[ "$(jq -r .behind <<<"$it")" -gt 0 ]]; then
         if write_release --method POST "repos/$repo/issues/$n/comments" -f body="@dependabot rebase" >/dev/null; then
           action rebase "$key" done "asked Dependabot to rebase"
-          new_head="$head"; k=0; max="$(polls)"
+          new_head="$head"; k=0; max="$(polls "$REBASE_WAIT_CAP_SECS")"
           while [[ "$new_head" == "$head" && $k -lt $max ]]; do
             get "repos/$repo/pulls/$n" "$work/pr.json" && new_head="$(jq -r '.head.sha // empty' "$work/pr.json")"; [[ -n "$new_head" ]] || new_head="$head"
             k=$((k + 1)); [[ "$new_head" == "$head" ]] && sleep_poll
           done
-          if [[ "$new_head" == "$head" ]]; then item "$key" "$path" "$pkg" "$eco" waiting release_pending "$extra wait: rebase"; continue; fi
-          head="$new_head"; state="$(check_state "$head")"
+          if [[ "$new_head" == "$head" ]]; then
+            # No new head before the rebase cap: continue with the current head. A squash merge of a branch
+            # behind main is valid (the verdict runs on main after the merge); a red check goes to claude -p
+            # on the autofix branch from main, as for any red Dependabot pull request.
+            extra="$extra rebase: dependabot_no_response"
+          else
+            head="$new_head"; state="$(check_state "$head")"
+          fi
         else action rebase "$key" failed "$(redact <"$work/err" | head -c 200 | tr '\n' ' ')"; item "$key" "$path" "$pkg" "$eco" waiting release_pending "$extra"; continue; fi
       fi
       [[ "$state" == success || "$state" == failure ]] || state="$(wait_check "$head")"

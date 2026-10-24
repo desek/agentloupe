@@ -80,6 +80,8 @@ fn deps_autofix_pull_requests_and_release() {
         "private_repo_release_stays_with_human",
         "release_pr_with_deps_fix_merged_later",
         "behind_pr_is_rebased_then_merged",
+        "behind_pr_no_rebase_green_merges",
+        "behind_pr_no_rebase_red_goes_to_claude",
         "red_dependabot_pr_goes_to_claude",
         "actions_pr_sha_to_tag_refused",
     ]);

@@ -987,3 +987,15 @@ Implementation notes, 2026-10-24, decided by the supervisor on the implementer's
 2. The daily workflow is disabled with `gh workflow disable` until the secret `CLAUDE_CODE_OAUTH_TOKEN` exists and the repository is public, so it does not fail every day on the missing secret.
 3. The additions to the dependencies specification where the CR was silent (the extra item reasons, exit 4 when alerts are off, a held item as exit 1) are accepted as specification additions.
 4. The parts that wait: the real run, the measured hosted durations, the fourteen runs with a defined end, the cost of a run, and the second repository secret.
+
+### Iteration notes, 2026-10-24: the rebase fallback
+
+Observation of the first real run: the run asked Dependabot to rebase pull request 8 with the comment `@dependabot rebase` and waited the wait cap of 30 minutes. Dependabot never rebased (no reaction, no new head commit), so the run made no progress; with five Dependabot pull requests behind `main` it would have waited 30 minutes for each of them and then hit the job timeout of 180 minutes. The supervisor cancelled the run.
+
+Decision of the supervisor: the wait of requirement 26 gets a fallback. Iteration:
+
+1. The wait for the new head commit after the rebase command has its own cap of 5 minutes, the constant `REBASE_WAIT_CAP_SECS` next to `WAIT_CAP_SECS` in `deps.autofix.sh` (1 poll in the fixture mode). The wait cap of judgement call 4 (30 minutes) stays for the check `verdict`.
+2. When the new head does not come before the rebase cap, the script continues with the current head. A green check `verdict` of that head merges the pull request with squash, as before: a squash merge of a branch behind `main` is valid, and the verdict runs on `main` after the merge. A red check hands the pull request to one `claude -p` run, as before (requirement 28): the fix is made on the autofix branch from `main`, not on the Dependabot branch (the script never pushes to a Dependabot branch), and the fix closes the Dependabot pull request.
+3. The item line records `rebase: dependabot_no_response` in that case. Before, the item waited with `release_pending` and `wait: rebase`.
+4. Tests: `behind_pr_is_rebased_then_merged` (Dependabot answers) stays; `behind_pr_no_rebase_green_merges` and `behind_pr_no_rebase_red_goes_to_claude` cover no answer with a green and a red check. The shell tests are now 27.
+5. `docs/specification/dependencies.md` states the rebase cap in "Limits" and the fallback in item 1 of "Dependabot pull requests".

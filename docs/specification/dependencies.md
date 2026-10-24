@@ -113,6 +113,7 @@ For each alert, the script starts at most one `claude -p` run in one workflow ru
 | `claude -p` runs of one workflow run | at most 4 |
 | Budget of one workflow run | at most 15 US dollars, API-equivalent; when the sum passes the cap, the script starts no more `claude -p` runs |
 | Wait for a check `verdict` | at most 30 minutes |
+| Wait for the new head commit after the rebase command of Dependabot | at most 5 minutes; then the run continues with the current head |
 | Job timeout of the workflow | 180 minutes |
 
 A documented flag of the script lowers the turn limit for a test run. It cannot raise a limit.
@@ -178,7 +179,7 @@ When `claude -p` fails with an authentication error, the script starts no more `
 
 For each open Dependabot pull request, the script does these steps:
 
-1. When the pull request is behind `main`, the script posts the rebase command of Dependabot with the release token, and waits for the new head commit with the wait cap.
+1. When the pull request is behind `main`, the script posts the rebase command of Dependabot with the release token, and waits for the new head commit for at most 5 minutes (the rebase cap). When the new head does not come before that cap, the script continues with the current head, and the item line records `rebase: dependabot_no_response`: a green check `verdict` of that head merges with squash as in item 2 (a squash merge of a branch behind `main` is valid, and the verdict runs on `main` after the merge); a red check goes to the `claude -p` run of item 3, which works on the autofix branch made from `main`, never on the Dependabot branch.
 2. When the check `verdict` of the up-to-date head commit is green, the script merges the pull request with squash (see "Merge rule").
 3. When the check `verdict` fails, the script hands the update to one `claude -p` run on the autofix branch, with the rules of "Fix of an alert".
    1. When that fix passes, the script closes the Dependabot pull request with a comment that links the autofix pull request.

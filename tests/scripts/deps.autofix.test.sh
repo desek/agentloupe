@@ -371,8 +371,37 @@ setup; pulls '.number == 21'; serve "repos/$REPO/pulls/21/files" @files.cargo.js
 serve "repos/$REPO/pulls/21" '{"number": 21, "head": {"sha": "2424242424242424242424242424242424242424"}}'
 run
 [ $rc -eq 0 ] && grep -qx "POST repos/$REPO/issues/21/comments" "$D/calls" && grep -q '@dependabot rebase' "$D/bodies/"* \
-  && grep -qx "PUT repos/$REPO/pulls/21/merge" "$D/calls" && echo "$out" | grep -q 'status: merged'
+  && grep -qx "PUT repos/$REPO/pulls/21/merge" "$D/calls" && echo "$out" | grep -q 'status: merged' && ! echo "$out" | grep -q 'rebase: dependabot_no_response'
 result behind_pr_is_rebased_then_merged $?
+fi
+
+# Dependabot does not rebase within the rebase cap and the check of the current head is green: the run continues
+# with that head, squash merges it, and the item line records rebase: dependabot_no_response.
+if want behind_pr_no_rebase_green_merges; then
+setup; pulls '.number == 21'; serve "repos/$REPO/pulls/21/files" @files.cargo.json; serve "repos/$REPO/compare/main...2121212121212121212121212121212121212121" @compare.behind.json
+serve "repos/$REPO/pulls/21" '{"number": 21, "head": {"sha": "2121212121212121212121212121212121212121"}}'
+run
+[ $rc -eq 0 ] && grep -qx "POST repos/$REPO/issues/21/comments" "$D/calls" && grep -q '@dependabot rebase' "$D/bodies/"* \
+  && [ "$(grep -cx "GET repos/$REPO/pulls/21" "$D/calls")" -eq 1 ] && grep -qx "PUT repos/$REPO/pulls/21/merge" "$D/calls" && [ "$(claude_runs)" -eq 0 ] \
+  && echo "$out" | grep -q '^item: pr:21 path: pull_request package: smallvec ecosystem: cargo status: merged .* head: 212121212121 .* rebase: dependabot_no_response$' \
+  && ! echo "$out" | grep -q '^item: pr:21 .*status: waiting'
+result behind_pr_no_rebase_green_merges $?
+fi
+
+# Dependabot does not rebase within the rebase cap and the check of the current head is red: one claude -p run on
+# the autofix branch from main; the fix closes the Dependabot pull request, and the item line records the rebase.
+if want behind_pr_no_rebase_red_goes_to_claude; then
+setup; pulls '.number == 21'; serve "repos/$REPO/pulls/21/files" @files.cargo.json; serve "repos/$REPO/compare/main...2121212121212121212121212121212121212121" @compare.behind.json
+serve "repos/$REPO/pulls/21" '{"number": 21, "head": {"sha": "2121212121212121212121212121212121212121"}}'
+serve "repos/$REPO/commits/2121212121212121212121212121212121212121/check-runs" @checks.failure.json
+edit 'sed -i.bak "s/1.13.2/1.13.3/" Cargo.lock && rm Cargo.lock.bak'
+run
+[ $rc -eq 0 ] && grep -qx "POST repos/$REPO/issues/21/comments" "$D/calls" && [ "$(claude_runs)" -eq 1 ] \
+  && grep -q 'Dependabot pull request 21 whose check verdict failed' "$D/claude.prompt" \
+  && [ "$(remote_commits)" = 'fix(deps): bump smallvec to 1.13.3' ] && [ "$(git -C "$D/origin.git" rev-parse "$BRANCH~1")" = "$(git -C "$D/origin.git" rev-parse main)" ] \
+  && grep -qx "PATCH repos/$REPO/pulls/21" "$D/calls" && ! grep -qx "PUT repos/$REPO/pulls/21/merge" "$D/calls" \
+  && echo "$out" | grep -q '^item: pr:21 path: pull_request package: smallvec ecosystem: cargo status: fixed .* rebase: dependabot_no_response'
+result behind_pr_no_rebase_red_goes_to_claude $?
 fi
 
 # A red cargo Dependabot pull request goes to one claude -p run; the fix closes it with a link to the autofix pull request.
