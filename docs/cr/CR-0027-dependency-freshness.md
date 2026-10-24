@@ -2,7 +2,7 @@
 name: "CR-0027 Dependency freshness"
 description: "A weekly GitHub Actions workflow calls one repository script that reads the direct dependencies of cargo, of the npm prototype, and of the pinned GitHub Actions, gets the pinned and the latest version with their publish dates from the registries, and puts each dependency in one class: fresh, stale (pinned older than 90 days and behind the latest), or aged (the latest release older than 180 days). For each stale dependency, one headless Claude Code run raises it to the latest version, also a major version, and the script runs the full verdict to find if the app breaks: a green update goes as a fix(deps) or chore(deps) commit through the pull request flow of the dependency autofix, and a red update goes into one issue with the failing stage and the first error. For each aged dependency, one headless Claude Code run assesses a self-managed replacement (zero-dep approach) and writes keep, replace, or watch into one issue per dependency; a cryptography crate always gets keep."
 id: "CR-0027"
-status: "proposed"
+status: "approved"
 date: 2026-10-24
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, release manager), reviewer agent (approver)
@@ -33,7 +33,7 @@ The supervisor measured the baseline on 2026-10-24 from the crates.io API (secti
 ## Change Drivers
 
 * Five direct crates are more than 90 days behind their latest release. Four of them are behind by a major version in the sense of semantic versioning below `1.0.0` (for example `rusqlite` 0.37 against 0.40). Dependabot opens a pull request for each, but nobody checks if the app breaks, and a red pull request stays open.
-* Nine direct crates have no release for more than 180 days. Some are small and stable (`hex`), and some are large (`axum`). The project has no record of which of them it can replace with its own code, and no rule for which it must keep.
+* Eight direct crates have no release for more than 180 days. Some are small and stable (`hex`), and some are large (`axum`). The project has no record of which of them it can replace with its own code, and no rule for which it must keep.
 * The daily autofix of CR-0023 handles the security alerts and the Dependabot pull requests. It does not look at the age of a version, and it does not raise a version on its own.
 * The advisory response of CR-0025 acts after a vulnerability is known. An old pinned version raises the chance that a fix exists only in a version that the project cannot take without a major update. A regular update keeps the distance small.
 * A major update of `sha2` needs a major update of `hmac` in the same change, because both use the trait crate `digest` and the project uses `Hmac<Sha256>` in `src/capture/credential.rs` and `src/private/cookie.rs`. A single version bump by Dependabot cannot make such a coupled change.
@@ -65,14 +65,13 @@ The supervisor measured these values on 2026-10-24 from the crates.io API. The a
 | | `axum` | 0.8.9 | 193 | 0.8.9 | 193 |
 | | `tempfile` (dev) | 3.27.0 | 227 | 3.27.0 | 227 |
 | | `hmac` | 0.12.1 | 1709 | 0.13.0 | 208 |
-| | `toml` | 0.9.12 | 255 | 0.9.12 | 255 |
 | Pinned older than 90 days, but equal to the latest | `chrono`, `getrandom`, `bytes`, `serde` | | | | |
-| Fresh | `base64`, `futures-util`, `rust_decimal`, `clap`, `serde_json`, `jsonschema` (dev), `tokio` | | | | |
+| Fresh | `base64`, `futures-util`, `rust_decimal`, `clap`, `serde_json`, `jsonschema` (dev), `tokio`, `toml` | | | | |
 
 Two facts follow from the table:
 
 1. `hmac` is in the aged group, and it is also behind its latest version.
-2. The baseline counts 5 stale crates and 9 aged crates.
+2. The baseline counts 5 stale crates and 8 aged crates.
 
 The baseline of the npm packages and of the actions is not measured. The first scan of the model-based test records it.
 
@@ -187,12 +186,12 @@ sequenceDiagram
 
 **Scan: classes**
 
-9. The script **MUST** give each dependency exactly one class, with this order of precedence:
+9. The script **MUST** give each dependency exactly one class. A dependency whose lookup failed has the class `unknown` (requirement 5). A pin mismatch or a yanked or deprecated pinned version has the class `stale` (requirements 3 and 7). Each other dependency has one class, with this order of precedence:
    1. `aged`: the latest release is older than 180 days.
    2. `stale`: the pinned version is older than 90 days and is behind the latest.
    3. `fresh`: each other case, that is the pinned version is at most 90 days old, or it equals the latest.
 10. The line of each dependency **MUST** also hold the field `behind` (`yes` or `no`). A dependency of the class `aged` with `behind: yes` **MUST** get an update run as a stale dependency does (judgement call 5). At the baseline, this is `hmac`.
-11. The thresholds 90 days and 180 days **MUST** be two named constants of the script, each with a comment that states its reason: D1 for 90 days and D2 for 180 days. No other file **MUST** state the values, except `dependencies.md`.
+11. The thresholds 90 days and 180 days **MUST** be two named constants of the script, each with a comment that states its reason: D1 for 90 days and D2 for 180 days. Another script, a prompt template, or a workflow file **MUST NOT** state the values as thresholds; in the specification, `dependencies.md` states them.
 
 **Scan: output**
 
@@ -210,7 +209,7 @@ sequenceDiagram
 20. The prompt **MUST** come from `.agents/scripts/deps.freshness.update.prompt.md` with these fields: the ecosystem, the name, the kind, the pinned version, the latest version, and the manifest path. The prompt **MUST** tell Claude Code to raise the dependency to the latest version, also across a major version, in the manifest and in the lock file; to run `.agents/scripts/pipeline.verdict.sh`; to change code in the allowed paths only when the verdict fails because of the update; to raise another direct dependency only when the update cannot build without it (judgement call 7); and to end with one structured result.
 21. The structured result **MUST** hold the fields `status` (`updated`, `breaks`, or `failed`), `name`, `from_version`, `to_version`, `also_raised` (a list of name and version pairs), `files_changed`, `code_changed` (true or false), `verdict`, `failing_stage`, `first_error`, and `reason`. A missing, unparsable, or incomplete result **MUST** count as `failed` with the reason `invalid_result`.
 22. The credential rules of the autofix **MUST** apply to each `claude -p` run of this flow: the process gets no GitHub token, the checkout persists no credential, the process and the verdict of the script run with a fixed allowlist of environment variables, and the tool allowlist is the allowlist of the autofix (CR-0023, requirement 21 and judgement call 5).
-23. After each update run, the script **MUST** check the diff with the allowed paths and the credential patterns of the autofix (CR-0023, requirement 22, and judgement call 6). A path outside the allowed paths **MUST** fail the item with `path_not_allowed`. A credential match **MUST** fail the item with `credential_in_diff`.
+23. After each update run, the script **MUST** check the diff with the allowed paths and the credential patterns of the autofix (CR-0023, requirement 22, and judgement call 6). A path outside the allowed paths **MUST** fail the item with `path_not_allowed`. A credential match **MUST** fail the item with `credential_in_diff`. A diff that removes a direct dependency from `Cargo.toml` or `prototype/package.json` **MUST** fail the item with `dependency_removed`, so that an update run never replaces a dependency, also a cryptography crate, with own code.
 24. After each update run, the script **MUST** count the test attributes (`#[test]` and `#[tokio::test]`) under `src/` and `tests/`. When the count is lower than the count on the branch before the run, the item **MUST** fail with the reason `tests_removed`.
 25. The script **MUST** decide if the app breaks by its own checks, not by the result of Claude Code (judgement call 10). The app breaks when one of these checks fails:
     1. The verdict: `pipeline.verdict.sh` of the script, with no GitHub token and no `CLAUDE_CODE_OAUTH_TOKEN` in its environment, exits with a code that is not 0.
@@ -254,12 +253,12 @@ sequenceDiagram
 
 42. The workflow `.github/workflows/deps-freshness.yml` **MUST** start on a weekly schedule (judgement call 17) and on `workflow_dispatch`. A manual start **MUST** be able to ask for a dry run, which the workflow passes to the script as `--dry-run`.
 43. The workflow **MUST** use the concurrency group `deps-autofix`, the group of the daily autofix, with no cancel of an active run. Thus the weekly run and the daily run never run at once (judgement call 18).
-44. The workflow **MUST** be a thin caller per CR-0022, requirements 19 to 22. It **MUST** have two jobs, `update` and `assess`. Each job **MUST** call `deps.freshness.sh` in exactly one step, with the action `update` or `assess`. Each job **MUST** have a timeout (judgement call 12). The steps of a job **MUST** be a checkout with no persisted credential, the tool installs from the pin files as in the autofix workflow, a cache, the one call of the script, and one upload of the report as a workflow artifact (judgement call 19). The upload action **MUST** be pinned by its full commit SHA.
+44. The workflow **MUST** be a thin caller per CR-0022, requirements 19 to 22. It **MUST** have two jobs, `update` and `assess`. Each job **MUST** call `deps.freshness.sh` in exactly one step, with the action `update` or `assess`. Each job **MUST** have a timeout (judgement call 12). The steps of a job **MUST** be a checkout with no persisted credential, the tool installs from the pin files as in the autofix workflow, the step of `.agents/scripts/claude.ensure.sh` that makes the Claude Code binary runnable (`dependencies.md`, section "Install of Claude Code"), a cache, the one call of the script, and one upload of the report as a workflow artifact (judgement call 19). The upload action **MUST** be pinned by its full commit SHA.
 45. The job `update` **MUST** have the permissions of the autofix job and no others. The job `assess` **MUST** have only `contents: read` and `issues: write`. Only the step of the script **MUST** get `CLAUDE_CODE_OAUTH_TOKEN`. Only the step of the script of the job `update` **MUST** get the release token. This workflow **MUST NOT** add a repository secret.
 
 **Shared helper**
 
-46. The branch, push, pull request, merge rule, and release pull request steps of `deps.autofix.sh` **MUST** move into `.agents/scripts/deps.common.sh`, which both scripts source. The helper **MUST** take the branch name and the item lines as inputs. The behaviour of `deps.autofix.sh` **MUST NOT** change: its shell tests **MUST** pass with no change to their expected output.
+46. The branch, push, pull request, merge rule, and release pull request steps of `deps.autofix.sh` **MUST** move into `.agents/scripts/deps.common.sh`, which both scripts source. The helper **MUST** take the branch name and the item lines as inputs. The behaviour of `deps.autofix.sh` **MUST NOT** change: its shell tests **MUST** pass with no change to their expected output. The one change of `tests/scripts/deps.autofix.test.sh` **MUST** be the copy of `deps.common.sh` into the test repository next to `deps.autofix.sh`, because the setup of the test copies only the script and its prompt.
 
 **Script interface**
 
@@ -295,9 +294,9 @@ sequenceDiagram
 |---|---|---|---|
 | Stale direct dependencies | the count `stale` of the summary line of `deps.freshness.sh scan`, run 30 days after the first real run | 5 (crates.io, 2026-10-24) | 0 within 30 days after the first real run |
 | Aged and behind direct dependencies | the count of the scan lines with `class: aged` and `behind: yes` in the same scan | 1 (`hmac`) | 0 within 30 days after the first real run |
-| Aged dependencies with an assessment issue | after the first real run: the count of issues with the labels `dependencies` and `zero-dep` and a title that names an aged dependency of the scan, in each state, divided by the count `aged` of the scan | 0 of 9 | 9 of 9 (each aged dependency) |
+| Aged dependencies with an assessment issue | after the first real run: the count of issues with the labels `dependencies` and `zero-dep` and a title that names an aged dependency of the scan, in each state, divided by the count `aged` of the scan | 0 of 8 | 8 of 8 (each aged dependency) |
 | Cryptography crates with `replace` | the count of the assessment issues of a cryptography dependency (requirement 36) whose recommendation is not `keep` | none | 0 |
-| Correct latest version | in the model-based test, Part A: the count of the 14 crates of the baseline table with a stated latest version whose scan line names the same latest version | none | 14 of 14, unless a new release came after 2026-10-24, which the scenario names with its date |
+| Correct latest version | in the model-based test, Part A: the count of the 13 crates of the baseline table with a stated latest version whose scan line names the same latest version | none | 13 of 13, unless a new release came after 2026-10-24, which the scenario names with its date |
 | Time of one scan | the field of the scan time in the summary line of `deps.freshness.sh scan`, on the machine of the owner and on the runner | none | at most 120 seconds |
 | Limits of one `claude -p` run | the fields `num_turns` and `total_cost_usd` of the result, and the run time on the item line, for each run of the first real run | none | at most 30 turns, at most 5 US dollars API-equivalent, and at most the process timeout of the run kind |
 | Cost of one workflow run | the sum of `total_cost_usd` on the summary line of each job | none | at most the budget of each job (judgement call 12) |
@@ -320,6 +319,7 @@ New files:
 Changed files:
 
 * `.agents/scripts/deps.autofix.sh`: it sources the shared helper (requirement 46).
+* `tests/scripts/deps.autofix.test.sh`: its setup also copies `deps.common.sh` (requirement 46); no expected output changes.
 * `Cargo.toml`: one `[[test]]` entry for `tests/deps.freshness.rs`.
 * `docs/specification/dependencies.md`: five new sections and four changed sections (requirement 52).
 * `docs/specification/release.md`: the section "Releases from the dependency autofix" (requirement 53).
@@ -383,7 +383,7 @@ A user gets patch releases with current dependencies. A major update that change
 
 ### Business Impact
 
-The cost stays the subscription of the owner and zero for the runners of a public repository. The first real run can start up to 4 update runs and up to 7 assessment runs (9 aged minus 2 cryptography crates), each with a budget cap. The later weekly runs start fewer runs, because a fresh dependency starts none and an open assessment starts none until its input changes.
+The cost stays the subscription of the owner and zero for the runners of a public repository. The first real run can start up to 4 update runs and up to 6 assessment runs (8 aged minus 2 cryptography crates), each with a budget cap. The later weekly runs start fewer runs, because a fresh dependency starts none and an open assessment starts none until its input changes.
 
 ## Implementation Approach
 
@@ -453,7 +453,7 @@ The tests run `tests/scripts/deps.freshness.test.sh` from `tests/deps.freshness.
 
 ### Tests to Modify
 
-None with a change of expected output. `tests/deps.autofix.rs` and `tests/scripts/deps.autofix.test.sh` **MUST** pass unchanged after the move into the shared helper (requirement 46). This is the proof that the autofix keeps its behaviour.
+None with a change of expected output. `tests/deps.autofix.rs` and `tests/scripts/deps.autofix.test.sh` **MUST** pass after the move into the shared helper (requirement 46), with one change only: the setup of `tests/scripts/deps.autofix.test.sh` also copies `deps.common.sh` into the test repository. No assertion and no expected output changes. This is the proof that the autofix keeps its behaviour.
 
 ### Tests to Remove
 
@@ -504,6 +504,10 @@ And one line for each of the 4 packages of prototype/package.json
 And one line for each distinct external action pin of .github/workflows
 And no line for a transitive dependency or for the local verdict workflow
 And tokio has exactly one line
+Given a lock file with two versions of one direct crate
+Then the pinned version is the version that the root package uses
+Given an action pin whose version comment tag resolves to another SHA
+Then its line holds pin_check: mismatch and class stale
 ```
 
 ### AC-2: The latest version is the highest release (requirements 4 to 8)
@@ -517,6 +521,10 @@ Then latest is the highest version that is not a pre-release and not yanked
 And the ages are whole days in UTC from the publish dates
 And the crates.io requests carry a User-Agent that names the project
 And no registry gets more than one request in one second
+Given a deprecated npm version, a draft GitHub release, and an action tag v4
+Then none of them is the latest
+Given a pinned version that is yanked and 10 days old
+Then its line holds class stale and yanked yes
 ```
 
 ### AC-3: Each dependency has one class (requirements 9 to 11)
@@ -525,11 +533,12 @@ And no registry gets more than one request in one second
 Given the baseline of 2026-10-24
 When deps.freshness.sh scan runs on 2026-10-24
 Then aes-gcm, sha2, rusqlite, reqwest, and tokio-tungstenite have class stale
-And hex, subtle, chrono-tz, tracing, tracing-subscriber, axum, tempfile, hmac, and toml have class aged
+And hex, subtle, chrono-tz, tracing, tracing-subscriber, axum, tempfile, and hmac have class aged
 And hmac has behind yes
-And chrono, getrandom, bytes, and serde have class fresh
-And the summary line counts 5 stale and 9 aged
+And chrono, getrandom, bytes, serde, and toml have class fresh
+And the summary line counts 5 stale and 8 aged
 And the script states the thresholds 90 and 180 as named constants with their reasons
+And no other script, prompt template, or workflow file states them as thresholds
 ```
 
 ### AC-4: The scan output has the stated forms (requirements 12 to 15)
@@ -543,6 +552,7 @@ When scan runs with --json
 Then it prints one JSON document with the same fields
 When scan runs with --human
 Then it prints a table
+And scan runs with no CLAUDE_CODE_OAUTH_TOKEN in the environment
 And scan starts no claude -p run, writes no file in the tree, and makes no write call
 ```
 
@@ -588,6 +598,7 @@ And it counts the test attributes against the count before the run
 And it runs pipeline.verdict.sh with no GitHub token and no CLAUDE_CODE_OAUTH_TOKEN in the environment
 And for a cargo update it runs the smoke check of the debug binary
 And for an npm update it runs the frozen install and the build of the prototype
+And a diff that removes a direct dependency from a manifest fails the item with the reason dependency_removed
 And the update counts as green only when each check passes
 ```
 
@@ -650,7 +661,7 @@ And the branch holds no commit for the item
 ```gherkin
 Given the baseline of 2026-10-24
 When deps.freshness.sh assess runs
-Then each of the 9 aged crates has one issue "Zero-dep assessment: cargo <name>" with the labels dependencies and zero-dep
+Then each of the 8 aged crates has one issue "Zero-dep assessment: cargo <name>" with the labels dependencies and zero-dep
 And each issue holds the scan line, the import count, the symbols, the call sites, the file count, the estimate in lines, the risks, the recommendation, the reason, and the run link
 And each issue states that a replacement is a separate change request that the owner approves
 And the label zero-dep exists
@@ -684,12 +695,18 @@ Given an open assessment issue for hex from 10 days ago
 And the latest version and the counts did not change
 When deps.freshness.sh assess runs
 Then no claude -p run starts for hex and the issue does not change
-Given the owner closed the assessment issue of toml
-When deps.freshness.sh assess runs with the same latest version of toml
+Given the owner closed the assessment issue of tracing
+When deps.freshness.sh assess runs with the same latest version of tracing
 Then the issue stays closed with no new comment
 Given axum got a new release and is no longer aged
 When deps.freshness.sh assess runs
 Then the script comments on the axum issue with the reason and closes it
+Given an open assessment issue for chrono-tz whose last assessment is 91 days old, with the same latest version and counts
+When deps.freshness.sh assess runs
+Then one claude -p run starts for chrono-tz and the script comments on the issue
+Given the call site count of hex changed since its last assessment
+When deps.freshness.sh assess runs
+Then one claude -p run starts for hex and the script comments on the issue
 ```
 
 ### AC-18: The dry run plans and does nothing (requirement 48)
@@ -711,9 +728,12 @@ Then it starts on a weekly schedule and on workflow_dispatch with a dry-run inpu
 And its concurrency group is deps-autofix with no cancel of an active run
 And it has the jobs update and assess, each with a timeout
 And each job calls deps.freshness.sh in exactly one step
-And each other step is a checkout with no persisted credential, a tool install from the pin files, a cache, or the upload of the report artifact pinned by a full commit SHA
+And each other step is a checkout with no persisted credential, a tool install from the pin files, the step of claude.ensure.sh, a cache, or the upload of the report artifact pinned by a full commit SHA
 And the job assess has only the permissions contents read and issues write
 And only the step of the script gets CLAUDE_CODE_OAUTH_TOKEN
+And the job update has the permissions of the autofix job and no others
+And only the step of the script of the job update gets the release token
+And the workflow adds no repository secret
 When the weekly run is active and the daily autofix starts
 Then the daily autofix waits until the weekly run ends
 ```
@@ -734,8 +754,9 @@ And the report holds no credential
 ```gherkin
 Given the move of the shared steps into deps.common.sh
 When the test stage runs
-Then tests/deps.autofix.rs and tests/scripts/deps.autofix.test.sh pass with no change
+Then tests/deps.autofix.rs and tests/scripts/deps.autofix.test.sh pass, with the copy of deps.common.sh in the test setup as the one change and no change of an assertion or an expected output
 And .github/workflows/deps-autofix.yml and .github/dependabot.yml do not change
+And the pipeline entry points, pipeline.verdict.sh, the fingerprint script, and the workflows of CR-0022 and CR-0025 do not change
 ```
 
 ### AC-22: No credential in any output (requirement 41, non-functional requirement 4)
@@ -777,10 +798,31 @@ And index.md and .taxonomy have the stated rows
 Given the first real run and the scan 30 days later
 When the reviewer reads the scenario
 Then the count stale is 0 and the count of aged and behind is 0
-And 9 of 9 aged crates have an assessment issue
+And 8 of 8 aged crates have an assessment issue
 And each scan took at most 120 seconds
 And each claude -p run stayed in 30 turns, 5 US dollars, and its process timeout
 And no cryptography crate has a recommendation other than keep
+```
+
+### AC-26: The structured result and the credential rules of a run (requirements 21 and 22)
+
+```gherkin
+Given an update run
+Then the claude -p process has no GitHub token in its environment, the checkout holds no persisted credential, and the environment of the process and of the verdict of the script is the fixed allowlist of the autofix
+And the tool allowlist of the run is the allowlist of the autofix
+When the run ends with a result that lacks the field also_raised, or that cannot be parsed
+Then the item fails with the reason invalid_result
+When the run ends with a complete result
+Then the report holds status, name, from_version, to_version, also_raised, files_changed, code_changed, verdict, failing_stage, first_error, and reason
+```
+
+### AC-27: The scope of the change holds (non-functional requirements 3 and 5)
+
+```gherkin
+Given the tree after the CR and the workflow file of the freshness flow
+When a reviewer reads the diff of the implemented commit
+Then it adds no replacement code for a dependency
+And it names no paid service other than the Claude Code subscription of the owner, and no API key
 ```
 
 ## Quality Standards Compliance
@@ -832,7 +874,7 @@ A reviewer agent checks blocking findings only, with a focus on the latest versi
 
 ### Risk 3: The cost of many `claude -p` runs in one week
 
-**Likelihood:** high for the first real run (up to 4 update runs and 7 assessment runs), low later
+**Likelihood:** high for the first real run (up to 4 update runs and 6 assessment runs), low later
 **Impact:** medium, a part of the usage limit of the subscription
 **Mitigation:** The per-run limits of the autofix, the run cap and the budget of each job (judgement call 12), no run for a cryptography crate, no run for an action, no new assessment until its input changes or 90 days pass, and the hold time of a breaking item. The report records the cost of each run.
 
@@ -902,7 +944,7 @@ Verify the time of one update run with its verdict and smoke check on the runner
 7. **Coupled raise.** An update run can raise another direct dependency when the update cannot build without it, for example `sha2` 0.11 and `hmac` 0.13 through their shared trait crate `digest` and the use of `Hmac<Sha256>` in the project. The commit names each raised crate, and a raised crate gets no own run.
 8. **Branch name.** `deps/freshness-<YYYY-MM-DD>` in UTC, with the pull request flow of the autofix through the shared helper. A separate branch keeps the weekly major updates apart from the daily security fixes, so a red interaction never holds back a security fix. One weekly run gives at most one freshness release each week.
 9. **Issue titles.** "Dependency freshness: breaking updates" with the label `dependencies` for the breaking and failed update items, one issue. "Zero-dep assessment: <ecosystem> <name>" with the labels `dependencies` and `zero-dep`, one issue for each aged dependency. The titles differ from the autofix issue "Dependency autofix: failed items", so each script finds only its own issue.
-10. **What counts as "the app breaks".** A red verdict of the script, or a failed smoke check of the binary (`--version`, the line `listening`, `GET /healthz`, and a clean SIGTERM), or a failed frozen install or build of the prototype. The verdict of Claude Code does not count. A guard failure (`path_not_allowed`, `credential_in_diff`, `tests_removed`, `invalid_result`, `timeout`) is a failed run, not a finding that the app breaks, and the issue shows it with its reason.
+10. **What counts as "the app breaks".** A red verdict of the script, or a failed smoke check of the binary (`--version`, the line `listening`, `GET /healthz`, and a clean SIGTERM), or a failed frozen install or build of the prototype. The verdict of Claude Code does not count. A guard failure (`path_not_allowed`, `credential_in_diff`, `dependency_removed`, `tests_removed`, `invalid_result`, `timeout`) is a failed run, not a finding that the app breaks, and the issue shows it with its reason.
 11. **Hold time of a breaking item.** 28 days, or until the latest version changes, or `--retry-failed`. A weekly retry of the same version gives the same result and costs a run each week.
 12. **Limits of one workflow run.** Each `claude -p` run keeps the limits of the autofix: 30 turns, 5 US dollars API-equivalent, and the Sonnet alias. The process timeout is 40 minutes for an update run and 15 minutes for an assessment run, because an assessment only reads. The job `update` starts at most 4 update runs and spends at most 15 US dollars, as the autofix does, with a job timeout of 330 minutes, below the 6-hour bound of a hosted job. The job `assess` starts at most 10 assessment runs and spends at most 20 US dollars, with a job timeout of 180 minutes. The script starts no new update run when less than 75 minutes of the job time remain.
 13. **Polite rate.** At most one request per second for each registry, which is the crawler policy of crates.io. The `User-Agent` is `agentloupe-deps-freshness (https://github.com/desek/agentloupe)`.
@@ -919,7 +961,7 @@ Verify the time of one update run with its verdict and smoke check on the runner
 
 ## Decision Outcome
 
-Pending. The status is `proposed`.
+Approved on 2026-10-24 by a reviewer agent in a Pi session through the proxy, separate from the author.
 
 ## Related Items
 
@@ -933,3 +975,25 @@ Pending. The status is `proposed`.
 ## Notes
 
 Layer 1 isolation: this CR names the specification sections and the files that change. It does not hold their text, workflow YAML, or code. The decisions map to the requirements: D1 to requirements 9 to 11 and 16 to 33; D2 to requirements 9 to 11 and 34 to 40; D3 to requirements 20 to 27. The baseline of the cargo dependencies is the measurement of the supervisor on 2026-10-24; the scan of Part A of the model-based test replaces it for the npm packages and the actions.
+
+### Review notes, 2026-10-24
+
+A reviewer agent, separate from the author, reviewed this CR for blocking findings only, and made these edits:
+
+1. **Contradiction with the repository: the Claude Code install step.** Requirement 44 listed the allowed steps of a job and left out the step of `.agents/scripts/claude.ensure.sh`. `dependencies.md` (section "Install of Claude Code") and `deps-autofix.yml` need that step, because the install on a hosted runner leaves the platform binary of Claude Code missing. Edit: requirement 44 and AC-19 name the step.
+2. **Contradiction with the repository: the unchanged autofix tests.** Requirement 46, "Tests to Modify", and AC-21 required the autofix tests to pass with no change. The setup of `tests/scripts/deps.autofix.test.sh` copies only `deps.autofix.sh` and its prompt into the test repository, so a script that sources `deps.common.sh` fails there. Edit: the one allowed change is the copy of `deps.common.sh` in the test setup, with no change of an assertion or an expected output; requirement 46, "Tests to Modify", AC-21, and "Affected Components" state it.
+3. **Cryptography crate replaced by own code.** No guard stopped an update run from removing a direct dependency, also a cryptography crate, and writing own code in `src/` in its place. Edit: requirement 23 adds the guard `dependency_removed`; AC-8 and judgement call 10 name it.
+4. **Requirement not testable.** Requirement 11 said that no other file states the values 90 and 180, which this CR, `.taxonomy`, and `operations.md` contradict. Edit: the rule names another script, a prompt template, or a workflow file; AC-3 checks it.
+5. **Requirements without an acceptance criterion.** Requirements 2, 3, 7, 21, and 22, the part of requirement 14 on the token, the part of requirement 45 on the job `update` and the release token, and non-functional requirements 1, 3, and 5 had no criterion. Edit: AC-1, AC-2, AC-4, AC-19, and AC-21 got lines, and AC-26 and AC-27 are new.
+
+No blocking finding stays open. Each `claude -p` run has a turn limit, a budget, and a process timeout; the workflow is a thin caller; the CR holds no code, YAML, or file content; and the stated permissions cover each step.
+
+### Review notes, 2026-10-24, second reviewer
+
+A second reviewer agent, separate from the author and from the first reviewer, reviewed the CR after the edits above for blocking findings only, and made these edits:
+
+6. **Contradiction with the repository: the baseline of `toml`.** The table had `toml` pinned at 0.9.12 with the latest 0.9.12, in the aged group. `Cargo.toml` states `toml = "1.1"`, and `Cargo.lock` resolves 1.1.8, which commit 7538603 brought after the source commit. crates.io lists 1.1.8 as the highest release, published on 2026-10-09, so 0.9.12 was never the latest by requirement 6. `toml` is fresh. Edit: the `toml` row moved to the fresh row; the aged count is 8 in "Change Drivers", in "Current State", in AC-3, in AC-14, in AC-25, and in the target "Aged dependencies with an assessment issue"; the target "Correct latest version" counts 13 crates; "Business Impact" and Risk 3 count 6 assessment runs; and AC-17 uses `tracing` in place of `toml` for the closed issue.
+7. **Contradiction inside the class rule.** Requirement 9 gave each dependency exactly one of three classes, with `aged` first. But requirement 5 sets the class `unknown`, and requirements 3 and 7 set `stale` for a pin mismatch or for a yanked pinned version, also when the latest release is older than 180 days. Edit: requirement 9 names these cases before the order of precedence.
+8. **Requirement without an acceptance criterion.** Requirement 40, item 3 (a new run when the counts change) and the new run after 90 days in item 2 had no criterion. Edit: AC-17 got two blocks.
+
+No blocking finding stays open after these edits. The status stays `approved`.
