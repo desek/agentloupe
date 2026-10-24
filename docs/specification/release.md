@@ -542,9 +542,9 @@ The script follows the same rules as the release scripts: `--help`, a machine ou
 
 The release builds send the start request to the telemetry endpoint. `telemetry.md` gives the full rules.
 
-1. The endpoint is the Cloudflare Worker `agentloupe-telemetry` on its `workers.dev` subdomain of the owner's account, with no route and no custom domain. Its source is under `telemetry/`.
+1. The endpoint is the Cloudflare Worker `agentloupe-telemetry` on the custom domain `telemetry.agentloupe.dev` of the owner's zone `agentloupe.dev`. Its `workers.dev` subdomain and its preview URLs are off. Its source is under `telemetry/`.
 2. The Worker has one route: a `GET` of `/` and a commit of 40 lowercase hex characters. It answers 204 with no body after one atomic insert-or-update, 404 for each other path or method with no write, and 503 with no body when the store fails.
 3. The store is the D1 database `agentloupe-telemetry` with one table `starts` of four columns: `sha`, `firstseen`, `lastseen`, and `count`. The dates are UTC dates.
 4. The Worker stores no IP address, no `user-agent`, no header, no query, no time of day, and no country. Its logs are off. It has no read route.
 5. `.agents/scripts/telemetry.deploy.sh` tests and deploys the Worker through `wrangler`, which `.tool-versions` pins as `npm:wrangler 4.100.0`. Only the owner runs the script, with the owner's consent. No workflow runs it.
-6. The owner sets the repository variable `LOUPE_TELEMETRY_HOST` to the host that the deploy script prints. The release builds read it (see "Binary archives" and "Container image"). Until the owner sets it, each release is `built-out`.
+6. The owner sets the repository variable `LOUPE_TELEMETRY_HOST` to the host that the deploy script prints, `telemetry.agentloupe.dev`. The release builds read it (see "Binary archives" and "Container image"). Until the owner sets it, each release is `built-out`.

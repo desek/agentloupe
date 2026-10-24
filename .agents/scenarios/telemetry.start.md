@@ -3,7 +3,7 @@ date: 2026-10-23
 source: cr (CR-0026)
 surface: cli, http
 outcome: intended
-runs: "Part A 1 of 1 (consented), Part B 2 of 2, Part C 2 of 2 passed, last run 2026-10-23"
+runs: "Part A 2 of 2 (consented), Part B 2 of 2, Part C 2 of 2 passed, last run 2026-10-24"
 intent_code: "src/telemetry/mod.rs:start, build.rs:telemetry, telemetry/src/index.js:fetch"
 intent_test: "tests/telemetry.send.rs:telemetry_sends_one_get, tests/telemetry.built_out.rs:telemetry_built_out_state, telemetry/test/worker.test.mjs:insert"
 coverage_gap: false
@@ -65,6 +65,8 @@ coverage_gap: false
 **Part B, run 2, `HEAD` `e487306`.** The same sequence with the scripted helper: row `[]` before; `sent` → `count` 1; `sent` → `count` 2; `disabled` → `count` 2; built-out build: `config show` `built-out`, 0 matches of the host in the binary, `state` `built-out`, `count` 2.
 
 **Part C, runs 1 and 2 (`HEAD` `eab56f0` and `e487306`).** Each run: A 1 request, `GET`, path = `HEAD`, query empty, 0 body bytes, user agent `agentloupe/0.1.0 (aarch64-apple-darwin)`, headers `accept`, `host`, `user-agent`; B 0; 0 exchanges. Opt-out `=1`: 0 new; `=true`: 1 new. Hold: healthz 200 twice while open, exit 0 in 0.01 to 0.02 s, 1 request. Start delay medians, hold against opt-out: 142.5 against 144.1 ms (run 1), 142.9 against 145.0 ms (run 2); the baseline before the change was 146.5 ms. Override commit: path `/1111…`. Marker: 1 match in the marker build, 0 in the built-out build, 0 matches of the commit, `built-out`, 0 requests. Bad values: exit 101 and 1 error naming the variable each, 0 echoes. No `.git`: exit 101 with the commit error. No process left. (A first attempt of run 1 is not counted: the harness did not wait for the answer-mode fake to stop, so the hold-mode fake could not bind its port; the harness now waits.) Live check: 1 `snapshot` frame, `calls` 0, `in_flight` 0, while the request was held. Rebuild rule: `Dirty ... the file .git/refs/heads/feat/cr-0026-telemetry has changed`; new `HEAD` 1 match, old `8876e40` 0 matches.
+
+**Part A, 2026-10-24, the custom domain (consented).** The one product domain is `agentloupe.dev`; `telemetry/wrangler.toml` names the custom domain `telemetry.agentloupe.dev` and sets `workers_dev` to false. `--test`: 3 Worker cases passed, exit 0. `--dry-run`: exit 0, step `domain` passed with `telemetry.agentloupe.dev`, `git status` unchanged. Real run: exit 0, `exists ... none created`, `0 applied`, the deploy listed `telemetry.agentloupe.dev (custom domain)`, host `telemetry.agentloupe.dev`. Test `sha` `65f49c86d7b747d5959704488b75d84db861326b` (SHA-1 of a test string): no row before; `GET https://telemetry.agentloupe.dev/<sha>` 204; row `count` 1, `firstseen` = `lastseen` = `2026-10-24`. The old host `agentloupe-telemetry.daniel-95c.workers.dev`, the same path: 404 with Cloudflare `error code: 1042`, `count` still 1. `GET /` on the new host: 404. Test row deleted (1 change), 0 rows of the `sha` after. Repository variable `LOUPE_TELEMETRY_HOST` set to `telemetry.agentloupe.dev`; no release build had used the old value.
 
 **Outcome.** `intended`: the behaviour comes from `src/telemetry/mod.rs:start` (the state, the line, the task), `build.rs:telemetry` (the host, the commit, the target, the rerun rules), and `telemetry/src/index.js:fetch` (the upsert and the 404); the Rust tests of `tests/telemetry.send.rs`, `tests/telemetry.built_out.rs`, and the unit tests in `src/telemetry/`, and the Worker cases of `telemetry/test/worker.test.mjs`, assert it.
 

@@ -107,7 +107,7 @@ The build reads two variables of its own at build time: `LOUPE_TELEMETRY_HOST` a
 `LOUPE_TELEMETRY_HOST` is the host of the start request.
 
 1. When the variable is absent, or empty after the removal of white space at the start and the end, the binary holds no telemetry host. The build state is `built-out`.
-2. A set value is a host name with an optional port, for example `example.workers.dev`, `127.0.0.1:8899`, or `localhost`. The value has no scheme, no path, no query, no fragment, no user name, no password, and no empty label.
+2. A set value is a host name with an optional port, for example `telemetry.agentloupe.dev`, `127.0.0.1:8899`, or `localhost`. The value has no scheme, no path, no query, no fragment, no user name, no password, and no empty label.
 3. The scheme of the request is `https`. It is `http` only when the host is `127.0.0.1` or `localhost`, for a local fake endpoint. This follows the loopback rule of the provider base URLs.
 4. A value that is not valid stops the build with an actionable error. The error names `LOUPE_TELEMETRY_HOST`, the rule, and the fix. It does not print the full value.
 

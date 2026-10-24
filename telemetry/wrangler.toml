@@ -1,15 +1,17 @@
-# @agents-index Wrangler configuration of the Worker agentloupe-telemetry: the workers.dev subdomain only, one D1 database, logs off.
+# @agents-index Wrangler configuration of the Worker agentloupe-telemetry: the custom domain telemetry.agentloupe.dev only, one D1 database, logs off.
 #
-# The Worker receives the start request of loupe serve (docs/specification/telemetry.md). It has no route and
-# no custom domain, no Logpush, and no tail consumer. telemetry.deploy.sh writes database_id on the first run;
-# the ID is not a secret.
+# The Worker receives the start request of loupe serve (docs/specification/telemetry.md). Its one route is the
+# Cloudflare custom domain telemetry.agentloupe.dev on the zone agentloupe.dev; the deploy makes the DNS record
+# and the certificate. The workers.dev subdomain and the preview URLs are off. It has no Logpush and no tail
+# consumer. telemetry.deploy.sh writes database_id on the first run; the ID is not a secret.
 name = "agentloupe-telemetry"
 main = "src/index.js"
 compatibility_date = "2025-09-01"
-workers_dev = true
+workers_dev = false
 preview_urls = false
 logpush = false
 send_metrics = false
+routes = [{ pattern = "telemetry.agentloupe.dev", custom_domain = true }]
 
 # Workers Logs would keep request data, headers included, on the account.
 [observability]

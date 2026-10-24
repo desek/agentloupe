@@ -9,7 +9,7 @@ shows how many tokens the agents used, what those tokens cost at API list prices
 requests I opened and merged, how many lines changed, and one paragraph per day that describes the
 kind of work. No prompt, no code, and no detail that identifies a project leaves the machine.
 
-The product domains are `agentloupe.dev` and `agentloupe.app`.
+The product domain is `agentloupe.dev`.
 
 ## Status
 
@@ -305,7 +305,8 @@ the release workflow sets it (see [Privacy model](#privacy-model)).
 
 The receiver of the start request lives under [`telemetry/`](telemetry/). Only the owner deploys it,
 with `.agents/scripts/telemetry.deploy.sh` and the `wrangler` of `.tool-versions`: `--test` runs the
-Worker test on a local database, and `--dry-run` shows the steps and changes nothing.
+Worker test on a local database, and `--dry-run` shows the steps and changes nothing. The Worker
+answers on the custom domain `telemetry.agentloupe.dev` only; its `workers.dev` host is off.
 
 ### Check a release
 
@@ -519,8 +520,8 @@ the request holds no data of the user, the host, the calls, or the dashboard. It
 port is open, has one attempt with a timeout of 5 seconds, and its result never changes the start.
 The start log line `telemetry` names the state at each start (`sent`, `disabled`, or `built-out`),
 and `loupe config show` prints the line `telemetry` with the build state. The receiver is the
-Cloudflare Worker `agentloupe-telemetry` on `workers.dev`, whose source is under
-[`telemetry/`](telemetry/). It stores per commit only the first date, the last date (UTC dates),
+Cloudflare Worker `agentloupe-telemetry` on the custom domain `telemetry.agentloupe.dev`, whose
+source is under [`telemetry/`](telemetry/). It stores per commit only the first date, the last date (UTC dates),
 and a count. It stores no IP address, no `User-Agent`, no header, no query, and no time of day; its
 logs are off, and it has no read route. A build from source and a local image build
 (`docker compose up -d --build`) hold no host and send no request.

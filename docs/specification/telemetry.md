@@ -61,8 +61,9 @@ At each start, after the line `listening`, `loupe serve` writes one info line `t
 
 The receiver is the Cloudflare Worker `agentloupe-telemetry`. Its source is under `telemetry/` in this repository: one `wrangler` configuration file, the Worker source, one D1 migration under `telemetry/migrations/`, and the Worker test under `telemetry/test/`.
 
-1. The Worker is served on its `workers.dev` subdomain of the owner's account: `agentloupe-telemetry.<account subdomain>.workers.dev`. It has no route and no custom domain.
-2. The Worker has one D1 database with the name `agentloupe-telemetry`.
+1. The Worker is served on the Cloudflare custom domain `telemetry.agentloupe.dev`, on the zone `agentloupe.dev` of the owner's account. `agentloupe.dev` is the one product domain. The `wrangler` configuration names the custom domain as its one route, and the deploy makes the DNS record and the certificate of the host.
+2. The `wrangler` configuration sets `workers_dev` to false and `preview_urls` to false. Thus the `workers.dev` host of the Worker does not reach the Worker: Cloudflare answers it with 404 and the error code 1042, and the Worker writes nothing.
+3. The Worker has one D1 database with the name `agentloupe-telemetry`.
 
 ### Store
 
@@ -116,13 +117,14 @@ The verdict does not run the Worker test. The deploy script runs it.
 3. A real run does these steps in this order:
    1. It checks the pin.
    2. It runs the Worker test.
-   3. It checks the `wrangler` login.
-   4. It makes the D1 database `agentloupe-telemetry` only when the account has no database of that name.
-   5. It applies the migration to the remote database.
-   6. It deploys the Worker.
-   7. It prints the host of the deployed Worker, and the command that sets the repository variable `LOUPE_TELEMETRY_HOST` to that host.
+   3. It checks the custom domain: the `wrangler` configuration holds exactly one route with `custom_domain = true`, its host is under the zone `agentloupe.dev`, and `workers_dev` is false.
+   4. It checks the `wrangler` login.
+   5. It makes the D1 database `agentloupe-telemetry` only when the account has no database of that name.
+   6. It applies the migration to the remote database.
+   7. It deploys the Worker. The deploy output must list the custom domain.
+   8. It prints the host, which is the custom domain `telemetry.agentloupe.dev`, and the command that sets the repository variable `LOUPE_TELEMETRY_HOST` to that host.
 4. `wrangler` binds a D1 database by its ID. On the first real run, the script writes the ID of the new database into the `wrangler` configuration. The owner commits that change. The ID is not a secret.
-5. `--dry-run` runs the pin check, the Worker test, the login check, and the dry run of the `wrangler` deploy. It prints each step that a real run does. It makes no change on the Cloudflare account and no change in the repository.
+5. `--dry-run` runs the pin check, the Worker test, the custom domain check, the login check, and the dry run of the `wrangler` deploy. It prints each step that a real run does. It makes no change on the Cloudflare account and no change in the repository.
 6. `--test` runs the Worker test alone.
 7. The script is idempotent. A second run with no change in `telemetry/` makes no second database, applies no migration again, prints the same host, and exits 0.
 8. The script stores no Cloudflare credential. It does not set the repository variable. The owner sets it one time. No workflow and no pipeline script runs the script. Only the owner runs it, on the owner's machine, with the owner's consent.
@@ -134,6 +136,7 @@ The verdict does not run the Worker test. The deploy script runs it.
 | 2 | A usage error. |
 | 3 | `wrangler` is missing or is not the pinned version. The error names the pin and the fix. |
 | 4 | `wrangler` is not logged in. The error names the `wrangler` login. |
+| 5 | The `wrangler` configuration has no single custom domain under `agentloupe.dev`, or `workers_dev` is not false. The error names the custom domain and the fix. |
 
 ## Release builds
 

@@ -146,7 +146,7 @@ fn telemetry() {
     } else {
         if let Err(why) = host::check(host) {
             stop(&format!(
-                "LOUPE_TELEMETRY_HOST {why}, so the build cannot fix the target of the start request. The rule: a host name with an optional port, with no scheme, no path, no query, no fragment, no user name, no password, and no empty label. Fix 1: set it to the host only, for example agentloupe-telemetry.<account subdomain>.workers.dev or 127.0.0.1:8899. Fix 2: unset it for a build with no start request. Reference: docs/specification/configuration.md, section Build variables. Verify: cargo build succeeds and loupe config show prints the line telemetry."
+                "LOUPE_TELEMETRY_HOST {why}, so the build cannot fix the target of the start request. The rule: a host name with an optional port, with no scheme, no path, no query, no fragment, no user name, no password, and no empty label. Fix 1: set it to the host only, for example telemetry.agentloupe.dev or 127.0.0.1:8899. Fix 2: unset it for a build with no start request. Reference: docs/specification/configuration.md, section Build variables. Verify: cargo build succeeds and loupe config show prints the line telemetry."
             ));
         }
         let given = std::env::var("LOUPE_BUILD_COMMIT").unwrap_or_default();
