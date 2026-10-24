@@ -2,7 +2,7 @@
 name: "CR-0027 Dependency freshness"
 description: "A weekly GitHub Actions workflow calls one repository script that reads the direct dependencies of cargo, of the npm prototype, and of the pinned GitHub Actions, gets the pinned and the latest version with their publish dates from the registries, and puts each dependency in one class: fresh, stale (pinned older than 90 days and behind the latest), or aged (the latest release older than 180 days). For each stale dependency, one headless Claude Code run raises it to the latest version, also a major version, and the script runs the full verdict to find if the app breaks: a green update goes as a fix(deps) or chore(deps) commit through the pull request flow of the dependency autofix, and a red update goes into one issue with the failing stage and the first error. For each aged dependency, one headless Claude Code run assesses a self-managed replacement (zero-dep approach) and writes keep, replace, or watch into one issue per dependency; a cryptography crate always gets keep."
 id: "CR-0027"
-status: "approved"
+status: "implemented"
 date: 2026-10-24
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, release manager), reviewer agent (approver)
@@ -997,3 +997,28 @@ A second reviewer agent, separate from the author and from the first reviewer, r
 8. **Requirement without an acceptance criterion.** Requirement 40, item 3 (a new run when the counts change) and the new run after 90 days in item 2 had no criterion. Edit: AC-17 got two blocks.
 
 No blocking finding stays open after these edits. The status stays `approved`.
+
+### Implementation notes, 2026-10-24
+
+The implementation covers the parts that a private repository and a dry run can complete: requirements 1 to 51 in code and tests, 52 to 56 in the specification commit, and the non-functional requirements 1, 2, 3, 5, and 6. The run log is `.agents/scenarios/deps.freshness.md` with `.agents/scenarios/deps.freshness.dryrun.log`; the measured values are in `docs/specification/operations.md` (Dependency freshness targets), and the results of the checks at implementation in `docs/specification/dependencies.md`. The scan of the source tree reproduces the baseline classes: 5 stale crates, 8 aged crates with `hmac` behind, and 13 of 13 latest versions. On the same day, the daily autofix merged `hmac` 0.13.0, `aes-gcm` 0.11.1, and `sha2` 0.11.1 (`b19bd6d`), and crates.io published `rusqlite` 0.41.0; the scan after the rebase shows 3 stale crates and no aged crate behind.
+
+Parts that wait:
+
+1. Part B of the model-based test: the manual dry run of `deps-freshness.yml` on GitHub, its two report artifacts, the scan time on the runner, and parameter P2 (a daily run that waits behind an active weekly run, and a second pending run). A manual start needs the workflow file on the default branch, so it follows the merge. After it, the owner disables the workflow until the items below (judgement call 23).
+2. The public repository and the secret `CLAUDE_CODE_OAUTH_TOKEN`, as for the daily autofix.
+3. Part C, the first real run, and with it AC-6 to AC-17 and AC-20 on GitHub, AC-22 over real run logs, AC-25, parameter P4, and the targets of `operations.md` that need a real run or the scan 30 days after it.
+
+Decisions at the implementation:
+
+1. The fixtures are under `tests/fixtures/freshness/`, as `operations.md` states. They are real answers of crates.io, the npm registry, and the GitHub API, recorded on 2026-10-24 and trimmed; the README of the directory lists the edits (a pre-release first and an out-of-order list, a yanked latest, a yanked pinned version, a draft, a pre-release, and a tag `v9`).
+2. The shared helper `deps.common.sh` holds the steps of requirement 46 and the calls they make: the GitHub reads and writes, the git push with the release token, the check polls, and the redaction. The `claude -p` plumbing (the environment allowlist, the tool lists, the limits, the price of a run) stays in each script; the shell test `thresholds_and_limits` checks that the freshness script keeps the values of the autofix.
+3. The polite rate waits 1100 ms from the end of the last request of a lane, so two requests to one registry never start within one second. The three registries run as three parallel lanes, so a scan of 37 dependencies takes 40 to 46 seconds.
+4. The latest version of `also_raised` comes from the lock files before and after the run, not from the result of Claude Code; the item of a raised dependency prints the status `raised` with the reason `also_raised`. The line `code changed: yes` follows the diff of the script or the field `code_changed` of the result.
+5. The smoke check sets `LOUPE_LISTEN=127.0.0.1:0` and `DO_NOT_TRACK=1`, reads the port from the line `listening`, and waits at most 60 seconds for it.
+6. The remaining job time counts from the start of the script. A held breaking item counts as an item that the issue holds (exit code 1), as in the autofix. Exit code 6 wins over exit code 1.
+7. A failed assessment (`timeout`, `invalid_result`, `tree_changed`) writes its reason into the assessment issue with no date, so the next run assesses it again, and the run ends with exit code 1. The machine line of an assessment issue holds the latest version, the counts, the class, and the date.
+8. The job `assess` installs only Node and Claude Code, because it builds nothing; it has no cache step.
+9. The shell tests run in two nextest groups, not four: with four, the timing test `private_config_read_is_cached` of the same test stage missed its 5 ms bound on a loaded machine.
+10. The job `update` does not call `runner.space.sh`, which `40fe18f` added to the autofix job after the specification commit: requirement 44 lists the allowed steps. The first real run shows whether the job needs it.
+
+Hosted verdict of the pull request <https://github.com/desek/agentloupe/pull/19> before this commit: run 40088432078 on `79ccfef`, `success` in 7 minutes 44 seconds; run 40092344315 on `b5144b5`, after the rebase on `b19bd6d`, `success` in 7 minutes 58 seconds (the test job 7 minutes 21 seconds).

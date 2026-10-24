@@ -91,6 +91,13 @@ The daily dependency autofix is a source of `fix(deps)` releases. `dependencies.
 6. One autofix branch for each day gives at most one autofix release for each day.
 7. A release that the autofix merges also carries each other unreleased releasable commit on `main`, for example a `feat` commit of the owner.
 
+The weekly freshness flow of `dependencies.md` is a second source of `fix(deps)` releases. It uses the same shared steps and the same rules as the autofix:
+
+1. The freshness flow merges its green updates as one squash commit on `main`. The commit is `fix(deps)` when it holds one or more `cargo` updates, and release-please then proposes a patch release. An update that changes only `prototype/` is `chore(deps)` and makes no release.
+2. The freshness flow then does the same release pull request step as the autofix, with items 2 to 5 and item 7 of this list.
+3. A `cargo` update of a dev dependency is also `fix(deps)`. It makes a patch release with no change of the binary.
+4. One freshness branch for each week gives at most one freshness release for each week.
+
 ### First release
 
 The changelog starts after the commit `446f065`. The configuration sets `bootstrap-sha` to this commit and `release-as` to `0.1.0`. The first release pull request proposes `0.1.0`, which equals `Cargo.toml`. Right after `v0.1.0` publishes, a `chore(release)` commit removes `release-as`. This commit goes to `main` through the admin bypass of the main ruleset. The work before the first release is in `docs/cr/`.
@@ -335,11 +342,11 @@ A dependency update gets its type from what it changes. Only an update of the sh
 
 | Update | Type | Section |
 |---|---|---|
-| A `cargo` update, by Dependabot or by the dependency autofix | `fix(deps)` | Bug Fixes, a patch bump |
-| An `npm` update of `prototype/`, by Dependabot, or a fix of the dependency autofix that changes only `prototype/` | `chore(deps)` | hidden, because the prototype is not shipped |
+| A `cargo` update, by Dependabot, by the dependency autofix, or by the freshness flow | `fix(deps)` | Bug Fixes, a patch bump |
+| An `npm` update of `prototype/`, by Dependabot, or a fix of the dependency autofix or an update of the freshness flow that changes only `prototype/` | `chore(deps)` | hidden, because the prototype is not shipped |
 | A pin update of an action, by Dependabot | `ci(deps)` | hidden, because a pin does not change the binary or the image |
 
-The squash commit of an autofix pull request is `fix(deps)` when the pull request holds one or more `cargo` fixes, and `chore(deps)` when it holds only `prototype/` fixes. The squash body keeps one line for each fix, with the type of that fix.
+The squash commit of an autofix pull request or of a freshness pull request is `fix(deps)` when the pull request holds one or more `cargo` changes, and `chore(deps)` when it holds only `prototype/` changes. The squash body keeps one line for each change, with the type of that change.
 
 ## Commit rule for a change request
 

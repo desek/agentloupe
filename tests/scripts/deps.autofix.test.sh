@@ -95,7 +95,7 @@ echo "corepack \$*" >>"$D/corepack.calls"; exit "\$(cat "$D/corepack_rc" 2>/dev/
 COREPACK
   chmod +x "$D/bin/"*
   G="$D/git"; mkdir -p "$G/.agents/scripts" "$G/.github/workflows" "$G/vendor/litellm" "$G/src" "$G/prototype"
-  cp "$ROOT/.agents/scripts/deps.autofix.sh" "$ROOT/.agents/scripts/deps.autofix.prompt.md" "$G/.agents/scripts/"
+  cp "$ROOT/.agents/scripts/deps.autofix.sh" "$ROOT/.agents/scripts/deps.autofix.prompt.md" "$ROOT/.agents/scripts/deps.common.sh" "$G/.agents/scripts/"
   cat >"$G/.agents/scripts/pipeline.verdict.sh" <<VERDICT
 #!/bin/bash
 # Stand-in verdict: records its environment, prints the log of the test, exits with the next code of the test.

@@ -1,0 +1,44 @@
+[
+ {
+  "tag_name": "v8.0.0",
+  "name": "v8.0.0",
+  "draft": true,
+  "prerelease": false,
+  "published_at": null
+ },
+ {
+  "tag_name": "v8.0.0-beta.1",
+  "name": "v8.0.0-beta.1",
+  "draft": false,
+  "prerelease": true,
+  "published_at": "2026-10-22T10:00:00Z"
+ },
+ {
+  "tag_name": "v9",
+  "name": "v9",
+  "draft": false,
+  "prerelease": false,
+  "published_at": "2026-10-23T10:00:00Z"
+ },
+ {
+  "tag_name": "v7.0.1",
+  "name": "v7.0.1",
+  "draft": false,
+  "prerelease": false,
+  "published_at": "2026-07-20T15:10:05Z"
+ },
+ {
+  "tag_name": "v6.1.0",
+  "name": "v6.1.0",
+  "draft": false,
+  "prerelease": false,
+  "published_at": "2026-07-20T15:23:28Z"
+ },
+ {
+  "tag_name": "v5.1.0",
+  "name": "v5.1.0",
+  "draft": false,
+  "prerelease": false,
+  "published_at": "2026-07-20T15:27:58Z"
+ }
+]

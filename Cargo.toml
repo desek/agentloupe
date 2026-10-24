@@ -409,6 +409,10 @@ path = "tests/advisory.respond.rs"
 name = "deps_autofix"
 path = "tests/deps.autofix.rs"
 
+[[test]]
+name = "deps_freshness"
+path = "tests/deps.freshness.rs"
+
 # The release build profile (docs/specification/release.md, section Release build profile): build hygiene
 # that makes the binary smaller and casual reading harder; no secrecy claim. The dev and test profiles stay
 # the Cargo defaults. panic = "abort" rests on the unwinding check of that section.
