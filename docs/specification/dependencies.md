@@ -32,7 +32,7 @@ The file `.github/dependabot.yml` declares the version updates. Dependabot secur
 
 The workflow `.github/workflows/deps-autofix.yml` is a thin caller (`operations.md`, Hosted workflows).
 
-1. It starts each day at 04:17 UTC and on a manual start. The time is before the working day of the owner and off the full hour, where GitHub delays scheduled runs.
+1. It starts each day at 04:17 UTC and on a manual start. A manual start can ask for a dry run, and the workflow then passes the dry-run flag to the script, so the run plans and writes nothing. The time is before the working day of the owner and off the full hour, where GitHub delays scheduled runs.
 2. It does not start on a push or on a pull request. Thus its own merges do not start it again.
 3. It has one concurrency group for all its runs. At most one run is active. A new run waits and does not cancel the active run.
 4. Its one job has a timeout of 180 minutes. This timeout is the one limit in the workflow file.
@@ -222,7 +222,7 @@ The script does this step when the run merged at least one `fix(deps)` commit, o
 4. When the check is green, it merges the release pull request with squash. Then the release flow of `release.md` makes the tag and the release.
 5. When the check is not green before the cap, the script records `release_pending` and leaves the pull request open. The next run does the step again.
 
-The script does not merge a release pull request that proposes `1.0.0` or a new major version. It records the case in the autofix issue as `release_needs_human`.
+The script does not merge a release pull request that proposes `1.0.0` or a new major version. It records the case in the autofix issue as `release_needs_human`. It also does not merge a release pull request while the repository is private, because the release flow stops on a private repository and a merge would make a tag with no assets. It records that case as `release_needs_human` and leaves the pull request open.
 
 A release that the script merges carries each unreleased releasable commit on `main`, also the `feat` and `fix` commits of the owner.
 

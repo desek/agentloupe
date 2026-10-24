@@ -77,6 +77,7 @@ fn deps_autofix_failures() {
 fn deps_autofix_pull_requests_and_release() {
     shell_tests(&[
         "dependabot_pr_merges_and_release_step",
+        "private_repo_release_stays_with_human",
         "release_pr_with_deps_fix_merged_later",
         "behind_pr_is_rebased_then_merged",
         "red_dependabot_pr_goes_to_claude",

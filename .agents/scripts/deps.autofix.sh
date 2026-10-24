@@ -44,7 +44,7 @@
 # pull request with squash, after the rebase command of Dependabot when it is behind; refuses a pin update that
 # replaces a commit SHA with a tag; (9) pushes the branch, opens or updates its pull request, and squash merges it
 # after a green check verdict; (10) merges the release pull request after a green check verdict when a fix(deps)
-# change is in it, never 1.0.0 or a new major version; (11) opens, comments on, or closes the autofix issue.
+# change is in it, never 1.0.0 or a new major version, and only when the repository is public; (11) opens, comments on, or closes the autofix issue.
 #
 # Output (stdout, key: value):
 #   repo: <owner/name> visibility: public|private mode: dry-run|run
@@ -732,6 +732,13 @@ release_step() {
     if [[ $dry_run -eq 1 ]]; then item "release:$n" release "$version" - planned release_needs_human "plan: no merge, record in the issue"; planned_records=$((planned_records + 1))
     elif [[ $nothing_open -eq 1 ]]; then item "release:$n" release "$version" - waiting release_needs_human "no merge; a human merges it"
     else item "release:$n" release "$version" - failed release_needs_human; record_failure "release:$n" "version=$version" release_needs_human "$version" "" ""; fi
+    return
+  fi
+  # A private repository keeps the release with a person: the release workflow stops on a private repository,
+  # so a merge would make a tag with no assets.
+  if [[ "$visibility" != public ]]; then
+    if [[ $dry_run -eq 1 ]]; then item "release:$n" release "$version" - planned release_needs_human "plan: no merge, the repository is $visibility"; planned_records=$((planned_records + 1))
+    else item "release:$n" release "$version" - waiting release_needs_human "no merge; the repository is $visibility and the release workflow stops"; fi
     return
   fi
   if [[ $dry_run -eq 1 ]]; then

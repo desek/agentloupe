@@ -12,6 +12,11 @@ on:
   schedule:
     - cron: '17 4 * * *'
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Plan only, with no write (true or false)
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -58,4 +63,5 @@ jobs:
           RELEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: .agents/scripts/deps.autofix.sh --repo "$GITHUB_REPOSITORY" --run-url "$RUN_URL"
+          DRY_RUN: ${{ inputs.dry_run == true && '--dry-run' || '' }}
+        run: .agents/scripts/deps.autofix.sh --repo "$GITHUB_REPOSITORY" --run-url "$RUN_URL" $DRY_RUN

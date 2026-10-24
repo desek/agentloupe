@@ -115,7 +115,7 @@ VERDICT
   echo 'lockfileVersion: 9.0' >"$G/prototype/pnpm-lock.yaml"
   (cd "$G" && git init -q -b main && git config user.email t@example.com && git config user.name t && git add -A && git commit -qm init \
     && git init -q --bare "$D/origin.git" && git remote add origin "$D/origin.git" && git push -q origin main && git fetch -q origin) || exit 1
-  serve "repos/$REPO" '{"private": true, "visibility": "private"}'
+  serve "repos/$REPO" '{"private": false, "visibility": "public"}'
   serve "repos/$REPO/actions/workflows/verdict.yml" @workflow.verdict.json
   serve "repos/$REPO/dependabot/alerts" @alerts.empty.json
   serve "repos/$REPO/pulls" '[]'
@@ -346,6 +346,15 @@ run
 [ $ok -eq 0 ] && [ $rc -eq 1 ] && echo "$out" | grep -q '^item: release:2 path: release package: 1.0.0 ecosystem: - status: failed reason: release_needs_human' \
   && ! grep -qx "PUT repos/$REPO/pulls/2/merge" "$D/calls" && grep -q 'release_needs_human' "$D/bodies/"*
 result dependabot_pr_merges_and_release_step $?
+fi
+
+# On a private repository the fix pull request merges, but the release pull request stays with a person.
+if want private_repo_release_stays_with_human; then
+setup; serve "repos/$REPO" '{"private": true, "visibility": "private"}'; pulls '.number == 21'; serve "repos/$REPO/pulls/21/files" @files.cargo.json; with_release 0.1.1
+run
+[ $rc -eq 0 ] && grep -qx "PUT repos/$REPO/pulls/21/merge" "$D/calls" && ! grep -qx "PUT repos/$REPO/pulls/2/merge" "$D/calls" \
+  && echo "$out" | grep -q '^item: release:2 path: release package: 0.1.1 ecosystem: - status: waiting reason: release_needs_human'
+result private_repo_release_stays_with_human $?
 fi
 
 # A later run with nothing open merges a green release pull request whose changelog lists a fix(deps) change.
