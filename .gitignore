@@ -21,3 +21,6 @@ data/
 # Local compose overrides, for example a short LOUPE_IDLE_SECS for a verification
 compose.override.yaml
 .wrangler/
+
+# Early prototype archives stay local; they are not part of the public repository.
+brainstorm/
