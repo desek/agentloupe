@@ -24,3 +24,6 @@ compose.override.yaml
 
 # Early prototype archives stay local; they are not part of the public repository.
 brainstorm/
+
+# The removed prototype stays out, so a local copy with node_modules never returns.
+prototype/
