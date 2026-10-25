@@ -75,3 +75,33 @@ fn writer_commit_is_in_the_next_read() {
     .unwrap();
     assert_eq!(count(&r), 2);
 }
+
+/// A mirror version that changes during a run stops the process with the version error, so the
+/// restart policy starts it again against the new mirror.
+#[test]
+fn version_change_during_a_run_stops_the_process() {
+    let d = tempfile::tempdir().unwrap();
+    let err = tempfile::tempdir().unwrap();
+    public::seed_mirror(d.path());
+    let mut p = public::Public::start(d.path(), err.path(), &[]);
+    let w = rusqlite::Connection::open(agent_loupe::mirror::path(d.path())).unwrap();
+    w.pragma_update(None, "user_version", 99).unwrap();
+    drop(w);
+    // The poller checks the mirror once per second; give it a few passes.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    let status = loop {
+        if let Some(s) = p.child.try_wait().unwrap() {
+            break s;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the role public still runs after the version change: {}",
+            p.stderr()
+        );
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    };
+    assert_eq!(status.code(), Some(1));
+    let text = p.stderr();
+    assert!(text.contains("the public mirror changed"), "{text}");
+    assert!(text.contains("99"), "the error names the version found: {text}");
+}

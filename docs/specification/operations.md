@@ -112,7 +112,7 @@ The service `loupe-public` never mounts the volume `loupe-data` and never reads 
 
 The image makes `/data/public`, owned by the user `loupe`, so a new volume `loupe-public` gets that owner.
 
-`.env.example` lists each variable name that `compose.yaml` passes to the service `loupe`, with no value. It lists `LOUPE_ROLE` with no value and a comment that `compose.yaml` sets it for `loupe-public` only. `.env.public.example` lists the variables that the role `public` reads (`LOUPE_TZ`, the live variables, the log level, and the telemetry setting), with a comment that the file must hold no secret. `.gitignore` covers `.env.public`.
+`.env.example` lists each variable name that `compose.yaml` passes to the service `loupe`, with no value. It lists `LOUPE_ROLE` with no value and a comment that `compose.yaml` sets it for `loupe-public` only. `.env.public.example` lists, with no value, every variable that is not secret and that the role `public` reads: `LOUPE_TZ`, `LOUPE_SITE_TITLE`, the `LOUPE_SUBSCRIPTION_` variables, the live variables, and the telemetry setting `DO_NOT_TRACK`. A comment states that the file must hold no secret, and that `LOUPE_TZ`, `LOUPE_SITE_TITLE`, and the subscriptions must have the values of `.env`, so the two pages show the same data. The binary has no log level variable. `.gitignore` covers `.env.public`.
 
 ### Registry image
 
