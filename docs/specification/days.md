@@ -131,7 +131,7 @@ The mirror holds exactly two tables:
 
 | Table | Columns |
 |---|---|
-| `days` | `day`, `record`, `content_hash`, and `built_at` of each published row of the table `days` of `loupe.db`. |
+| `days` | `day`, `record`, `content_hash`, `built_at`, and `state` of each published row of the table `days` of `loupe.db`. A check constraint lets only the value `published` in `state`, so the public API reads the mirror with the same statements as `loupe.db`. |
 | `live_state` | One row: `date` (the current day in `LOUPE_TZ`), the call count, the five token counts, and the cost of that day, the open segment count, the ended counter, the in-flight count, and `updated_at`. |
 
 The mirror never holds another table, a column of another table of `loupe.db`, an identifier, a hash other than `content_hash`, a path, a header, a body, a model name outside a record, an agent label outside a record, or a day record that is not published. A row in the state `pending_review` or `deleted` is never in the mirror.
