@@ -2,7 +2,7 @@
 name: "CR-0028 Public instance"
 description: "A public, read-only role of loupe serve, selected by LOUPE_ROLE=public. It runs as a second container on this machine beside the proxy container, from the same image, on the same named volume. It serves only the dashboard, its files, the public API, the live route, and the health route. It opens the database read-only, starts no worker, applies no migration, and makes the live frames from a poll of the database. A Cloudflare Tunnel in front of it is later work that this CR only prepares for."
 id: "CR-0028"
-status: "proposed"
+status: "approved"
 date: 2026-10-25
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, operator of the machine, owner of the Cloudflare account), reviewer agent (approver), public readers of the dashboard
@@ -117,7 +117,7 @@ sequenceDiagram
 2. The loader **MUST** resolve `LOUPE_ROLE` with the precedence of `configuration.md` (environment, then the file of the environment, then the default). The role has no command-line flag.
 3. A value other than `full` or `public` **MUST** stop `loupe serve` and `loupe config show` before the port opens. The actionable error **MUST** name `LOUPE_ROLE`, the two values, the fix, `.env.example`, and the check `loupe config show`.
 4. In the role `full`, the behaviour of `loupe serve` **MUST** stay as today, with the one addition of requirement 33.
-5. The other subcommands (`aggregate`, `backfill`, `day`, `token`, `gen-key`, `summarize`, `parse`) **MUST** ignore `LOUPE_ROLE`.
+5. The other subcommands (`aggregate`, `backfill`, `day`, `token`, `gen-key`, `summarize`, `parse`, `price`) **MUST** ignore `LOUPE_ROLE`.
 
 **Router of the public role**
 
@@ -147,12 +147,12 @@ sequenceDiagram
 23. In the role `public`, `LOUPE_DATA_KEY` and `LOUPE_ACCOUNT_KEY` **MUST NOT** be required. The public role **MUST NOT** read them.
 24. In the role `public`, the process **MUST** ignore these variables when they are set: `LOUPE_ADMIN_TOKEN`, `LOUPE_BOOTSTRAP_TOKEN`, each `LOUPE_GITHUB_TOKEN_<LABEL>`, `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `LOUPE_DATA_KEY`, `LOUPE_ACCOUNT_KEY`, and `LOUPE_UPSTREAMS_FILE`. It **MUST** write one info line `public role ignores` with the names of the set variables of this list. The line **MUST NOT** hold a value. It **MUST NOT** be a warning, because the shared env file is the documented setup and a normal start logs no warning (`operations.md`, section "Logging").
 25. The validation of the other values **MUST** stay as today in the two roles. Thus one env file that is valid for the role `full` is valid for the role `public`.
-26. The public role **MUST** write only these files on the volume: its log file of requirement 27 and the shared-memory file that SQLite needs for the read of a WAL database. It **MUST NOT** write the spill directory.
+26. The public role **MUST** write only these files on the volume: its log file of requirement 27, the shared-memory file (`-shm`) that SQLite needs for the read of a WAL database, and the empty `-wal` file that SQLite makes when it is absent at the open. It **MUST NOT** write the spill directory.
 27. The log file of the public role **MUST** be `<LOUPE_DATA_DIR>/logs/loupe-public.log`, so the two processes do not write one file.
 
 **Live route of the public role**
 
-28. In the role `public`, when the live feed is enabled, the process **MUST** start one poller and one local hub. The poller wakes every 1 second through an injected clock. The live route and the client loop of `live.md` **MUST** read the local hub, with no change to the origin rule, the rate limit, the coalescing, the heartbeat, the connection limit, or the slow-client rule.
+28. In the role `public`, when the live feed is enabled, the process **MUST** start one poller and one local hub. The poller wakes every 1 second through an injected clock. The live route and the client loop of `live.md` **MUST** read the local hub, with no change to the origin rule, the rate limit, the heartbeat, the connection limit, or the slow-client rule. The coalescing of `live.md` **MUST** take the poller events with the same rules: a `calls.batch` adds its counts to the pending sum, an `exchanges.batch` adds its `started` and `ended` to the pending batch, and a `snapshot` drops the pending frames of the client and is its next frame. The poller **MUST** set the in-flight count of the local hub to the value of requirement 34 at each pass, so the snapshot and each coalesced `exchanges.batch` carry that value.
 29. The first frame of each socket **MUST** be a `snapshot` from the database, with the fields of `live.md` (section "Snapshot"). `in_flight` **MUST** come from requirement 34.
 30. Each poll pass **MUST** read, in one read transaction, the totals of the current day in `LOUPE_TZ` with the day rule of `days.md`, the count of open segments, the count of exchanges that ended since the last pass, and the in-flight count of requirement 34. It **MUST** compare them with the last pass and send these events to the local hub:
     1. When the call count of the day grew: one `calls.batch` with `ts` (the time of the pass), `calls`, the five token counts, and `cost_usd`, each the difference from the last pass.
@@ -163,7 +163,7 @@ sequenceDiagram
 
 **In-flight count across processes**
 
-33. In the role `full`, when the live hub is on, one task **MUST** write the in-flight count of the hub and the time to the one-row table `live_state`. The task writes when the count changed, at most once per second, and at least every 5 seconds. The write **MUST NOT** run in the request path and **MUST NOT** delay the proxy. At a clean shutdown, the task writes the count 0. A new migration adds the table. The table holds no field outside the allowlist of `live.md` and no identifier.
+33. In the role `full`, when the live hub is on, one task **MUST** write the in-flight count of the hub and the time to the one-row table `live_state`. The task writes when the count changed, at most once per second, and at least every 5 seconds. The write **MUST NOT** run in the request path and **MUST NOT** delay the proxy. At a clean shutdown, the task writes the count 0. A new migration adds the table. The table holds only the in-flight count and the time of the write, and no identifier.
 34. The public role **MUST** read `in_flight` from `live_state`. When the row is absent or its time is more than 15 seconds old, the public role **MUST** use 0.
 
 **Start line, config show, health, and telemetry**
@@ -226,7 +226,7 @@ sequenceDiagram
 * `src/serve/router.rs`: the dispatch of the role `public` and its 404 body with no token segment.
 * `src/store/open.rs`: a read-only open. `src/store/migrate.rs`: a read of the schema version and of the highest migration of the binary, with no apply.
 * `migrations/`: a new migration for the table `live_state`.
-* `src/live/`: a new poller module, a writer of `live_state` for the role `full`, and a source of `in_flight` for the snapshot in the role `public`. `src/live/route.rs` and `src/live/client.rs` take the local hub with no change of their rules.
+* `src/live/`: a new poller module, a writer of `live_state` for the role `full`, and a source of `in_flight` for the snapshot in the role `public`. `src/live/event.rs` and `src/live/hub.rs` get the poller events and a setter of the in-flight count; `src/live/batch.rs` coalesces the poller events by the rules of requirement 28. `src/live/route.rs` and `src/live/client.rs` take the local hub with no change of their rules.
 * `src/log/`: the log file name by role.
 * `src/telemetry/`: no change of behaviour; the call stays after the line `listening` in the two roles.
 * `compose.yaml`: the service `loupe-public`. `.env.example`: the line `LOUPE_ROLE`.
@@ -373,6 +373,22 @@ Given LOUPE_ROLE=reader
 When loupe serve starts
 Then it stops before the port opens
 And the error names LOUPE_ROLE, the values full and public, .env.example, and loupe config show
+
+Given LOUPE_ROLE=public
+When loupe aggregate, loupe parse --once, or loupe token list runs
+Then it behaves as with no LOUPE_ROLE
+
+Given LOUPE_ROLE=public and no LOUPE_DATA_KEY and no LOUPE_ACCOUNT_KEY
+When loupe serve starts and loupe config show runs
+Then loupe serve starts and config show prints each secret as set or unset
+
+Given LOUPE_ROLE=public and LOUPE_LIVE_MAX_RATE=0
+When loupe serve starts
+Then it stops with the error of the role full
+
+Given the role full with LOUPE_ADMIN_TOKEN set
+When a client with the admin token reads GET /private/api/config
+Then it holds the entry role with the value full and its source
 ```
 
 ### AC-2: The public role serves only the public routes
@@ -382,6 +398,10 @@ Given loupe serve in the role public with a published day
 When a client sends GET to /, to each page file, to /favicon.ico, to /v1/days, to /v1/days/<day>, and to /healthz
 Then each answer is 200 with the headers of today
 And GET /live with a valid upgrade switches protocols
+
+Given loupe serve in the role public with LOUPE_LIVE_ENABLED=false
+When a client sends GET /live with a valid upgrade
+Then the answer is 404 and no poller runs
 ```
 
 ### AC-3: Every other path answers 404
@@ -404,6 +424,8 @@ Then it writes one info line public role ignores with the two names and no value
 And it writes no warning
 And it runs no bootstrap token step
 And GET /private/ answers 404
+And no file appears under spill/
+And the log lines go to logs/loupe-public.log and logs/loupe.log does not change
 ```
 
 ### AC-5: The public role opens the database read-only
@@ -412,7 +434,11 @@ And GET /private/ answers 404
 Given a database at the schema of the binary
 When the role public opens it
 Then an insert through its connection fails with a read-only error
+And each connection has query_only on and a busy timeout of 5 seconds
+And the journal mode of the file stays wal
+And a row that a writer commits after the open is in the next read of the role public
 And the row counts of each table and of schema_version stay the same after 100 API requests and 10 live clients
+And the WAL file resets after a checkpoint of the writer while the role public polls
 ```
 
 ### AC-6: The public role never migrates
@@ -451,6 +477,10 @@ When a client connects to /live
 Then the first frame is a snapshot with the totals of the day and in_flight from live_state
 When a writer commits two calls and the clock moves 1 second
 Then the client gets one calls.batch with calls 2 and the sums of the two calls
+When a segment opens and the clock moves 1 second
+Then the client gets one segments.open with the new count
+When the poller sends three events in one pass
+Then the client gets them within the rate limit, coalesced by the rules of requirement 28
 And each frame holds only the fields of the public column of live.md
 ```
 
@@ -460,8 +490,11 @@ And each frame holds only the fields of the public column of live.md
 Given the role full with 3 open exchanges
 When 1 second passes on its clock
 Then live_state holds in_flight 3
+And the role full writes live_state at most once per second and at least every 5 seconds
 And the role public sends exchanges.batch with in_flight 3 at its next pass
-When the role full stops and 16 seconds pass on the clock of the role public
+When the role full stops cleanly
+Then live_state holds in_flight 0
+When the role full stops without a write and 16 seconds pass on the clock of the role public
 Then the role public uses in_flight 0
 ```
 
@@ -471,6 +504,7 @@ Then the role public uses in_flight 0
 Given the role public with a client and calls on the current day
 When the clock passes midnight in LOUPE_TZ
 Then the client gets a snapshot of the new day
+And no frame of the old day follows the snapshot
 And no frame holds a negative count
 ```
 
@@ -495,6 +529,8 @@ And it sets LOUPE_ROLE=public and LOUPE_ENV=container
 And it binds 127.0.0.1:8788 to the container port 8787
 And it has a healthcheck on /healthz, starts after loupe is healthy, and restarts unless stopped
 And no port binds an address other than 127.0.0.1
+And a comment states that the volume is read-write in the two services and that the role public enforces the read-only access
+And .env.example lists LOUPE_ROLE with no value
 ```
 
 ### AC-13: Two containers on this machine
@@ -527,6 +563,19 @@ Then it names the two services and their ports
 And it states that only 8788 can be exposed and that 8787 is never exposed
 And it states the Cloudflare Tunnel as later work, with only loupe-public behind it
 And it states that the rate limit and the cache in front are the job of the host
+And it names LOUPE_LIVE_ALLOWED_ORIGIN and LOUPE_LIVE_MAX_CONNECTIONS, and the second env file with no secret
+And the sections Scope, The loupe binary, the configuration table, Dashboard, and Privacy model name the role
+```
+
+### AC-16: The measured targets of the public instance
+
+```gherkin
+Given the baselines of "Measurable Targets" measured at the start of implementation
+When proxy.latency.sh, the memory read, and the start time read run after the change
+Then the proxy time to first byte at the 95th percentile is at most 1 ms above the baseline
+And the resident memory of the public process is below that of the full process
+And the poller and live_state tests use a set clock and no wait
+And a review of the code of the role public under src/serve finds no write statement
 ```
 
 ## Quality Standards Compliance
@@ -610,7 +659,7 @@ Medium: one configuration variable, one start sequence, one router branch, a rea
 
 ## Decision Outcome
 
-Pending. The status is `proposed`.
+Approved on 2026-10-25 by a reviewer agent in a Pi session through the proxy, separate from the author.
 
 ## Open Questions
 
@@ -644,3 +693,15 @@ Pending. The status is `proposed`.
 ## Notes
 
 The Layer 1 boundary holds: the CR names the files and the specification sections that change, and it inlines no file content, no code, and no YAML. The owner's three messages of 2026-10-25 are quoted in "Motivation and Background".
+
+### Review notes, 2026-10-25
+
+The reviewer checked for blocking findings only. Each finding got the smallest edit:
+
+1. Requirement 5 left out the subcommand `price`, which `src/cli/mod.rs` has. Edit: `price` added to the list.
+2. Requirement 26 said the public role writes only its log file and the `-shm` file. A read-only SQLite connection on a WAL database also makes an empty `-wal` file when it is absent at the open, for example when the role `full` stopped cleanly. Edit: the `-wal` file added to the list.
+3. Requirement 28 kept "the coalescing" unchanged, but the hub of `src/live/hub.rs` carries only `exchange.start`, `exchange.end`, `call.stored`, and `segments.open`, and `src/live/batch.rs` sets `in_flight` of a coalesced `exchanges.batch` from the in-flight count of the hub. In the role `public` that count is 0, so a coalesced frame would carry a wrong `in_flight`, and a pending frame of the old day could follow a day-change snapshot. Edit: requirement 28 states the coalescing rules for the poller events, has the poller set the in-flight count of the local hub, and drops the pending frames at a snapshot. "Affected Components" names `src/live/event.rs`, `src/live/hub.rs`, and `src/live/batch.rs`.
+4. Requirement 33 said `live_state` holds no field outside the allowlist of `live.md`, but its time column is not in that allowlist. Edit: the table holds only the in-flight count and the time of the write, and no identifier.
+5. Requirements 5, 10, 11 to 15, 23, 25, 26, 27, 30.2, 33 (rate and shutdown), 36 (private config route), 37, 44, 45, 46.5, 46.6, 47, and the non-functional requirements 3 to 6 had no acceptance criterion. Edit: Gherkin lines added to AC-1, AC-2, AC-4, AC-5, AC-8, AC-9, AC-10, AC-12, and AC-15, and a new AC-16 for the measured targets.
+
+No blocking finding stays open. The checks that found no finding: the router rules against `src/serve/router.rs` and `proxy.md` (the unknown-path body, the reserved names, `/v1/other`, `/healthz/x`), the private page paths against `private-reports.md`, the token segment rule against `proxy.tokens.md`, the read-only open and the 5-second busy timeout against `src/store/open.rs`, the schema check against `src/store/migrate.rs`, the frames against `live.md` and the page code under `web/assets/js/` (a later `snapshot` resets the state, `exchanges.batch` sets the in-flight count), the compose service and the health check against `compose.yaml` and the `Dockerfile`, the start line against `src/cli/serve.rs` and `operations.md`, the telemetry rules against `telemetry.md`, and the implemented CRs 0011, 0013, 0022, and 0026.
