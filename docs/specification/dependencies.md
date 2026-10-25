@@ -21,14 +21,13 @@ The file `.github/dependabot.yml` declares the version updates. Dependabot secur
 | Ecosystem | Directory | Interval | Commit type of the pull request title | Effect on the release |
 |---|---|---|---|---|
 | `cargo` | `/` | weekly | `fix(deps)` | a patch release |
-| `npm` | `/prototype` | weekly | `chore(deps)` | none, the type is hidden, because the prototype is not shipped |
 | `github-actions` | `/` | weekly | `ci(deps)` | none, the type is hidden, because a pin of an action does not change the binary or the image |
 
 1. The version updates run each Monday at 03:00 UTC. Thus the daily run of Monday finds the new pull requests.
 2. The minor and patch updates of one ecosystem come in one grouped pull request each week. Each major update has its own pull request.
 3. Dependabot updates the pin of an action by its full 40-character commit SHA and keeps the version comment.
 4. Dependabot does not read `.tool-versions`, the digests of the base images in the `Dockerfile`, or the vendored price file under `vendor/litellm/`. The owner updates these by hand. `prices.vendor.sh` refreshes the price file.
-5. The `npm` entry stays in the file also when Dependabot does not support the pnpm version that `prototype/package.json` names. Then the failure shows in the Dependabot log, and the script still fixes the alerts of `prototype/`.
+5. The project has no npm code, so the file has no `npm` entry. The dependency flows have the ecosystems `cargo` and `github-actions` only.
 
 ## Autofix workflow
 
@@ -64,7 +63,7 @@ The job requests these permissions of the `GITHUB_TOKEN`, and no others:
 1. The script reads the alerts with one token, named in one place of the script. Dependabot does not act on a command from the bot of the `GITHUB_TOKEN`, and an event of the `GITHUB_TOKEN` starts no verdict workflow. Thus each write that must start a workflow or a Dependabot action uses the release token.
 2. The script gives a GitHub token to git only for its own push. While `claude -p` runs, no file in the tree or in `.git/` holds a GitHub token, and the environment of the `claude -p` process holds no GitHub token. The freshness script follows the same rule.
 3. The owner makes the subscription token with `claude setup-token`. The token has a fixed lifetime. Expiry date: not recorded yet. The owner records the date here when the secret is made.
-4. The crates.io API, the npm registry, and the public GitHub releases need no token for the freshness scan. The scan reads the GitHub data with the `GITHUB_TOKEN` of the job, or with the `gh` login of the person who runs it.
+4. The crates.io API and the public GitHub releases need no token for the freshness scan. The scan reads the GitHub data with the `GITHUB_TOKEN` of the job, or with the `gh` login of the person who runs it.
 
 To rotate the subscription token, do these steps:
 
@@ -78,7 +77,7 @@ To rotate the subscription token, do these steps:
 The script holds all the logic of the flow. A run does these steps in this order:
 
 1. **Precondition.** When the verdict workflow is absent from the checked-out tree, or is not active on the repository, the script stops with exit code 5 before any API write and before any `claude -p` run. The error names the file of the verdict workflow and the release governance that adds it.
-2. **Tools and credentials.** When `gh`, `git`, `claude`, `cargo`, or `corepack` is missing, or when `CLAUDE_CODE_OAUTH_TOKEN` or the GitHub token is empty, the script stops with exit code 3 before any run. The error names the missing item and never its value. pnpm comes through corepack, with the version of the `packageManager` field of `prototype/package.json`.
+2. **Tools and credentials.** When `gh`, `git`, `claude`, or `cargo` is missing, or when `CLAUDE_CODE_OAUTH_TOKEN` or the GitHub token is empty, the script stops with exit code 3 before any run. The error names the missing item and never its value.
 3. **Alerts on.** The script lists the Dependabot alerts with the alert read token. When the error of the list call names disabled alerts, the script stops with exit code 4 and an actionable error that names the setting.
 4. **Discovery.** The script lists the open alerts and the open pull requests whose author is Dependabot, through `gh`.
    1. For each alert, it reads the alert number, the advisory identifier (GHSA), the ecosystem, the package, the vulnerable version range, the first patched version, the manifest path, and the severity.
@@ -148,11 +147,9 @@ The prompt tells Claude Code to do these steps:
 3. Change code only when the verdict fails because of the update.
 4. End with one JSON object, the structured result.
 
-For `prototype/`, the update runs with pnpm through corepack, in `prototype/`. When no update of a direct dependency brings the patched version of a transitive package, the update adds an override entry in `prototype/package.json`.
-
 ### Tools of Claude Code
 
-Claude Code gets the tools Read, Edit, Write, Grep, and Glob. It gets the Bash tool only for `cargo`, for `pnpm` in `prototype/`, for `git diff`, `git status`, and `git log`, and for `.agents/scripts/pipeline.*.sh`. It gets no web fetch, no web search, no `git commit`, no `git push`, no `gh`, no `curl`, no `env`, and no `printenv`. Claude Code does not commit, does not push, and does not call the GitHub API.
+Claude Code gets the tools Read, Edit, Write, Grep, and Glob. It gets the Bash tool only for `cargo`, for `git diff`, `git status`, and `git log`, and for `.agents/scripts/pipeline.*.sh`. It gets no web fetch, no web search, no `git commit`, no `git push`, no `gh`, no `curl`, no `env`, and no `printenv`. Claude Code does not commit, does not push, and does not call the GitHub API.
 
 ### Structured result
 
@@ -172,10 +169,9 @@ A result that is missing, that cannot be parsed, or that lacks a field counts as
 
 The script, not Claude Code, is the authority for the diff and the verdict. After each `claude -p` run, the script does these checks in this order:
 
-1. **Allowed paths.** The diff can always change `Cargo.toml`, `Cargo.lock`, `prototype/package.json`, and `prototype/pnpm-lock.yaml`. It can change `src/`, `tests/`, and `prototype/src/` only when the verdict failed after the version change. It can never change `.github/`, `.agents/`, `docs/`, `vendor/`, `web/`, `Dockerfile`, `compose.yaml`, `rust-toolchain.toml`, or `.tool-versions`. A diff with another path fails with the reason `path_not_allowed`.
+1. **Allowed paths.** The diff can always change `Cargo.toml` and `Cargo.lock`. It can change `src/` and `tests/` only when the verdict failed after the version change. It can never change `.github/`, `.agents/`, `docs/`, `vendor/`, `web/`, `Dockerfile`, `compose.yaml`, `rust-toolchain.toml`, or `.tool-versions`. A diff with another path fails with the reason `path_not_allowed`.
 2. **No credential.** A diff that holds a match of a credential pattern (see "Credentials and logs"), or the value of a token of the run, fails with the reason `credential_in_diff`. The script writes the matched text nowhere.
 3. **Verdict.** For a result with the status `fixed`, the script runs `pipeline.verdict.sh` itself, with no GitHub token and no `CLAUDE_CODE_OAUTH_TOKEN` in its environment. Only exit code 0 of this run counts as passed. The `verdict` field of the result does not count.
-4. **Prototype.** For an update in `prototype/`, the script also installs with the frozen lock file and builds the prototype, with the same environment rule. The verdict does not read `prototype/`.
 
 The script builds the crate one time before the first `claude -p` run, so later verdicts reuse the target directory.
 
@@ -186,7 +182,6 @@ When each check passes, the script makes one commit on the autofix branch. The s
 | Fix | Type |
 |---|---|
 | The fix changes a `cargo` dependency. | `fix` |
-| The fix changes only `prototype/`. | `chore` |
 
 ### Failure
 
@@ -218,7 +213,7 @@ All fixes of one workflow run land on one autofix branch.
 | Body | one line for each fix with the type of that fix, the advisories, and the link to the run |
 
 1. When the branch holds one or more fix commits, the script pushes it and opens one pull request to `main`, or updates the open pull request of that branch.
-2. The type of the title, and thus of the squash commit on `main`, is `fix` when the pull request holds one or more `cargo` fixes, and `chore` when it holds only `prototype/` fixes. The squash body keeps one line for each fix, with the type of that fix, so that each fix shows in the changelog.
+2. The type of the title, and thus of the squash commit on `main`, is `fix` when the pull request holds one or more `cargo` fixes, and `chore` when it holds no fix. The squash body keeps one line for each fix, with the type of that fix, so that each fix shows in the changelog.
 3. One branch for each day gives at most one autofix release for each day.
 4. The script never pushes to `main`. Each change to `main` comes through the merge of a pull request.
 
@@ -277,7 +272,7 @@ Before the script writes a log extract to an issue, it removes each match of the
 
 1. The machine output has one `key: value` line for each item and one summary line with the counts.
 2. The item line of a `claude -p` run holds the model, the four token counts `input_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`, and `output_tokens`, and the API-equivalent cost of the result.
-3. With `--dry-run`, the script does the discovery and prints each action that it would do: the item, the path, the branch, the prompt fields, the merge, and the issue action. It starts no `claude -p` run, writes nothing to the tree, pushes nothing, and writes nothing to the GitHub API. A dry run needs no `claude`, `cargo`, `corepack`, or `CLAUDE_CODE_OAUTH_TOKEN`. It reads with the release token when it is set, and else with the `gh` login of the person who runs it.
+3. With `--dry-run`, the script does the discovery and prints each action that it would do: the item, the path, the branch, the prompt fields, the merge, and the issue action. It starts no `claude -p` run, writes nothing to the tree, pushes nothing, and writes nothing to the GitHub API. A dry run needs no `claude`, `cargo`, or `CLAUDE_CODE_OAUTH_TOKEN`. It reads with the release token when it is set, and else with the `gh` login of the person who runs it.
 4. An unknown flag gives an actionable error on stderr and exit code 2.
 5. A documented flag for the tests names a fixture directory, which takes the place of the GitHub API and of `claude`. A run in this mode uses no network.
 
@@ -304,9 +299,9 @@ Before the script writes a log extract to an issue, it removes each match of the
 | `claude_failed` | The structured result has the status `failed`. |
 | `no_change` | The structured result has the status `fixed`, and the diff is empty. |
 | `verdict_failed` | The verdict of the script failed, or the check `verdict` of a pull request that no `claude -p` run may fix is red. |
-| `prototype_failed` | The frozen install or the build of the prototype failed. |
 | `run_cap` | The item waits for the next run, because this run reached its cap of `claude -p` runs. Not a failure. |
 | `budget_cap` | The item waits for the next run, because this run reached its budget. Not a failure. |
+| `ecosystem_removed` | The item has the ecosystem `npm`, for example an old alert. The project has no npm code. The item line records it with the status `skipped`. No `claude -p` run started, and the item is not a failure. |
 
 ## Freshness scan
 
@@ -319,7 +314,6 @@ The scan reads only the direct dependencies of three ecosystems:
 | Ecosystem | Dependencies | Pinned version |
 |---|---|---|
 | `cargo` | each entry of `[dependencies]`, `[dev-dependencies]`, and `[build-dependencies]` of `Cargo.toml`; a crate in more than one table counts as one dependency | the resolved version of `Cargo.lock`; when the lock file holds more than one version of the crate, the version that the root package uses |
-| `npm` | each entry of `dependencies` and `devDependencies` of `prototype/package.json` | the resolved version of `prototype/pnpm-lock.yaml` |
 | `github-actions` | each external action of the files under `.github/workflows/`; one dependency for each distinct pin; a local workflow or a local action does not count | the tag of the version comment of the pin |
 
 1. A transitive dependency is not scanned. It follows its parent: when the parent rises, the lock file brings the new transitive versions. The dependency check of the lint stage still checks each crate of `Cargo.lock` (`operations.md`, Dependency check).
@@ -331,7 +325,6 @@ The scan reads only the direct dependencies of three ecosystems:
 | Ecosystem | Source of the versions and of the publish dates |
 |---|---|
 | `cargo` | the crates.io API, one request for each crate, with the creation time of each version |
-| `npm` | the npm registry document of the package, with the field `time` for the publish time of each version |
 | `github-actions` | the releases API of the GitHub repository of the action, through `gh`, with the publish time of the release; for a tag with no release, the commit date of the tagged commit |
 
 1. The age of a version is the count of whole days from its publish time to the scan time, both in UTC.
@@ -343,10 +336,10 @@ The scan reads only the direct dependencies of three ecosystems:
 
 The latest version is the highest version by semantic version order that is not a pre-release and not withdrawn:
 
-1. A yanked crate version, a deprecated npm version, and a draft GitHub release are never the latest.
+1. A yanked crate version and a draft GitHub release are never the latest.
 2. A pre-release is never the latest. The update never goes to a pre-release. When the pinned version is a pre-release, the scan compares it with the highest release by the same rules.
 3. For an action, a tag that is not a full semantic version, for example `v4`, does not count.
-4. The scan does not take the order of the API answer, the npm `dist-tags`, or the first entry of a list as the latest. The first entry of the crates.io answer is not always the highest release.
+4. The scan does not take the order of the API answer or the first entry of a list as the latest. The first entry of the crates.io answer is not always the highest release.
 5. A pinned version that is yanked or deprecated gets the class `stale` with the field `yanked: yes`, whatever its age, because its authors withdrew it.
 
 ### Freshness classes
@@ -387,17 +380,17 @@ The action `update` does the scan, then raises each stale dependency to its late
 
 ### Items
 
-1. An update item is a `cargo` or `npm` dependency of the class `stale`, or of the class `aged` with `behind: yes`. Each item gets at most one `claude -p` update run in one workflow run.
+1. An update item is a `cargo` dependency of the class `stale`, or of the class `aged` with `behind: yes`. Each item gets at most one `claude -p` update run in one workflow run.
 2. A `github-actions` dependency gets no `claude -p` run, because Claude Code never changes a workflow file. Dependabot updates the pins of the actions, and the daily autofix merges a green pin pull request. The script records a stale action with the reason `dependabot_path` when a Dependabot pull request for that action is open, and with the reason `actions_no_pr` when none is open. An item with `actions_no_pr` goes into the breaking updates issue.
 3. A dependency of the class `unknown` gets no run.
+4. The scan reads no npm manifest, because the project has no npm code. Thus an npm dependency is never an item and gets no run. An old npm alert goes to the autofix, which skips it with the reason `ecosystem_removed`.
 
 ### Order
 
-The script handles the items in three groups, in this order:
+The script handles the items in two groups, in this order:
 
 1. `cargo` dependencies of `[dependencies]` and `[build-dependencies]`, because they change the shipped binary.
 2. `cargo` dependencies of `[dev-dependencies]`.
-3. `npm` dependencies.
 
 In each group, the oldest pinned version comes first, because it has the largest distance to the latest. Items above the run cap of the job, or after the remaining job time rule (see "Limits"), carry the reason `run_cap`.
 
@@ -441,14 +434,13 @@ The guards:
 
 1. **Allowed paths.** The diff follows the allowed paths of the autofix (see "Checks of the script" under "Fix of an alert"). Another path fails the item with the reason `path_not_allowed`.
 2. **No credential.** A match of a credential pattern, or the value of a token of the run, fails the item with the reason `credential_in_diff`.
-3. **No removed dependency.** A diff that removes a direct dependency from `Cargo.toml` or from `prototype/package.json` fails the item with the reason `dependency_removed`. Thus an update run never replaces a dependency, also a cryptography crate, with own code.
+3. **No removed dependency.** A diff that removes a direct dependency from `Cargo.toml` fails the item with the reason `dependency_removed`. Thus an update run never replaces a dependency, also a cryptography crate, with own code.
 4. **No removed test.** The script counts the test attributes `#[test]` and `#[tokio::test]` under `src/` and `tests/`. When the count is lower than the count on the branch before the run, the item fails with the reason `tests_removed`.
 
 The break checks:
 
 1. **Verdict.** The script runs `pipeline.verdict.sh` itself, with no GitHub token and no `CLAUDE_CODE_OAUTH_TOKEN` in its environment. Only exit code 0 counts as passed.
 2. **Smoke check of a `cargo` update.** The `loupe` binary of a debug build prints its version with `--version`, writes the line `listening` after `loupe serve`, answers `GET /healthz` with status 200 and the body `{"status":"ok"}`, and on SIGTERM writes the line `database closed, exit` and exits with code 0. These are the items of the binary check of `release.md` (Release build profile, Unwinding check) that run on one host.
-3. **Prototype check of an `npm` update.** The install with the frozen lock file and the build of the prototype pass.
 
 The app breaks when a break check fails. The verdict of Claude Code does not count. A guard failure, or a `timeout`, or an `invalid_result`, is a failed run, not a finding that the app breaks. The issue shows it with its reason.
 
@@ -459,19 +451,19 @@ Each update item ends green or red.
 **Green.** Each guard and each break check passes. The script makes one commit on the freshness branch. The script, not Claude Code, writes the message:
 
 1. The summary has the form `<type>(deps): bump <name> to <version>`.
-2. The type follows the ecosystem rule of "Commit" under "Fix of an alert": `fix` for a `cargo` update, also of a dev dependency, and `chore` for an update that changes only `prototype/`. A `cargo` update of a dev dependency thus makes a patch release with no change of the binary.
+2. The type follows the ecosystem rule of "Commit" under "Fix of an alert": `fix` for a `cargo` update, also of a dev dependency. A `cargo` update of a dev dependency thus makes a patch release with no change of the binary.
 3. The body holds the pinned age and the latest age, one line for each dependency of `also_raised` with its version, and the line `code changed: yes` when the result has `code_changed` true.
 
 The next update run starts from this commit. Thus the verdict runs between two updates.
 
-**Red.** A guard or a break check fails. The script resets the freshness branch to its last good commit. It records the item as `breaks` when a break check failed, or as `failed` with the reason of the guard. A `breaks` record holds the failing check (`verdict`, `smoke`, or `prototype`), the failing stage, and the first error line of the verdict output of the script, after the redaction of "Credentials and logs". Then the script continues with the next item.
+**Red.** A guard or a break check fails. The script resets the freshness branch to its last good commit. It records the item as `breaks` when a break check failed, or as `failed` with the reason of the guard. A `breaks` record holds the failing check (`verdict` or `smoke`), the failing stage, and the first error line of the verdict output of the script, after the redaction of "Credentials and logs". Then the script continues with the next item.
 
 ### Freshness branch and merge
 
 All green updates of one workflow run land on one freshness branch.
 
 1. The branch is `deps/freshness-<YYYY-MM-DD>`, with the date of the run in UTC, made from the head of `main`. A separate branch keeps the weekly major updates apart from the daily security fixes, so a red update never holds back a security fix.
-2. When the branch holds one or more commits, the script pushes it, opens one pull request to `main`, and merges it after a green check `verdict`, with the rules of "Autofix branch and merge" and "Merge rule". The title of the pull request follows the title forms of the autofix. The type of the title is `fix` when the pull request holds one or more `cargo` updates, and `chore` when it holds only `prototype/` updates.
+2. When the branch holds one or more commits, the script pushes it, opens one pull request to `main`, and merges it after a green check `verdict`, with the rules of "Autofix branch and merge" and "Merge rule". The title of the pull request follows the title forms of the autofix. The type of the title is `fix` when the pull request holds one or more `cargo` updates, and `chore` when it holds none.
 3. Then the script does the "Release pull request step" with the same rules as the autofix.
 4. The branch, push, pull request, merge rule, and release pull request steps are in one shared helper, `.agents/scripts/deps.common.sh`, which the autofix script and the freshness script both source. The helper takes the branch name and the item lines as inputs. The behaviour of the autofix does not change.
 5. One weekly run gives at most one freshness release each week.
@@ -502,7 +494,7 @@ The action `assess` does the scan, then writes one zero-dep assessment for each 
 
 ### Counts
 
-Before each assessment, the script counts the use of the dependency with a fixed search: the import lines, the distinct imported symbols, the call sites, and the count of files. The search covers `src/`, `tests/`, `build.rs`, `prototype/src/`, and, for an action, `.github/workflows/`. These counts are the authority. The assessment uses them.
+Before each assessment, the script counts the use of the dependency with a fixed search: the import lines, the distinct imported symbols, the call sites, and the count of files. The search covers `src/`, `tests/`, `build.rs`, and, for an action, `.github/workflows/`. These counts are the authority. The assessment uses them.
 
 ### Cryptography rule
 
@@ -613,7 +605,7 @@ An unknown flag gives an actionable error on stderr and exit code 2.
 
 ### Dry run
 
-With `--dry-run`, the actions `update` and `assess` do the scan and print the plan: each planned run with its prompt fields, the order, the caps, the branch, the issue actions, and the cryptography rule. They start no `claude -p` run, write nothing to the tree, push nothing, and make no write call to the GitHub API. A dry run needs no `claude`, no `cargo`, no `corepack`, and no `CLAUDE_CODE_OAUTH_TOKEN`.
+With `--dry-run`, the actions `update` and `assess` do the scan and print the plan: each planned run with its prompt fields, the order, the caps, the branch, the issue actions, and the cryptography rule. They start no `claude -p` run, write nothing to the tree, push nothing, and make no write call to the GitHub API. A dry run needs no `claude`, no `cargo`, and no `CLAUDE_CODE_OAUTH_TOKEN`.
 
 ### Exit codes and reasons
 
@@ -630,7 +622,7 @@ With `--dry-run`, the actions `update` and `assess` do the scan and print the pl
 | Item status or reason | Meaning |
 |---|---|
 | `updated` | A green update with one commit on the freshness branch. |
-| `breaks` | A break check failed: the verdict, the smoke check, or the prototype check. |
+| `breaks` | A break check failed: the verdict or the smoke check. |
 | `held` | A breaking item waits for its hold time. No `claude -p` run started. |
 | `unknown` | The registry lookup failed. No class and no run. |
 | `dependabot_path` | A stale action with an open Dependabot pull request. No `claude -p` run. |
@@ -694,7 +686,6 @@ These points are checked when the flow is built. Each has a stated rule, so none
 4. **Auto-merge and the bypass.** A check shows whether auto-merge with the release token waits for the check `verdict`. The result selects the item of "Merge rule".
 5. **Lifetime of the subscription token.** The expiry date goes into "Tokens".
 6. **Many fixes in one squash commit.** A check shows whether release-please reads each line of the squash body as its own change. When it does not, a merge with rebase keeps each fix commit, but the merge settings allow only squash. Then the owner decides the method, and this file states it.
-7. **pnpm of the prototype.** A check shows whether Dependabot supports the pnpm version of `prototype/package.json`.
 
 Results on 2026-10-24, on the private repository:
 
@@ -706,4 +697,3 @@ Results on 2026-10-24, on the private repository:
 | 4. Auto-merge and the bypass | Not checked yet: the ruleset exists only on the public repository. Until the check, the script uses item 2 of "Merge rule": it waits for the green check `verdict` and merges with squash. A constant of the script selects item 1. |
 | 5. Lifetime of the subscription token | Not checked yet: the owner has not made the token. |
 | 6. Many fixes in one squash commit | The release-please documentation states that each Conventional Commit line in the body of one commit becomes its own changelog entry. The script writes the squash body with one fix line per paragraph. Not checked yet on a real release. |
-| 7. pnpm of the prototype | Not checked yet: the first weekly Dependabot run follows the merge of `.github/dependabot.yml`. |

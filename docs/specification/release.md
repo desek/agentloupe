@@ -93,7 +93,7 @@ The daily dependency autofix is a source of `fix(deps)` releases. `dependencies.
 
 The weekly freshness flow of `dependencies.md` is a second source of `fix(deps)` releases. It uses the same shared steps and the same rules as the autofix:
 
-1. The freshness flow merges its green updates as one squash commit on `main`. The commit is `fix(deps)` when it holds one or more `cargo` updates, and release-please then proposes a patch release. An update that changes only `prototype/` is `chore(deps)` and makes no release.
+1. The freshness flow merges its green updates as one squash commit on `main`. The commit is `fix(deps)` when it holds one or more `cargo` updates, and release-please then proposes a patch release.
 2. The freshness flow then does the same release pull request step as the autofix, with items 2 to 5 and item 7 of this list.
 3. A `cargo` update of a dev dependency is also `fix(deps)`. It makes a patch release with no change of the binary.
 4. One freshness branch for each week gives at most one freshness release for each week.
@@ -347,10 +347,9 @@ A dependency update gets its type from what it changes. Only an update of the sh
 | Update | Type | Section |
 |---|---|---|
 | A `cargo` update, by Dependabot, by the dependency autofix, or by the freshness flow | `fix(deps)` | Bug Fixes, a patch bump |
-| An `npm` update of `prototype/`, by Dependabot, or a fix of the dependency autofix or an update of the freshness flow that changes only `prototype/` | `chore(deps)` | hidden, because the prototype is not shipped |
 | A pin update of an action, by Dependabot | `ci(deps)` | hidden, because a pin does not change the binary or the image |
 
-The squash commit of an autofix pull request or of a freshness pull request is `fix(deps)` when the pull request holds one or more `cargo` changes, and `chore(deps)` when it holds only `prototype/` changes. The squash body keeps one line for each change, with the type of that change.
+The squash commit of an autofix pull request or of a freshness pull request is `fix(deps)` when the pull request holds one or more `cargo` changes, and `chore(deps)` when it holds none. The squash body keeps one line for each change, with the type of that change.
 
 ## Commit rule for a change request
 
