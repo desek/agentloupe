@@ -178,7 +178,7 @@ The live section is directly below the headline. `live.md` gives the live route.
 3. The wordmark is the site title in the `h1` of the page, at 20 px.
 4. The range selector has the buttons `1M`, `3M`, `6M`, and `1Y`. The selected button has `aria-pressed="true"`. The keyboard can reach and use each button.
 5. The header does not show the time of the last update. The last row of the daily log shows the latest published day.
-6. The scheme control is one switch: a button with the role `switch` and the accessible name "Dark mode". It shows a track of 44 by 24 px with a round knob, and no text. When the switch is off, the track has the color `--color-text-faint` and the knob is at the left. When the switch is on, the track has the color `--color-text` and the knob is at the right. The knob has the color `--color-bg`. When the reader prefers reduced motion, the knob moves with no transition.
+6. The scheme control is one switch: a button with the role `switch` and the accessible name "Dark mode". It has the form and the size of a range button: a pill of at least 44 px in height and width with the border `--color-border`, and no text. It shows one glyph as inline SVG in the current text color: a sun when the switch is off, a moon when the switch is on. When the switch is on, the pill has the pressed look of a selected range button, the background `--color-text` and the glyph in `--color-ink-inverse`.
 7. The switch has `aria-checked="true"` when the page is dark, and `aria-checked="false"` when the page is light. It shows the resolved scheme, also when the page follows the system preference. The rule of a click is item 6 of the section "Color scheme".
 8. The keyboard reaches the switch with Tab, and Space or Enter sets the other scheme, as a click does. The switch has the focus outline of the range buttons.
 9. With the scheme control in the header, the headline stays visible with no scroll at 360 px and at 1440 px, and the page has no horizontal scroll at 360 px, in each scheme.
@@ -357,7 +357,7 @@ The tokens below are the same in both schemes.
 | `--radius-bar` | `3px` | top corners of a bar |
 | `--max-width` | `1200px` | width of the content column |
 | `--radius-cell` | `2px` | heatmap cell and legend swatch |
-| `--radius-pill` | `999px` | range buttons, track of the scheme control |
+| `--radius-pill` | `999px` | range buttons, the scheme control |
 
 The page contains no file of the mockup support script and no file of the mockup vendor directory.
 
