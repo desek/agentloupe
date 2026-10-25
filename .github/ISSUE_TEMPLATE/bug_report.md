@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Report a behaviour of loupe that differs from the README or the specification.
+about: Report a behaviour of loupe that differs from the README, a user guide under docs/guide/, or the specification.
 title: "bug: "
 labels: bug
 ---
@@ -11,7 +11,7 @@ labels: bug
 
 ## What you expected
 
-<!-- What should have happened? Link the README or specification section if you can. -->
+<!-- What should have happened? Link the user guide (docs/guide/) or specification section if you can. -->
 
 ## Steps to reproduce
 

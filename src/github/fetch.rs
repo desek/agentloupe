@@ -51,7 +51,7 @@ fn warn(label: &str, day: &str, cause: &str) {
         github_label = label,
         day,
         cause,
-        "the GitHub fetch failed. Fix 1: renew the token of LOUPE_GITHUB_TOKEN_{label}, or approve it for the organisation. Fix 2: wait for the rate limit, then retry. Then run loupe aggregate --date {day}. Reference: README.md, section GitHub, for the token permissions. Verify: github_fetches has status ok for the day and the label"
+        "the GitHub fetch failed. Fix 1: renew the token of LOUPE_GITHUB_TOKEN_{label}, or approve it for the organisation. Fix 2: wait for the rate limit, then retry. Then run loupe aggregate --date {day}. Reference: docs/guide/github.md, section GitHub, for the token permissions. Verify: github_fetches has status ok for the day and the label"
     );
 }
 

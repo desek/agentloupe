@@ -13,7 +13,7 @@
 # target of the toolchain that rust-toolchain.toml pins; this script states no version and no toolchain.
 # Before the build it stops when the tag version differs from the version in Cargo.toml at the tag, or when
 # the checked-out commit is not the tag commit. The archive holds one directory loupe-v<version>-<target>/
-# with loupe (execute bit kept), upstreams.toml, config/, LICENSE, README.md, and THIRD-PARTY-NOTICES, which
+# with loupe (execute bit kept), upstreams.toml, config/, LICENSE, README.md, docs/guide/, docs/images/dashboard.png, and THIRD-PARTY-NOTICES, which
 # release.notices.sh writes before the build (it needs cargo about of .tool-versions). The checksum file holds
 # one line in the format of sha256sum, which shasum -a 256 -c and sha256sum -c accept. After the archive, it
 # calls release.sbom.sh asset, which writes loupe-v<version>-<target>.cdx.json and its .sha256 file into the
@@ -104,7 +104,7 @@ if [[ -n "$telemetry_host" ]]; then telemetry="built-in host: $telemetry_host"; 
 build=(env "LOUPE_TELEMETRY_HOST=$telemetry_host" "LOUPE_BUILD_COMMIT=$build_commit" cargo build --release --locked --bin loupe)
 notices=("$ROOT/.agents/scripts/release.notices.sh")
 sbom=("$ROOT/.agents/scripts/release.sbom.sh" asset --tag "$tag" --target "$target" --out "$out")
-files="loupe upstreams.toml config/ LICENSE README.md THIRD-PARTY-NOTICES"
+files="loupe upstreams.toml config/ LICENSE README.md docs/guide/ docs/images/dashboard.png THIRD-PARTY-NOTICES"
 
 if [[ $dry_run -eq 1 ]]; then
   if [[ $human -eq 1 ]]; then
@@ -138,6 +138,10 @@ mkdir "$stage/$name"
 cp "$bin" "$stage/$name/loupe"
 chmod 0755 "$stage/$name/loupe"
 cp -R upstreams.toml config LICENSE README.md THIRD-PARTY-NOTICES "$stage/$name/"
+# The guides and the screenshot keep their docs/ paths, so the relative links of README.md work in the archive.
+mkdir -p "$stage/$name/docs/images"
+cp -R docs/guide "$stage/$name/docs/"
+cp docs/images/dashboard.png "$stage/$name/docs/images/"
 export COPYFILE_DISABLE=1  # no AppleDouble files of macOS in the archive
 # Fixed owner and order keep the archive free of the user name of the runner.
 if tar --version 2>/dev/null | grep -q GNU; then

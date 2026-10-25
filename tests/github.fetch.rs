@@ -141,7 +141,7 @@ fn unauthorized_token_is_recorded() {
     assert!(line.contains("\"github_label\":\"ALPHA\""), "{line}");
     assert!(line.contains(&format!("\"day\":\"{D}\"")), "{line}");
     assert!(
-        line.contains("loupe aggregate --date") && line.contains("README.md, section GitHub"),
+        line.contains("loupe aggregate --date") && line.contains("docs/guide/github.md, section GitHub"),
         "{line}"
     );
 }

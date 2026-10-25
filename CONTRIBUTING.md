@@ -50,7 +50,7 @@ when each stage passes. The tools come from `rust-toolchain.toml` and `.tool-ver
   on GitHub Actions.
 * Each pull request merges as one squash commit. The title of the pull request becomes the commit
   summary, so the title follows Conventional Commits.
-* Update the specification or the README in the same pull request when the behaviour changes.
+* Update the specification, the README, or the user guides under `docs/guide/` in the same pull request when the behaviour changes.
 * Never commit a secret. `.env` stays local; `.env.example` lists the names only.
 
 ## License

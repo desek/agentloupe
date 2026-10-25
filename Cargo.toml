@@ -450,3 +450,7 @@ path = "tests/mirror.readonly.rs"
 [[test]]
 name = "compose_public"
 path = "tests/compose.public.rs"
+
+[[test]]
+name = "docs_links"
+path = "tests/docs.links.rs"

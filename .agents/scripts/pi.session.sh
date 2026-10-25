@@ -45,7 +45,7 @@ done
 EXT="${PI_CC_AUTH_EXT:-}"
 [ -n "$EXT" ] || die 3 "PI_CC_AUTH_EXT is unset or empty, so Pi has no credential extension. Fix: clone pi-cc-auth and export PI_CC_AUTH_EXT=<clone>/src/index.ts, the path of its entry file. Verify: ls \"\$PI_CC_AUTH_EXT\" lists the file."
 [ -f "$EXT" ] || die 3 "PI_CC_AUTH_EXT names the path $EXT, which is not a file. Fix: export PI_CC_AUTH_EXT=<clone of pi-cc-auth>/src/index.ts with a path that exists. Verify: ls \"\$PI_CC_AUTH_EXT\" lists the file."
-[ -f "$TOKEN_FILE" ] || die 3 "the token file $TOKEN_FILE is missing. Fix: see README, section Connect an agent. Verify: ls $TOKEN_FILE."
+[ -f "$TOKEN_FILE" ] || die 3 "the token file $TOKEN_FILE is missing. Fix: see docs/guide/connect-agents.md, section Connect the agents. Verify: ls $TOKEN_FILE."
 log="${log:-$ROOT/.agents/logs/pi.$name.log}"
 mkdir -p "$(dirname "$log")"
 cmd=(pi -p --name "$name" --no-mcp --no-extensions -e "$EXT" ${skills[@]+"${skills[@]}"} --provider anthropic --model "$model" --thinking medium)

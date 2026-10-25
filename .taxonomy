@@ -7,6 +7,7 @@ The canonical vocabulary of the project. One row per term, one physical line per
 
 | Term | Means | Not | Lives in |
 |---|---|---|---|
+| **user guide** | A Markdown file under docs/guide/ that tells a user how to install, configure, and use loupe; the README links each one. | The system specification under docs/specification/, which describes the behaviour for the code; a change request under docs/cr/. | `docs/guide/`, `README.md` |
 | **proxy token** | A random value with the prefix `lpt_` that lets a client use the proxy; the binary stores only its SHA-256 hash, with a unique name and key=value tags. | A provider credential that the agent sends to the upstream; a GitHub token label. | `docs/specification/proxy.tokens.md`, `src/token/`, `src/cli/token.rs` |
 | **connect script** | The script that prints the export lines that point one agent at the proxy for one shell, with the proxy token from a file or a variable; it never touches the global agent settings. | The token subcommand, which makes the proxy token; a global agent setting file. | `.agents/scripts/agent.connect.sh`, `README.md` (Connect the agents), `docs/specification/operations.md` |
 | **isolated agent directory** | The directory under the user state directory (agentloupe/pi-agent) that holds only the model settings file of Pi for the proxy, with no credential file. | The global Pi agent directory, which holds the credential of the user. | `.agents/scripts/agent.connect.sh`, `README.md` (Connect the agents), `docs/specification/operations.md` |
