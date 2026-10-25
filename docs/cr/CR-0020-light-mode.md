@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "medium"
 target-version: 0.12.0
 source-branch: main
-source-commit: ac55e2a
+source-commit: 1ae92be
 ---
 
 # Light mode
@@ -41,7 +41,7 @@ The owner gave this one requirement. The functional requirements below make it t
 * The `content-security-policy` header has `script-src 'self'` and `style-src 'self'`. A test in `tests/web.serve.rs` asserts the header.
 * The private reports page `web/private/index.html` also loads `tokens.css`. Its spec (`private-reports.md`, section "Page", item 6) states that it uses the dark theme of the dashboard.
 * The paused state of the live section (the card "Today") shows "Paused, reconnecting" in the status note, stops the dot in `--color-text-faint`, and shows the kept figures and the sparkline in `--color-text-faint` at an opacity of 0.5.
-* `.agents/scripts/web.size.sh` gives `code_kib: 64.8` at `ac55e2a` and `code_kib: 65.6` at `446f065`, after CR-0021.
+* `.agents/scripts/web.size.sh` gives `code_kib: 64.8` at `1ae92be` and `code_kib: 65.6` at `c3e95d3`, after CR-0021.
 
 ### Current State Diagram
 
@@ -152,7 +152,7 @@ sequenceDiagram
 **Light color scheme from design tokens**
 
 1. `web/assets/css/tokens.css` **MUST** give a light value for each color token of the spec section "Design tokens". The light value **MUST** use the same token name as the dark value.
-2. The dark values **MUST** stay the values of the spec at `ac55e2a`.
+2. The dark values **MUST** stay the values of the spec at `1ae92be`.
 3. The page code **MUST NOT** hold a color literal outside `tokens.css`. Each color of the page, of each SVG chart, and of the live chart **MUST** come from a token.
 4. The CSS property `color-scheme` of the root element **MUST** equal the resolved scheme, `light` or `dark`. Thus the scrollbars and the native controls follow the scheme.
 
@@ -219,9 +219,9 @@ sequenceDiagram
 
 | Metric | Method | Baseline | Threshold |
 |---|---|---|---|
-| Code size | `.agents/scripts/web.size.sh` prints `code_kib` | 65.6 KiB at `446f065`, after CR-0021 (64.8 KiB at `ac55e2a`) | at most 100 KiB |
-| Added scheme code | the increase of `page_kib` from the baseline; `.agents/scripts/web.size.sh` prints `page_kib`, the bytes of `web/` minus `web/assets/fonts/`, `web/private/`, and `web/test/` | 47.7 KiB at `446f065`, after CR-0021 | at most 6.0 KiB |
-| Draw time, each scheme | `.agents/scripts/web.render.sh --days 400 --scheme light` and `--scheme dark` print `draw_ms` | measured after the implementation, not at the start: 58.2 ms, dark only, at `446f065` in a worktree (see Notes, 2026-10-23) | at most 500 ms in each scheme |
+| Code size | `.agents/scripts/web.size.sh` prints `code_kib` | 65.6 KiB at `c3e95d3`, after CR-0021 (64.8 KiB at `1ae92be`) | at most 100 KiB |
+| Added scheme code | the increase of `page_kib` from the baseline; `.agents/scripts/web.size.sh` prints `page_kib`, the bytes of `web/` minus `web/assets/fonts/`, `web/private/`, and `web/test/` | 47.7 KiB at `c3e95d3`, after CR-0021 | at most 6.0 KiB |
+| Draw time, each scheme | `.agents/scripts/web.render.sh --days 400 --scheme light` and `--scheme dark` print `draw_ms` | measured after the implementation, not at the start: 58.2 ms, dark only, at `c3e95d3` in a worktree (see Notes, 2026-10-23) | at most 500 ms in each scheme |
 | Remote requests, each scheme | `.agents/scripts/web.render.sh --days 400 --scheme light` and `--scheme dark` print `remote_requests` | 0, dark only | 0 in each scheme |
 | Headline above the fold | `.agents/scripts/web.render.sh --days 400 --scheme light` prints `headline_above_fold_360` and `headline_above_fold_1440` | true at both widths, with no control | true at both widths, with the control |
 | Headline ratio | `.agents/scripts/web.render.sh` prints `headline_ratio` | 2.12 | at least 2.0 |
@@ -467,7 +467,7 @@ Then each text token has at least 4.5 to 1 on --color-bg and on --color-surface
   And each chart color has at least 3 to 1 on --color-surface
   And --color-positive and --color-output have at least 4.5 to 1 on --color-surface
   And the heatmap levels 1 to 4 increase in contrast
-  And the dark values equal the values of the spec at ac55e2a
+  And the dark values equal the values of the spec at 1ae92be
   And no file under web/ other than tokens.css holds a color literal
 ```
 
@@ -637,7 +637,7 @@ None. The owner asked for a light mode. The layout details are judgement calls.
 
 Approved on 2026-10-23 by a reviewer agent in a Pi session through the proxy, separate from the author, after two passes. The first pass found four blocking findings: functional requirements 2, 3, 29 (second sentence), and 30 had no acceptance criterion. The second pass added these four criteria:
 
-1. AC-6: "the dark values equal the values of the spec at ac55e2a" (functional requirement 2).
+1. AC-6: "the dark values equal the values of the spec at 1ae92be" (functional requirement 2).
 2. AC-6: "no file under web/ other than tokens.css holds a color literal" (functional requirement 3).
 3. AC-7: "the muted figures of the live paused state have at least 3 to 1 on their background in each scheme" (functional requirement 29, second sentence).
 4. AC-7: "the focus outline of a button has at least 3 to 1 on its background in each scheme" (functional requirement 30).
@@ -650,12 +650,12 @@ Layer 1 boundary: this CR names the spec sections that change. It does not inlin
 
 ### Review notes, 2026-10-23
 
-Reviewer agent, rebase on the header and the live card of CR-0021 (implemented in `032ff51`). Each edit is the smallest change that fits the current state. Every judgement call still holds; judgement calls 2 and 5 changed only in their place rule and their reason.
+Reviewer agent, rebase on the header and the live card of CR-0021 (implemented in `9b6340c`). Each edit is the smallest change that fits the current state. Every judgement call still holds; judgement calls 2 and 5 changed only in their place rule and their reason.
 
 1. Current State: the header bullet now describes the one product row (brand with mark and wordmark at the left, range buttons `1M`, `3M`, `6M`, `1Y` at the right, no update line). The old text named a title, an update time, and three range buttons.
 2. Current State: `section.header.js` now sets only the pressed state of the range buttons. The old text said it also set the update time.
 3. Current State: the paused bullet now names the status note "Paused, reconnecting", the still dot, and the muted sparkline of the card "Today", in addition to the muted figures.
-4. Current State and Measurable Targets: the code size baseline is now 65.6 KiB at `446f065`, after CR-0021. The baseline 64.8 KiB at `ac55e2a` would have counted the code of CR-0021 against the 6.0 KiB budget of the scheme code.
+4. Current State and Measurable Targets: the code size baseline is now 65.6 KiB at `c3e95d3`, after CR-0021. The baseline 64.8 KiB at `1ae92be` would have counted the code of CR-0021 against the 6.0 KiB budget of the scheme code.
 5. Current State Diagram: the header node now shows the brand at the left and the four range buttons at the right.
 6. Proposed Change 4, functional requirement 9, judgement call 2, and Affected Components (`page.css`): the control group comes directly after the range group, and both groups sit together at the right of the header row, with the brand at the left. Reason: the header is a flex row with the brand at the left and the range buttons at the right (spec "Header", item 1). A third group placed only "after the range group" would move the range buttons away from the right end.
 7. Technical Impact and Risk 1: at 360 px the range buttons already take a second header line, so the control group can take a third line. The old text said the control could wrap to a second row.
@@ -677,12 +677,12 @@ Two decisions of the owner and of the supervisor, taken after the implementation
 
 1. The owner: the scheme control is a toggle switch, not three buttons. The header has one button with the role `switch`, `aria-checked="true"` when the scheme is dark, and the accessible name "Dark mode", after the range buttons. A click sets the other scheme. When the new scheme equals the system preference, the stored key is removed, so the page follows the system again; else the key holds the scheme. The resolve rule and the scheme script do not change. Changed: judgement calls 1 and 2, functional requirements 8 to 11, and AC-1, AC-2, AC-3, AC-4, AC-8, and AC-11. Implementation note 3 now applies to `aria-checked` of the switch: the HTML has the value `false`, and the control sets the value of the resolved scheme at load.
 2. The supervisor, method change of the target "Added scheme code":
-   * Old method and value: the increase of `code_kib` of `.agents/scripts/web.size.sh`, the bytes of `web/` minus `web/assets/fonts/` and `web/private/`. It gives +9.7 KiB, from 65.6 KiB at `446f065` to 75.3 KiB at `e88f5bd`.
-   * New method and value: the increase of `page_kib`, a new output of `web.size.sh`, the bytes of `web/` minus `web/assets/fonts/`, `web/private/`, and `web/test/`. It gives +3.5 KiB, from 47.7 KiB at `446f065` to 51.2 KiB at `e88f5bd`. The node tests under `web/test/` grew 6.2 KiB, from 17.9 KiB to 24.1 KiB.
+   * Old method and value: the increase of `code_kib` of `.agents/scripts/web.size.sh`, the bytes of `web/` minus `web/assets/fonts/` and `web/private/`. It gives +9.7 KiB, from 65.6 KiB at `c3e95d3` to 75.3 KiB at `dde12ef`.
+   * New method and value: the increase of `page_kib`, a new output of `web.size.sh`, the bytes of `web/` minus `web/assets/fonts/`, `web/private/`, and `web/test/`. It gives +3.5 KiB, from 47.7 KiB at `c3e95d3` to 51.2 KiB at `dde12ef`. The node tests under `web/test/` grew 6.2 KiB, from 17.9 KiB to 24.1 KiB.
    * Threshold: unchanged, at most 6.0 KiB.
    * Reason: judgement call 17 states a page budget, and the Estimated Effort lists about five new node tests apart from the two small scripts. Thus the method of the approved CR did not measure the metric that the CR states: `code_kib` counts the node tests, which the browser does not load.
-   * Evidence: `git ls-tree -r -l` at `446f065` and at `e88f5bd`, with the sum of the sizes of the files under `web/` outside `web/assets/fonts/` and `web/private/` (65.6 KiB and 75.3 KiB), and of the files under `web/test/` (17.9 KiB and 24.1 KiB). `web.size.sh` on the two trees gives the same `code_kib` and `page_kib` values.
-   * The target "Code size" does not change: `code_kib` at most 100 KiB. It was 75.3 KiB at `e88f5bd`, passed.
+   * Evidence: `git ls-tree -r -l` at `c3e95d3` and at `dde12ef`, with the sum of the sizes of the files under `web/` outside `web/assets/fonts/` and `web/private/` (65.6 KiB and 75.3 KiB), and of the files under `web/test/` (17.9 KiB and 24.1 KiB). `web.size.sh` on the two trees gives the same `code_kib` and `page_kib` values.
+   * The target "Code size" does not change: `code_kib` at most 100 KiB. It was 75.3 KiB at `dde12ef`, passed.
 3. This note does not change the other text of the CR that names the three buttons or the state System: the description, Proposed Change items 4 to 6, the diagrams, functional requirements 7, 12, 15, and 16, the alternative "A two-state toggle", and judgement calls 3 and 12. Functional requirement 10 and the spec section "Color scheme" give the rule of the switch.
 4. Verification, 2026-10-23: `node --test web/test/*.test.js` passed 43 of 43 tests, `cargo nextest run --test web_serve` passed 15 of 15, and `.agents/scripts/pipeline.verdict.sh` exited 0 in 972.9 seconds (format, lint, test, web, and image `status: passed`). The scenario `.agents/scenarios/dashboard.light-mode.md` passed 35 of 35 checks in 2 of 2 runs with the switch. The measured values of every target are in `docs/specification/operations.md`. The quality checks of the reviewer agent and of the commit title stay open.
 
@@ -697,6 +697,6 @@ The CR is implemented. This edit is a record of the implemented switch, not a ch
 Decisions of the supervisor, 2026-10-23:
 
 1. Judgement call 3 (words, not icons) is replaced by the accessible name "Dark mode" with no visible text. The 44 px minimum height of the control becomes a track of 24 px height (44 by 24 px) inside the 48 px header row.
-2. Draw time baseline: 58.2 ms, dark only, measured after the implementation in a worktree at `446f065`. Accepted, because no baseline was recorded at the start of the implementation (Implementation Approach step 1).
-3. The `.taxonomy` row "scheme override" was updated together with the row "scheme control" to describe the switch and its click rule (`3c6122c`). Accepted.
+2. Draw time baseline: 58.2 ms, dark only, measured after the implementation in a worktree at `c3e95d3`. Accepted, because no baseline was recorded at the start of the implementation (Implementation Approach step 1).
+3. The `.taxonomy` row "scheme override" was updated together with the row "scheme control" to describe the switch and its click rule (`08f087a`). Accepted.
 4. The first test run of the verdict of the light mode verification took 798.6 seconds under the macOS scan of freshly linked test binaries. It is recorded in `docs/specification/operations.md` under the target of the scan ("Test stage, first run after a Rust edit"), not under this CR.

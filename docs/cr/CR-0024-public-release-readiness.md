@@ -20,7 +20,7 @@ The repository `desek/agentloupe` is private today. It turns public at the first
 
 ## Motivation and Background
 
-Two audits are in the explore cache. Each was made at commit `d93de7d`, while the release pull request #2 (`chore(release): release 0.1.0`) is open with a green verdict:
+Two audits are in the explore cache. Each was made at commit `35833c3`, while the release pull request #2 (`chore(release): release 0.1.0`) is open with a green verdict:
 
 * `.agents/explore/2026-10-23-cicd-governance-audit.md`: the workflows, the branch rules, the repository files, the release governance, the supply chain, and the secrets hygiene. Its gap table has rows 1 to 23 with the severities blocking, should fix, and note. Its verdict: "do the four blocking items in the window between going public and merging PR #2".
 * `.agents/explore/2026-10-23-history-audit.md`: the secrets, the personal data, the stray files, the commit quality, and the tracked configuration in all 301 commits. Its findings table has rows 1 to 12. Its verdict: "fit to publish. There are no blocking items."
@@ -85,7 +85,7 @@ Where a decision or a fact leaves a detail open, this CR states a rule and names
 * `release-please-config.json` holds `release-as` for `0.1.0`. Step 17 of `.agents/scenarios/release.first.md` removes it in a `chore(release)` commit after the release.
 * CR-0023 (approved, not implemented) gives the `npm` updates of `/prototype` the form `fix(deps)` (requirement 2, judgement call 13), plans the `main` ruleset in requirement 45, and freezes the workflows of CR-0022 in non-functional requirement 2.
 * The two audit files in `.agents/explore/` are tracked. They quote the owner's former home path, so `git grep -nE "/Users/[d]esek"` matches 5 lines in them. CR-0022, requirement 3, requires no match in the tree.
-* The local `main` is at `e13351f`. `origin/main` is at `d93de7d`.
+* The local `main` is at `e13351f`. `origin/main` is at `35833c3`.
 
 ### Current State Diagram
 
@@ -527,9 +527,9 @@ And the merge time of pull request #2 is after the last applied line of repo.set
 ### AC-2: The history stays (requirements 3 and 4)
 
 ```gherkin
-Given the published history of main at commit d93de7d
+Given the published history of main at commit 35833c3
 When the CR is implemented
-Then every commit at or before d93de7d keeps its hash
+Then every commit at or before 35833c3 keeps its hash
 And no force push to main happened
 And the author email of each past commit is unchanged
 And the tree has no .mailmap file

@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
 target-version: "0.1.0"
 source-branch: main
-source-commit: 81755b6
+source-commit: adb479e
 ---
 
 # Project foundation: crate, configuration, logging, storage, container, verdict pipeline
@@ -32,7 +32,7 @@ The human wants Claude Code and Pi to send model requests through a local contai
 
 ## Current State
 
-The repository is on branch `main` at commit `81755b6`. It contains:
+The repository is on branch `main` at commit `adb479e`. It contains:
 
 * `README.md`: the master document and the authority for intent.
 * `vendor/litellm/`: the price file, its schema, `SOURCE.md`, and `LICENSE`.

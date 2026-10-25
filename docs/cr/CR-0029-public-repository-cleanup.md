@@ -376,3 +376,7 @@ The first reviewer found two blocking findings. Each got the smallest edit:
 1. AC-3 had no exception for `.gitignore` and this CR, so it could not pass with requirement 10. Edit: AC-3 uses the exceptions of the target row.
 2. The hash updates of requirement 18 need the new hashes, which exist only after the rewrite, so they need a new commit. Edit: requirements 17 to 19, the commit count target, and AC-5 state one hash commit on top of the rewritten commits.
 
+### Hashes in this record
+
+Each commit hash in this CR and in `CR-0029-rollback-log.md` names a commit of the history before the rewrite, which the archive repository `desek/agentloupe-archive` keeps. The hash commit of requirement 18 does not change these two files, because they describe the old history. The other tracked files name the new hashes. The new hash of the old commit `446f065` is `c3e95d3`.
+

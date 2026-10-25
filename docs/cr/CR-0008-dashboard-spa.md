@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
 target-version: 0.8.0
 source-branch: main
-source-commit: 2dda610
+source-commit: 3f48ff2
 ---
 
 # Stateless dashboard SPA built into the binary

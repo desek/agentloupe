@@ -46,7 +46,7 @@ The container, its anonymous volume, and the temporary directory are removed on 
 
 - 2026-10-23, agent: steps 1 to 8 (agent part) ran.
   1. `Cargo.toml` holds `0.1.0`; `git ls-remote --tags origin` printed nothing.
-  2. Pull request https://github.com/desek/agentloupe/pull/1 (8 `checkpoint(CR-0022)` commits) was squash merged as `46735d3 feat(release): Release governance (CR-0022)`, after `main` was pushed from `5a72c93` to `e7a1c16`, so the earlier commits stay as they are.
+  2. Pull request https://github.com/desek/agentloupe/pull/1 (8 `checkpoint(CR-0022)` commits) was squash merged as `e2bb601 feat(release): Release governance (CR-0022)`, after `main` was pushed from `0ec15e2` to `6a57edb`, so the earlier commits stay as they are.
   3. Verdict run 39997205916 on `main`: format, lint, test, web, image, and verdict each `success`; 17:41:59 to 17:48:38 UTC (6 min 39 s).
   4. Release-please run 39997205842 opened https://github.com/desek/agentloupe/pull/2, title `chore(release): release 0.1.0`, branch `release-please--branches--main--components--agent-loupe`, label `autorelease: pending`, author `desek` (the owner of the token).
   5. Files of pull request 2: only `CHANGELOG.md`. `Cargo.toml`, `Cargo.lock`, and the manifest already hold `0.1.0`, so release-please changes none of them.

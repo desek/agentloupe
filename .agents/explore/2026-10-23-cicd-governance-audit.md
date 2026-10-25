@@ -1,12 +1,12 @@
 ---
 date: 2026-10-23
 branch: main
-commit: d93de7d
+commit: 35833c3
 ---
 
 <!--
 @agents-index: Cached audit of the CI, release, and repository governance of desek/agentloupe against
-a professional public open-source project, at d93de7d while the repository is still private and the
+a professional public open-source project, at 35833c3 while the repository is still private and the
 first release pull request (#2, v0.1.0) is open. Covers workflows, branch rules, community files,
 release governance, supply chain, and secrets hygiene, and ends with a gap table with severities.
 -->
@@ -86,7 +86,7 @@ vendored price files. Nothing under `target/` or `node_modules/` was searched.
 | Check | Result | Evidence |
 |---|---|---|
 | Ruleset / protection on `main` | **None — and impossible while private on the free plan.** | rulesets, protection, and rules endpoints all return 403 "Upgrade to GitHub Pro or make this repository public". |
-| Require PR | No. Owner pushes `checkpoint(...)` commits directly to `main` (HEAD d93de7d is a direct push; CR-0022 Out of Scope: "The owner commits to `main` directly today"). |
+| Require PR | No. Owner pushes `checkpoint(...)` commits directly to `main` (HEAD 35833c3 is a direct push; CR-0022 Out of Scope: "The owner commits to `main` directly today"). |
 | Require `verdict` status check | No. The check name will be `verdict` (workflow `verdict`, job `verdict`). |
 | Linear history | Not enforced; de facto linear (0 merge commits in 293). Merge-commit and rebase merges are both still allowed, although release.md step 5 prescribes squash. |
 | No force push / no deletion | Not enforced. |
@@ -119,7 +119,7 @@ vendored price files. Nothing under `target/` or `node_modules/` was searched.
 | Version in binary | **Pass.** `#[command(name = "loupe", version, ...)]` (src/cli/mod.rs:30) → `loupe <version>`; tested by `tests/cli.version.rs`. |
 | Version in start log | **Pass.** `tracing::info!(version = env!("CARGO_PKG_VERSION"), "loupe serve starting")` (src/cli/serve.rs:39); `release.check.sh` checks it. |
 | `Cargo.toml` as the one source | **Pass.** `version = "0.1.0"` (Cargo.toml:4); the only other occurrences are the allowed exceptions `.release-please-manifest.json` and `release-as` in the config; scripts read it from `Cargo.toml` at the tag; no workflow states it. |
-| First release bootstrap | **Pass with follow-ups.** `bootstrap-sha: 446f065…`, `packages["."].release-as: "0.1.0"`, manifest `".": "0.1.0"`, `include-v-in-tag: true`, `include-component-in-tag: false`. Consequences: (a) PR #2 changelog heading links `compare/v0.1.0...v0.1.0` (manifest already at 0.1.0); (b) `release-as` must be removed right after the release or every later release PR proposes 0.1.0 again (scenario step 17 plans it); (c) the release branch is `release-please--branches--main--components--agent-loupe`, not the `release-please--branches--main` of CR-0022 judgement call 6 (harmless, but the spec is wrong). |
+| First release bootstrap | **Pass with follow-ups.** `bootstrap-sha: c3e95d3…`, `packages["."].release-as: "0.1.0"`, manifest `".": "0.1.0"`, `include-v-in-tag: true`, `include-component-in-tag: false`. Consequences: (a) PR #2 changelog heading links `compare/v0.1.0...v0.1.0` (manifest already at 0.1.0); (b) `release-as` must be removed right after the release or every later release PR proposes 0.1.0 again (scenario step 17 plans it); (c) the release branch is `release-please--branches--main--components--agent-loupe`, not the `release-please--branches--main` of CR-0022 judgement call 6 (harmless, but the spec is wrong). |
 | Spec drift ahead | release.md "Pinned actions" says "No tool opens update pull requests for the pins", but approved CR-0023 adds the `github-actions` Dependabot ecosystem and lists only two other release.md edits (req. 47). |
 
 ### (5) Supply chain

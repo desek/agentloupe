@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
 target-version: 1.0.0
 source-branch: main
-source-commit: ce3d666
+source-commit: 96451a4
 ---
 
 # End-to-end acceptance on macOS with Claude Code and Pi

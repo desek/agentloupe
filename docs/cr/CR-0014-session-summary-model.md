@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "medium"
 target-version: 0.14.0
 source-branch: main
-source-commit: 69fb72f
+source-commit: 07c06cc
 ---
 
 # Session summary model

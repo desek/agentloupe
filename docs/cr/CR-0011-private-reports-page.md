@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "medium"
 target-version: 1.1.0
 source-branch: main
-source-commit: 0c10efe
+source-commit: ed5e318
 ---
 
 # Private reports page per proxy token and tag

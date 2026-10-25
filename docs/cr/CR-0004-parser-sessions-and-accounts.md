@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
 target-version: 0.4.0
 source-branch: main
-source-commit: 6923289
+source-commit: 8f6fe45
 ---
 
 # Model-call parser, sessions, and provider accounts

@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, release manager), reviewer agent (approve
 priority: "medium"
 target-version: 0.2.0
 source-branch: main
-source-commit: 753b497
+source-commit: 2d97ce7
 ---
 
 # Dependency freshness
@@ -992,7 +992,7 @@ No blocking finding stays open. Each `claude -p` run has a turn limit, a budget,
 
 A second reviewer agent, separate from the author and from the first reviewer, reviewed the CR after the edits above for blocking findings only, and made these edits:
 
-6. **Contradiction with the repository: the baseline of `toml`.** The table had `toml` pinned at 0.9.12 with the latest 0.9.12, in the aged group. `Cargo.toml` states `toml = "1.1"`, and `Cargo.lock` resolves 1.1.8, which commit 7538603 brought after the source commit. crates.io lists 1.1.8 as the highest release, published on 2026-10-09, so 0.9.12 was never the latest by requirement 6. `toml` is fresh. Edit: the `toml` row moved to the fresh row; the aged count is 8 in "Change Drivers", in "Current State", in AC-3, in AC-14, in AC-25, and in the target "Aged dependencies with an assessment issue"; the target "Correct latest version" counts 13 crates; "Business Impact" and Risk 3 count 6 assessment runs; and AC-17 uses `tracing` in place of `toml` for the closed issue.
+6. **Contradiction with the repository: the baseline of `toml`.** The table had `toml` pinned at 0.9.12 with the latest 0.9.12, in the aged group. `Cargo.toml` states `toml = "1.1"`, and `Cargo.lock` resolves 1.1.8, which commit 60e9643 brought after the source commit. crates.io lists 1.1.8 as the highest release, published on 2026-10-09, so 0.9.12 was never the latest by requirement 6. `toml` is fresh. Edit: the `toml` row moved to the fresh row; the aged count is 8 in "Change Drivers", in "Current State", in AC-3, in AC-14, in AC-25, and in the target "Aged dependencies with an assessment issue"; the target "Correct latest version" counts 13 crates; "Business Impact" and Risk 3 count 6 assessment runs; and AC-17 uses `tracing` in place of `toml` for the closed issue.
 7. **Contradiction inside the class rule.** Requirement 9 gave each dependency exactly one of three classes, with `aged` first. But requirement 5 sets the class `unknown`, and requirements 3 and 7 set `stale` for a pin mismatch or for a yanked pinned version, also when the latest release is older than 180 days. Edit: requirement 9 names these cases before the order of precedence.
 8. **Requirement without an acceptance criterion.** Requirement 40, item 3 (a new run when the counts change) and the new run after 90 days in item 2 had no criterion. Edit: AC-17 got two blocks.
 
@@ -1000,7 +1000,7 @@ No blocking finding stays open after these edits. The status stays `approved`.
 
 ### Implementation notes, 2026-10-24
 
-The implementation covers the parts that a private repository and a dry run can complete: requirements 1 to 51 in code and tests, 52 to 56 in the specification commit, and the non-functional requirements 1, 2, 3, 5, and 6. The run log is `.agents/scenarios/deps.freshness.md` with `.agents/scenarios/deps.freshness.dryrun.log`; the measured values are in `docs/specification/operations.md` (Dependency freshness targets), and the results of the checks at implementation in `docs/specification/dependencies.md`. The scan of the source tree reproduces the baseline classes: 5 stale crates, 8 aged crates with `hmac` behind, and 13 of 13 latest versions. On the same day, the daily autofix merged `hmac` 0.13.0, `aes-gcm` 0.11.1, and `sha2` 0.11.1 (`b19bd6d`), and crates.io published `rusqlite` 0.41.0; the scan after the rebase shows 3 stale crates and no aged crate behind.
+The implementation covers the parts that a private repository and a dry run can complete: requirements 1 to 51 in code and tests, 52 to 56 in the specification commit, and the non-functional requirements 1, 2, 3, 5, and 6. The run log is `.agents/scenarios/deps.freshness.md` with `.agents/scenarios/deps.freshness.dryrun.log`; the measured values are in `docs/specification/operations.md` (Dependency freshness targets), and the results of the checks at implementation in `docs/specification/dependencies.md`. The scan of the source tree reproduces the baseline classes: 5 stale crates, 8 aged crates with `hmac` behind, and 13 of 13 latest versions. On the same day, the daily autofix merged `hmac` 0.13.0, `aes-gcm` 0.11.1, and `sha2` 0.11.1 (`8b151d3`), and crates.io published `rusqlite` 0.41.0; the scan after the rebase shows 3 stale crates and no aged crate behind.
 
 Parts that wait:
 
@@ -1019,6 +1019,6 @@ Decisions at the implementation:
 7. A failed assessment (`timeout`, `invalid_result`, `tree_changed`) writes its reason into the assessment issue with no date, so the next run assesses it again, and the run ends with exit code 1. The machine line of an assessment issue holds the latest version, the counts, the class, and the date.
 8. The job `assess` installs only Node and Claude Code, because it builds nothing; it has no cache step.
 9. The shell tests run in two nextest groups, not four: with four, the timing test `private_config_read_is_cached` of the same test stage missed its 5 ms bound on a loaded machine.
-10. The job `update` does not call `runner.space.sh`, which `40fe18f` added to the autofix job after the specification commit: requirement 44 lists the allowed steps. The first real run shows whether the job needs it.
+10. The job `update` does not call `runner.space.sh`, which `b6ca48d` added to the autofix job after the specification commit: requirement 44 lists the allowed steps. The first real run shows whether the job needs it.
 
-Hosted verdict of the pull request <https://github.com/desek/agentloupe/pull/19> before this commit: run 40088432078 on `79ccfef`, `success` in 7 minutes 44 seconds; run 40092344315 on `b5144b5`, after the rebase on `b19bd6d`, `success` in 7 minutes 58 seconds (the test job 7 minutes 21 seconds).
+Hosted verdict of the pull request <https://github.com/desek/agentloupe/pull/19> before this commit: run 40088432078 on `79ccfef`, `success` in 7 minutes 44 seconds; run 40092344315 on `b5144b5`, after the rebase on `8b151d3`, `success` in 7 minutes 58 seconds (the test job 7 minutes 21 seconds).

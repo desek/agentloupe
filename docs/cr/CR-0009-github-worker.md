@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "medium"
 target-version: 0.9.0
 source-branch: main
-source-commit: 54778f2
+source-commit: af0b699
 ---
 
 # GitHub pull request and line counts with multiple tokens

@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
 target-version: 0.6.0
 source-branch: main
-source-commit: 998ca98
+source-commit: f9e18d4
 ---
 
 # Non-identifying one-line session summaries and raw-body retention

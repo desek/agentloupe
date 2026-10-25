@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
 target-version: 0.7.0
 source-branch: main
-source-commit: 54778f2
+source-commit: af0b699
 ---
 
 # Day aggregation, nightly publishing, and the public API
@@ -33,7 +33,7 @@ The README fixes the shape of the day record with an example, the time zone and 
 
 ## Current State
 
-The repository is on branch `main` at commit `54778f2`. The CRs CR-0001 to CR-0006 are approved. When they are implemented, the state is:
+The repository is on branch `main` at commit `af0b699`. The CRs CR-0001 to CR-0006 are approved. When they are implemented, the state is:
 
 * `exchanges` holds the encrypted bodies and the metadata (CR-0002, CR-0004, CR-0006).
 * `proxy_tokens` holds the proxy tokens as hashes with metadata (CR-0003).

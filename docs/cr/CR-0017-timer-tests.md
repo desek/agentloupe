@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
 target-version: 0.10.0
 source-branch: main
-source-commit: d2a183b
+source-commit: 974fc7c
 ---
 
 # Timer tests without real waits

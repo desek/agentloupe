@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
 target-version: 0.5.0
 source-branch: main
-source-commit: fc7439e
+source-commit: 4109bc0
 ---
 
 # API-equivalent cost from the vendored LiteLLM prices
@@ -478,6 +478,6 @@ Chosen approach: "embed the vendored file, match by model and the provider in `u
 
 Reviewed and approved by an independent reviewer agent on 2026-10-18.
 
-Reviewed and approved by an independent reviewer agent on 2026-10-18, after the revision in commit 907608d.
+Reviewed and approved by an independent reviewer agent on 2026-10-18, after the revision in commit 27fd74f.
 
 Approved by an independent reviewer agent on 2026-10-20 after the answered questions were recorded.

@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
 target-version: 0.3.0
 source-branch: main
-source-commit: 6e4f5bf
+source-commit: 6277235
 ---
 
 # Multiple proxy tokens with metadata and tracking
@@ -491,7 +491,7 @@ Chosen approach: "a token segment in the route, checked against SHA-256 hashes i
 * **Started:** not started
 * **Completed:** not started
 * **Deployed to Production:** not applicable
-* **Notes:** Reviewed and approved by an independent reviewer agent on 2026-10-18. The revision of commit 57cc483 was reviewed again and approved by an independent reviewer agent on 2026-10-18. Re-approved by an independent reviewer agent on 2026-10-19 after the human decisions were recorded.
+* **Notes:** Reviewed and approved by an independent reviewer agent on 2026-10-18. The revision of commit bf44041 was reviewed again and approved by an independent reviewer agent on 2026-10-18. Re-approved by an independent reviewer agent on 2026-10-19 after the human decisions were recorded.
 
 ## Related Items
 

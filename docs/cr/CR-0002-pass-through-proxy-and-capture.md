@@ -7,7 +7,7 @@ stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
 target-version: 0.2.0
 source-branch: main
-source-commit: a5fbdbf
+source-commit: 95ff9f3
 ---
 
 # Pass-through proxy with encrypted capture
