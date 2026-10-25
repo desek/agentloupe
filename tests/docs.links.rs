@@ -112,7 +112,10 @@ fn readme_is_short_and_shows_the_screenshot_first() {
     let image = text
         .lines()
         .find_map(|l| l.find("![").map(|i| &l[i..]))
-        .and_then(|l| l.split_once("](").map(|(_, r)| r.split(')').next().unwrap().to_string()))
+        .and_then(|l| {
+            l.split_once("](")
+                .map(|(_, r)| r.split(')').next().unwrap().to_string())
+        })
         .expect("README.md has no image. Fix: show docs/images/dashboard.png near the top.");
     assert!(
         image.starts_with("docs/images/") && root().join(&image).is_file(),
