@@ -1,4 +1,4 @@
-<!-- @agents-index Specification of the proxy routes, allowlist, forwarding, capture record, redaction, encryption, spill, and failure rules. -->
+<!-- @agents-index Specification of the proxy routes, the public role router, allowlist, forwarding, capture record, redaction, encryption, spill, and failure rules. -->
 # Proxy
 
 ## Routes
@@ -10,6 +10,10 @@ One source file holds the list of reserved first path segments. The list is `hea
 Every other path has the form `/<agent>/<upstream>/<path>`. The route parser returns one typed route: the agent label, the upstream name, the rest of the path, and the query. The parser is one function behind one interface, so a later change can add an optional leading segment without a change to the forwarder or the capture.
 
 A path can start with an optional token segment, as `/<token>/<agent>/<upstream>/<path>`. A first segment that starts with `lpt_` is the presented token, and the route carries it. The token gate checks it before the forwarder. See `proxy.tokens.md`.
+
+In the role `public` (`configuration.md`, section "Role"), the binary uses a different router. It serves only the public route set, with the same behaviour as the role `full`: `GET /` and the static files of the dashboard (`/assets/...` and `/favicon.ico`), the routes under `/v1/` of `api.md` with their methods, CORS, and cache headers, `GET /live`, and `GET /healthz`. Every other path answers 404 with the same body as an unknown path, for each method. This includes each proxy path, with or without a token segment, each path under `/private/`, and each path under `/live/` other than `/live`. The router of the role `public` never calls the forwarder, the token gate, the capture, or the private routes.
+
+The 404 body of the role `public` holds no token segment. When the first path segment starts with `lpt_`, the path in the body is the path with that segment removed, as the rule of `proxy.tokens.md` (section "Privacy of the raw token") states for the logs.
 
 ## Names
 

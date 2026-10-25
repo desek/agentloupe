@@ -53,6 +53,8 @@ Each field name of a record and of the envelope is in the allowlist of `days.md`
 
 The routes under `/v1/` need no proxy token. A path with a token segment, `/<token>/v1/days`, does not serve the API.
 
+The role `public` serves the same routes, with the same statements and answers, from the table `days` of the public mirror. `days.md` (section "Public mirror") gives the mirror. Each read of the role `public` is one short read transaction.
+
 ## Version policy
 
 The path prefix `/v1/` is the version. A change within `/v1/` only adds fields or routes. A change that removes or changes a field or a route uses a new prefix, such as `/v2/`. The project publishes no JSON Schema and no OpenAPI file for the API.

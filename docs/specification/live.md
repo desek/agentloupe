@@ -1,4 +1,4 @@
-<!-- @agents-index Specification of the live route, the live hub, the live events and their allowlist, the snapshot, the rate limit, and the limits. -->
+<!-- @agents-index Specification of the live route, the live hub, the live events and their allowlist, the snapshot, the rate limit, the limits, and the live poller of the public role. -->
 # Live feed
 
 The live feed sends the activity of the current day to the dashboard while it occurs. It carries counts and token sums only.
@@ -36,12 +36,16 @@ If `LOUPE_LIVE_ENABLED` is `false`, `GET /live` returns `404` and the live hub d
 
 The binary holds one live hub. The hub is one bounded broadcast channel with a capacity of `LOUPE_LIVE_BUFFER` events. A send to the hub never waits. A send when no client is connected does nothing. The capture, the proxy, and the parser never wait for a client.
 
+The hub also keeps two values for the public mirror: the in-flight count, and the ended counter, which is the count of the exchanges that ended since the process started. In the role `public`, the hub is a local hub that the live poller feeds, and the poller sets its in-flight count with a setter at each pass.
+
 ## Senders
 
 1. The capture sends `exchange.start` when it starts to forward a request.
 2. The capture sends `exchange.end` when the response ends, with or without an error.
 3. The parser sends `call.stored` after it stores a call.
 4. After each parse pass, the parser counts the open segments. It sends `segments.open` when the count changed since the last pass.
+
+In the role `public`, the only sender is the live poller (section "Public role"). It sends `calls.batch`, `segments.open`, `exchanges.batch`, and `snapshot`.
 
 Only the parser worker inside `loupe serve` sends `call.stored`. A `loupe parse --once` or a `loupe backfill` run in a second process stores calls that live clients see in the next snapshot, not as events.
 
@@ -80,12 +84,15 @@ After the upgrade, the route sends one `snapshot` frame first. The frame holds t
 4. `in_flight` is the count of exchanges that started and did not end.
 5. `live_enabled` is `true`.
 
+In the role `full`, the route reads these values from `loupe.db` and from the hub. In the role `public`, the route reads them from the row `live_state` of the public mirror. When the row is absent, the snapshot holds zero counts and the date of the current day in `LOUPE_TZ`. When the row is more than 15 seconds old by its `updated_at`, `in_flight` is 0.
+
 ## Rate limit and coalescing
 
 1. The route sends at most `LOUPE_LIVE_MAX_RATE` frames per second to one client.
 2. Above the rate, the route adds the `call.stored` events into one `calls.batch` frame. The public route sends no sums for each agent.
 3. Above the rate, the route keeps only the last `segments.open` event.
 4. Above the rate, the route changes the `exchange.start` and `exchange.end` events into one `exchanges.batch` frame with `started`, `ended`, and `in_flight`.
+5. The coalescing takes the events of the live poller with the same rules. A `calls.batch` adds its counts to the pending sum. An `exchanges.batch` adds its `started` and `ended` to the pending batch. A `snapshot` drops the pending frames of the client and is its next frame. The `in_flight` of a coalesced `exchanges.batch` is the in-flight count of the hub.
 
 ## Heartbeat
 
@@ -101,6 +108,22 @@ The route closes a client with code `1008` in two cases:
 
 1. The receiver of the client falls behind the hub, and the hub drops events for it.
 2. A write to the client does not complete in 5 seconds.
+
+## Public role
+
+In the role `public`, when the live feed is enabled, the process starts one live poller and one local hub. When `LOUPE_LIVE_ENABLED` is `false`, no poller starts and `GET /live` returns `404`. The live route and the client loop read the local hub, with the same origin rule, rate limit, heartbeat, connection limit, and slow-client rule as the role `full`.
+
+The poller wakes every 1 second through an injected clock. The interval is fixed and has no variable. Each pass reads the row `live_state` of the public mirror in one short read transaction, compares it with the last pass, and sends these events to the local hub:
+
+1. When the date of the row is the date of the last pass and the call count grew: one `calls.batch` with `ts` (the time of the pass), `calls`, the five token counts, and `cost_usd`, each the difference from the last pass.
+2. When the open segment count changed: one `segments.open` with the new count.
+3. When the ended counter grew or the in-flight count changed: one `exchanges.batch` with `ended` (the growth of the ended counter), `in_flight` (the new count, after the stale rule of section "Snapshot"), and `started` (the ended growth plus the change of the in-flight count, not less than zero).
+4. When the date of the row changed: no difference, and one `snapshot` of the new row to each client.
+5. When a counter of the row is lower than at the last pass on the same date, because the role `full` started again: no negative difference, and the row is the new base.
+
+At each pass, the poller sets the in-flight count of the local hub, so the snapshot and each coalesced `exchanges.batch` carry that value. When a pass reads a `user_version` that differs from the mirror version of the binary, the process writes the actionable error of the version check and stops. The restart policy of the service starts it again.
+
+A frame of the role `public` reaches a client at most one mirror write interval, one poll interval, and one frame interval after the call, at most 2.1 seconds.
 
 ## Configuration
 

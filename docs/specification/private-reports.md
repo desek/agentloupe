@@ -9,6 +9,7 @@ The private page shows the usage, the cost, and the sessions per proxy token and
 2. If the value is not set or is empty, the private page is off. Every path under `/private/` then returns `404` with the same body as any unknown path.
 3. If the value is set and has fewer than 32 characters, `loupe serve` stops before it opens the port. The error names the variable, the fix `loupe token generate`, the file `.env.example`, and the check `loupe config show`.
 4. A change of the admin token makes every admin session cookie invalid.
+5. In the role `public`, the private page does not exist, whatever the value of `LOUPE_ADMIN_TOKEN`. Every path under `/private/` returns `404` with the unknown-path body. `GET /private/api/config` of the role `full` shows the line `role`.
 
 ## Authorization
 

@@ -57,7 +57,7 @@ Errors and repeated runs:
 
 ## Bootstrap token
 
-The bootstrap token is the token with the name `bootstrap`. `loupe serve` makes, replaces, or revokes it from `LOUPE_BOOTSTRAP_TOKEN` before it opens the port:
+The bootstrap token is the token with the name `bootstrap`. In the role `full`, `loupe serve` makes, replaces, or revokes it from `LOUPE_BOOTSTRAP_TOKEN` before it opens the port. The role `public` has no bootstrap token step:
 
 1. If the variable is set, the value must be a valid raw token. If not, the start stops with an actionable error. The error names the variable, the fix `loupe token generate`, the file `.env.example`, and the check `loupe config show`.
 2. If the variable is set and no row named `bootstrap` exists, the step makes the row with no tags.
@@ -72,7 +72,7 @@ A proxied path can start with an optional token segment: `/<token>/<agent>/<upst
 
 ## Token gate
 
-The token gate runs after the route parser and before the forwarder. It reads the token state from the database for each request, so a `create` or a `revoke` from another process takes effect on the next request with no restart. A cache of the state is at most 5 seconds old. The gate reads the age of the cache through an injected clock. The binary uses the system clock; a test uses a set clock, so it can make the cache expire without a wait.
+The token gate exists only in the role `full`. The role `public` has no token gate and no proxy route. The token gate runs after the route parser and before the forwarder. It reads the token state from the database for each request, so a `create` or a `revoke` from another process takes effect on the next request with no restart. A cache of the state is at most 5 seconds old. The gate reads the age of the cache through an injected clock. The binary uses the system clock; a test uses a set clock, so it can make the cache expire without a wait.
 
 The gate has three states:
 

@@ -1,4 +1,4 @@
-<!-- @agents-index Specification of the day record, its storage, the aggregation queue, the publisher, loupe aggregate, and loupe day. -->
+<!-- @agents-index Specification of the day record, its storage, the aggregation queue, the publisher, the public mirror, loupe aggregate, and loupe day. -->
 # Days
 
 This file describes how `loupe` builds one record for each day with activity, stores it, and publishes it. `api.md` describes the routes that serve the records.
@@ -107,7 +107,7 @@ A queue write adds no network call and no lock that the proxy waits on.
 
 ## Publisher
 
-`loupe serve` starts one publisher worker. It wakes once at start and then at an interval of `LOUPE_PUBLISH_INTERVAL_SECS` seconds. The default is 60. The worker reads the time through one injected clock, so tests can set the time.
+In the role `full`, `loupe serve` starts one publisher worker. The role `public` starts no publisher. It wakes once at start and then at an interval of `LOUPE_PUBLISH_INTERVAL_SECS` seconds. The default is 60. The worker reads the time through one injected clock, so tests can set the time.
 
 A day D is due when the local time in `LOUPE_TZ` is at or after `LOUPE_PUBLISH_AT` on the date D plus one. The default of `LOUPE_PUBLISH_AT` is `01:00`.
 
@@ -122,6 +122,31 @@ A first write sets the state to `published` when `LOUPE_DAY_REVIEW` is `auto`, a
 A late session updates its day. A segment that starts on day D and closes after the publish of D puts D in the queue. The next wake writes a new revision of D. This late update is silent: the record holds no revision and no mark of an update, and the dashboard shows no mark.
 
 Each publish and each update writes one log line with the day, the revision, the reason, `calls`, `sessions`, and `unpriced_calls`. The line never holds the summary or a hash.
+
+## Public mirror
+
+In the role `full`, `loupe serve` writes the public mirror, the SQLite file `<LOUPE_DATA_DIR>/public/public.db`. It makes the directory `<LOUPE_DATA_DIR>/public/` when it is absent, and opens or makes the file before the port opens. The mirror holds only data that the public API or the live route already makes public. The role `public` reads only this file. `operations.md` (section "Start sequence by role") gives the start of each role.
+
+The mirror holds exactly two tables:
+
+| Table | Columns |
+|---|---|
+| `days` | `day`, `record`, `content_hash`, and `built_at` of each published row of the table `days` of `loupe.db`. |
+| `live_state` | One row: `date` (the current day in `LOUPE_TZ`), the call count, the five token counts, and the cost of that day, the open segment count, the ended counter, the in-flight count, and `updated_at`. |
+
+The mirror never holds another table, a column of another table of `loupe.db`, an identifier, a hash other than `content_hash`, a path, a header, a body, a model name outside a record, an agent label outside a record, or a day record that is not published. A row in the state `pending_review` or `deleted` is never in the mirror.
+
+**Version.** The role `full` sets `PRAGMA user_version` of the mirror to the mirror version of the binary. When the file holds another version or another table, the role `full` drops the tables of the mirror and makes them again in one transaction, then fills them from `loupe.db`. The mirror is derived data, so this loses nothing, and it has no migration files.
+
+**Journal mode.** The role `full` sets the journal mode `DELETE` on the mirror, so a reader on a read-only mount can read it with no shared-memory file.
+
+**Reconcile of days.** The mirror task reconciles the table `days` at start and then every 5 seconds, through an injected clock. It reads the day, the content hash, and `built_at` of each published row of `loupe.db`. It writes each day that is new or changed, and deletes each day that is no longer published. It writes only when a difference exists, in one transaction. Thus a write of `loupe aggregate` or `loupe day` in another process reaches the mirror within 5 seconds, and a day that goes from `published` to `deleted` leaves the mirror within 5 seconds.
+
+**Live row.** The mirror task writes the row `live_state` when a value changed, at most once per second, and at least every 5 seconds, through the injected clock. The totals use the day rule of the live snapshot (`live.md`, section "Snapshot"). `in_flight` and the ended counter come from the live hub. The ended counter is the count of the exchanges that ended since the process started. When the live hub is off, these two values are 0. At a clean shutdown, the task writes `in_flight` 0.
+
+**Read access of the role `public`.** The role `public` opens the mirror with the SQLite read-only open flag and without the create flag. It sets the `query_only` pragma and a busy timeout of 5 seconds on each connection. It does not set the journal mode and does not open the file as immutable, so it sees each commit of the role `full`. Each read (the API, the snapshot, and each poll pass) is one short read transaction, and no read transaction stays open across an await point or across two poll passes. A write through a connection of the role `public` fails with a read-only error. When the file is absent, the start stops with an actionable error that names the path and the fix: start the role `full` first, with the volume `loupe-public` mounted. The role `public` never makes the file. When the table list in `sqlite_schema` holds a table other than `days` and `live_state`, the start stops with an actionable error that names the extra tables and states that the file is not a public mirror. When `user_version` is not the mirror version of the binary, the start stops with an actionable error that names the two versions and the fix: run the same image for the two services, and start the role `full` first, for example `docker compose up -d loupe`. The check is `GET /healthz` of the role `full`.
+
+**Failures.** The mirror task runs in its own task, never in the request path, and does not delay the proxy. A failed mirror write writes one warning with an actionable fix and does not stop the role `full`. The next pass tries again.
 
 ## `loupe aggregate`
 

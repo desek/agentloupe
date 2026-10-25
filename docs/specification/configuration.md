@@ -1,4 +1,4 @@
-<!-- @agents-index How the loupe binary resolves, validates, and shows its configuration values and their sources, and the build variables of the start request. -->
+<!-- @agents-index How the loupe binary resolves, validates, and shows its configuration values and their sources, the role, and the build variables of the start request. -->
 # Configuration
 
 ## Precedence
@@ -23,6 +23,7 @@ The flag `--env` or the variable `LOUPE_ENV` gives the name of the environment. 
 | Variable | Required | Secret | Default |
 |---|---|---|---|
 | `LOUPE_ENV` | no | no | `local` |
+| `LOUPE_ROLE` | no | no | `full` (`full` or `public`) |
 | `LOUPE_LISTEN` | no | no | `0.0.0.0:8787` in the container |
 | `LOUPE_DATA_DIR` | no | no | `/data` in the container, `./data` outside it |
 | `LOUPE_DATA_KEY` | yes | yes | none |
@@ -96,9 +97,25 @@ The subcommand also prints these lines:
 8. The next due publish time, in `LOUPE_TZ` and in UTC.
 9. `site_title: <value>`, the effective site title.
 10. `live_enabled`, `live_allowed_origin`, `live_max_rate`, `live_max_connections`, and `live_buffer`, each with its source.
-11. `telemetry`, with the source `build`. The value is `built-out` when the binary holds no telemetry host, and `built-in host=<host>` when the binary holds a telemetry host. The line shows the build state only. It reads no run-time variable.
+11. `role`, the role of `loupe serve`, with its source.
+12. `telemetry`, with the source `build`. The value is `built-out` when the binary holds no telemetry host, and `built-in host=<host>` when the binary holds a telemetry host. The line shows the build state only. It reads no run-time variable.
 
 `GET /private/api/config` returns the same entries as `loupe config show`, from the same render. `private-reports.md` gives the rules.
+
+## Role
+
+`LOUPE_ROLE` selects the role of `loupe serve`. The values are `full` and `public`. The default is `full`. The loader resolves it from the environment, then the file of the environment, then the default. The role has no command-line flag.
+
+1. In the role `full`, `loupe serve` runs the proxy, the workers, the private page, and the public routes, and it writes the public mirror. `days.md` (section "Public mirror") gives the mirror.
+2. In the role `public`, `loupe serve` reads only the public mirror and serves only the public routes. It does not load or validate the upstreams file, so `LOUPE_UPSTREAMS_FILE` has no effect. The validation of each value that is not secret is the same in the two roles.
+3. A value other than `full` or `public` stops `loupe serve` and `loupe config show` before the port opens. The actionable error names `LOUPE_ROLE`, the two values, the fix, `.env.example`, and the check `loupe config show`.
+4. In the role `public`, `LOUPE_DATA_KEY` and `LOUPE_ACCOUNT_KEY` are not required, for `loupe serve` and for `loupe config show`. `loupe config show` prints each secret as `set` or `unset`, as in the role `full`.
+5. The other subcommands (`aggregate`, `backfill`, `day`, `token`, `gen-key`, `summarize`, `parse`, `price`) ignore `LOUPE_ROLE`.
+
+The role `public` has two guards. They run at start, before the process opens a file, and they fail closed:
+
+1. **Secret guard.** When a secret variable is set to a value that is not empty, the start stops. The secret variables are each variable that the table "Variables" marks secret and each variable with the prefix `LOUPE_GITHUB_TOKEN_`, so a new secret variable joins the guard with no second list. The actionable error names each set variable and never holds a value. The fix is to remove the variable from the environment of the public process and to use `.env.public` with no secret, as `.env.public.example` shows. The check is `loupe config show`, which prints each secret as `unset`.
+2. **Private database guard.** When `<LOUPE_DATA_DIR>/loupe.db` exists, the start stops. The actionable error states that the private database is reachable from the public process. The fix is to give the public process its own data directory with only the mirror volume, as in `compose.yaml`. The check is `loupe config show` and the list of the mounts of the service.
 
 ## Build variables
 

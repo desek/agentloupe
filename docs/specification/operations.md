@@ -1,24 +1,46 @@
-<!-- @agents-index How the loupe binary runs: subcommands, logging, storage, health, the provider ping, the start request, shutdown, container, the local pipeline verdict, and the hosted verdict reuse. -->
+<!-- @agents-index How the loupe binary runs: subcommands, start by role, logging, storage, health, the provider ping, the start request, shutdown, container, the local pipeline verdict, and the hosted verdict reuse. -->
 # Operations
 
 ## Subcommands
 
 | Subcommand | Behaviour |
 |---|---|
-| `loupe serve` | Loads the configuration, opens the database, applies the migrations, then listens on `LOUPE_LISTEN`. After the listener is bound and the line `listening` is written, it decides the telemetry state, writes the line `telemetry`, and in the state `sent` starts the one start request in its own task. See "Start request". |
+| `loupe serve` | Loads the configuration and runs the start sequence of its role (see "Start sequence by role"), then listens on `LOUPE_LISTEN`. After the listener is bound and the line `listening` is written, it decides the telemetry state, writes the line `telemetry`, and in the state `sent` starts the one start request in its own task. See "Start request". |
 | `loupe gen-key` | Prints one new random 32-byte key in standard base64 with padding, then a newline. The key comes from the random source of the operating system. The subcommand stores nothing. |
 | `loupe config show` | Prints the effective configuration. See `configuration.md`. |
 | `loupe backfill` | Reads the session logs of Claude Code or Pi into the calls and the sessions. See `backfill.md`. |
 
 Each subcommand has a complete `--help`.
 
+### Start sequence by role
+
+`LOUPE_ROLE` selects the role of `loupe serve`. `configuration.md` (section "Role") gives the values and the guards.
+
+In the role `full`, `loupe serve` opens the database, applies the migrations, makes `<LOUPE_DATA_DIR>/public/` when it is absent, opens or makes the public mirror, and starts the workers and the mirror task. Then it binds the port. `days.md` (section "Public mirror") gives the mirror.
+
+In the role `public`, `loupe serve` does these steps, in this order:
+
+1. It loads and validates the configuration. It does not load the upstreams file.
+2. It writes the first log line, with `version` and `role`.
+3. It stops when a secret is set or when `<LOUPE_DATA_DIR>/loupe.db` exists.
+4. It opens `<LOUPE_DATA_DIR>/public/public.db` read-only, with no create.
+5. It reads the table list and `user_version` of the mirror. It stops when the file is absent, when it holds a table other than `days` and `live_state`, or when the version is not the mirror version of the binary.
+6. When the live feed is enabled, it starts the live poller and the local live hub. `live.md` (section "Public role") gives the poller.
+7. It binds the port, writes the line `listening`, writes the line `telemetry`, and starts the start request.
+
+Each stop writes an actionable error and returns a non-zero exit code before the port opens.
+
+The role `public` never opens `loupe.db` or another file of the role `full`, and it holds no proxy state, no token gate, no private state, no data key, and no account key. It does not start the capture writer, the spill import, the parser, the price index load, the summary worker, the provider ping, the publisher, the GitHub fetch, the retention worker, the mirror task, a backfill, or the bootstrap token step. Its code lives in modules that do not import the capture, proxy, token, private, account, session, parse, or store modules of `loupe.db`, and a test checks their import list. It holds no code path that writes a database.
+
+The role `public` writes only its log file. It writes nothing under `<LOUPE_DATA_DIR>/public/`, and it does not make the spill directory.
+
 `loupe --version` prints `loupe <version>`, then a newline, on stdout, and exits with code 0. The version comes from `Cargo.toml` at build time. `release.md` states the version rules.
 
 ## Logging
 
-The binary writes each log event as one line to stderr and to `<LOUPE_DATA_DIR>/logs/loupe.log`. Each line in the file is one JSON object. Each line has the time in UTC, the level, the source location as `path/file.rs:LINE`, and the message with its key fields. No log line contains a secret value. A normal start with valid configuration logs no warning and no error.
+The binary writes each log event as one line to stderr and to its log file. The log file is `<LOUPE_DATA_DIR>/logs/loupe.log` in the role `full` and `<LOUPE_DATA_DIR>/logs/loupe-public.log` in the role `public`. Each line in the file is one JSON object. Each line has the time in UTC, the level, the source location as `path/file.rs:LINE`, and the message with its key fields. No log line contains a secret value. A normal start with valid configuration logs no warning and no error.
 
-The first log line of `loupe serve` holds the key field `version` with the version from `Cargo.toml`. Like each line, it goes to stderr and to the log file.
+The first log line of `loupe serve` holds the key field `version` with the version from `Cargo.toml`, and next to it the key field `role` with `full` or `public`. Like each line, it goes to stderr and to the log file.
 
 After the line `listening`, `loupe serve` writes one info line `telemetry` at each start. Its key field `state` is `sent`, `disabled`, or `built-out`. In the states `sent` and `disabled`, the key field `host` holds the host of the start request, and nothing else of the URL. The line never holds the scheme, the port, the path, the commit, the query, or the `user-agent` value. The line is at info level, so a normal start still logs no warning and no error. The result of the start request goes to one line at debug level only. `telemetry.md` gives the rules.
 
@@ -30,9 +52,11 @@ If the capture queue is full, the binary writes each sealed exchange record as o
 
 At start, the binary applies the versioned migrations from `migrations/` in order. It records each applied version in a version table in the database. A second start applies no migration again.
 
+In the role `full`, the binary also writes the public mirror `<LOUPE_DATA_DIR>/public/public.db`. The mirror has no migration files: it is derived data, and a version change makes it again. `days.md` (section "Public mirror") gives the rules. The role `public` opens only the mirror, read-only, and stores nothing.
+
 ## Health
 
-`GET /healthz` returns status 200 and the body `{"status":"ok"}`. The route answers only after the database is open and migrated. The route carries `access-control-allow-origin: *`, as `api.md` states. The provider status never changes the status or the body of `GET /healthz`. A provider that is down does not make the container unhealthy, because the proxy works without the summarizer.
+`GET /healthz` returns status 200 and the body `{"status":"ok"}`. The status and the body are the same in the two roles. In the role `full`, the route answers only after the database is open and migrated. In the role `public`, it answers only after the secret guard, the private database guard, the check that the mirror exists, the table check, and the version check passed. The route carries `access-control-allow-origin: *`, as `api.md` states. The provider status never changes the status or the body of `GET /healthz`. A provider that is down does not make the container unhealthy, because the proxy works without the summarizer.
 
 ## Provider ping
 
@@ -47,7 +71,7 @@ The ping worker keeps a provider status for each known provider. It runs in its 
 
 ## Start request
 
-A binary that holds a telemetry host sends one start request at each start of `loupe serve`. A release build holds the host. A build from source and a local image build do not. `telemetry.md` gives the full rules of the request and of its receiver.
+A binary that holds a telemetry host sends one start request at each start of `loupe serve`, in the role `full` and in the role `public`, with the same rules. Two services send two requests per start. A release build holds the host. A build from source and a local image build do not. `telemetry.md` gives the full rules of the request and of its receiver.
 
 1. The request is one `GET` of `https://<host>/<commit>`, with the full 40-character lowercase hex commit of the build as the path. The scheme is `http` only for the host `127.0.0.1` or `localhost`. The URL has no query. The URL is the schema.
 2. The request has no body. The header `user-agent` has the form `agentloupe/<version> (<target triple>)`, with the version from `Cargo.toml` and the target triple of the build.
@@ -79,7 +103,16 @@ Each `FROM` line of the `Dockerfile` names its base image by the SHA-256 digest 
 
 The runtime stage puts `LICENSE` into `/app` in each image. The release image also holds `/app/THIRD-PARTY-NOTICES`. A local build passes when no `THIRD-PARTY-NOTICES` file exists, and the image then holds `/app/LICENSE` only. `release.md` (Third-party notices) states the file.
 
-`compose.yaml` has one service. It binds the port as `127.0.0.1:8787:8787`. It mounts a named volume at `/data`, reads the secrets from `.env`, and sets `LOUPE_ENV`. `.env.example` lists each variable name that `compose.yaml` passes, with no value.
+`compose.yaml` has two services from the same image:
+
+1. The service `loupe` runs the role `full`. It binds the port as `127.0.0.1:8787:8787`. It mounts the named volume `loupe-data` at `/data` and the named volume `loupe-public` read-write at `/data/public`. It reads the secrets from `.env` and sets `LOUPE_ENV`.
+2. The service `loupe-public` runs the role `public`. It sets `LOUPE_ENV=container` and `LOUPE_ROLE=public`. It binds the host port as `127.0.0.1:8788` to the container port 8787, so `LOUPE_LISTEN` and the image `HEALTHCHECK` stay the same. It mounts the volume `loupe-public` read-only at `/data/public` and its own named volume `loupe-public-logs` at `/data`. Its env file is `.env.public`, which is optional, so the service starts when the file is absent. It has a healthcheck that calls `GET /healthz` inside the container with the values of the image `HEALTHCHECK`, it starts after the service `loupe` is healthy, and its restart policy is `unless-stopped`.
+
+The service `loupe-public` never mounts the volume `loupe-data` and never reads `.env`, because they hold the raw requests and the key that opens them. A comment in `compose.yaml` states this rule.
+
+The image makes `/data/public`, owned by the user `loupe`, so a new volume `loupe-public` gets that owner.
+
+`.env.example` lists each variable name that `compose.yaml` passes to the service `loupe`, with no value. It lists `LOUPE_ROLE` with no value and a comment that `compose.yaml` sets it for `loupe-public` only. `.env.public.example` lists the variables that the role `public` reads (`LOUPE_TZ`, the live variables, the log level, and the telemetry setting), with a comment that the file must hold no secret. `.gitignore` covers `.env.public`.
 
 ### Registry image
 
@@ -490,6 +523,26 @@ The baseline of the latest versions, from the crates.io API on 2026-10-24, holds
 | Update runs with a defined end | over the first 4 weekly runs: the count of update items with a commit, a `breaks` record in the issue, or a `held` line, divided by the count of update items | none | each item || no weekly run yet. In the shell tests each update item ends `updated`, `breaks`, `failed` with a reason, `held`, `raised`, or `waiting` with `run_cap` |
 | Credentials in logs | for each real run of the scenario: download the run log with `gh run view <run id> --log`, the artifacts, the issue texts, and the pull request text, then run `gitleaks` on them and count the matches of `sk-ant-`, `ghp_`, `github_pat_`, `gho_`, `ghs_`, and the literal value of each secret on the machine of the owner | none | 0 findings and 0 matches || no real run yet. Over the dry run log: `gitleaks dir` finds no leaks and the pattern search 0 matches; the shell test `redaction_and_no_token` finds 0 test values in the output, the report, the issue text, the commit, and the job summary |
 | Requests per second to a registry | the fake registry of the shell tests records the time of each request | none | at most 1 request in each second, for each registry || the fake registry of `user_agent_and_rate` records 1181 to 1200 ms between two requests to crates.io and 1200 ms between two GitHub requests of the action lane (at most 1 request in each second); each crates.io request has the `User-Agent` of the project |
+
+### Public instance targets
+
+The targets of the role `public` and of the public mirror. The baselines were measured on 2026-10-25 on Apple silicon, unless the row states another date.
+
+| Metric | Method | Baseline | Threshold |
+|---|---|---|---|
+| Non-public data reachable from the public container | `docker compose exec loupe-public bash -c 'ls -A /data /data/public; env'` and `sqlite_schema` of the mirror | a public container with `loupe.db`, `spill/`, and `LOUPE_DATA_KEY` reachable (the design before the mirror) | `/data` holds only `logs` and `public`; `/data/public` holds only `public.db` and, at most, its journal; `env` holds no secret variable; the mirror holds only `days` and `live_state` |
+| Non-public rows in the mirror | the mirror test seeds days in each state, sessions, calls, exchanges, and accounts, runs the mirror, and reads each table and column of the mirror | none | 0 rows of a day that is not published; 0 columns outside the columns of `days.md` (section "Public mirror") |
+| Mirror lag of a day change | the mirror test publishes, changes, and deletes a day through a second connection, with a set clock | none | each change in the mirror at the next pass, at most 5 seconds of the set clock |
+| Routes that answer in the public role | the router test sends `GET` to `/`, `/index.html` when served, each file under `/assets/` that the page loads, `/favicon.ico`, `/v1/days`, `/v1/days/<published day>`, `/healthz`, and `/live` with a valid upgrade, and counts the answers that are not 404 | none | exactly the public set: 200 for each static path, each `/v1` path, and `/healthz`; 101 for `/live` |
+| 404 paths in the public role | the router test sends a fixed list of at least 20 paths and methods: the private page, login, logout, and API paths, proxy paths with and without a leading `lpt_` segment (POST and GET), `/lpt_<43 characters>/v1/days`, `/live/x`, `/v1/other`, `/healthz/x`, `/unknown`, and `/a/b/c` | none | each entry 404 with the unknown-path body; 0 bodies that hold `lpt_` |
+| Resident memory of the public process | `docker stats --no-stream --format '{{.MemUsage}}'` for each service, 60 seconds after start with no client, then with 32 live clients | the full process: 33.3 MiB after 55 minutes with real data | public at most 50 percent of the full process with no client, and at most 64 MiB with 32 clients |
+| Live frame delay | the live test commits calls through the role `full` with a set clock and measures the delay to the `calls.batch` frame on the public route: one mirror write interval plus one poll interval plus one frame interval | none | at most 2.1 seconds of the set clock |
+| Live frame delay in the scenario | the time from the end of a proxied call on 8787 to the change of the live card on 8788, minus the same time to the change of the live card on 8787 | none | at most 2.1 seconds |
+| Start time of the public role | the time from the process start to the first 200 of `GET /healthz`, median of 5 starts | the role `full`: 146.5 ms, measured on 2026-10-23 (see "Start telemetry targets") | at most the median of the role `full` |
+| Page code size | `.agents/scripts/web.size.sh` prints `code_kib` | `code_kib` 76.8 | the same value |
+| Mirror write time with readers | the mirror test runs 10 readers that read the mirror every 100 ms while the mirror task writes 1 000 `live_state` rows | none | 95th percentile at most 50 ms; 0 busy errors |
+| Proxy time to first byte with the mirror task, 95th percentile | `.agents/scripts/proxy.latency.sh --requests 200 --with-token` | `p95_added_ms` 0.10 (0.54 direct, 0.64 through the proxy) | at most 1 ms above the baseline |
+| Writes by the public role | compare the mirror file and its `user_version` before and after a run of the role `public` with 100 API requests and 10 live clients for 60 seconds, with the role `full` stopped | none | the file is byte for byte the same |
 
 ### Start telemetry targets
 

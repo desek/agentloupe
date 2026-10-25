@@ -18,7 +18,7 @@ The run-time environment does not change the host. A value of `LOUPE_TELEMETRY_H
 
 ## Start request
 
-When the binary holds a host, `loupe serve` sends exactly one start request at each start, unless the run-time opt-out is set.
+When the binary holds a host, `loupe serve` sends exactly one start request at each start, unless the run-time opt-out is set. This holds in the role `full` and in the role `public`, with the same rules, and each role writes the line `telemetry`. Two services send two requests per start.
 
 1. The method is `GET`. The URL is `https://<host>/<commit>`. The scheme is `http` only when the host is `127.0.0.1` or `localhost`, for a local fake endpoint.
 2. The path is `/` and the full commit of the build: exactly 40 characters, each a digit or a lowercase letter from `a` to `f`. The URL has no query and no fragment. The URL is the schema. The request has no schema field. A later change of the shape of the path is a new schema.
