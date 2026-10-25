@@ -13,9 +13,8 @@ Do these steps in this order:
 
 1. Update the package to the target version or the lowest later version that resolves, in the manifest and in the lock file.
    - For the ecosystem `cargo`: use `cargo update --precise` for a package in `Cargo.lock` only, or change `Cargo.toml` and run `cargo update` for a direct dependency whose requirement excludes the target version.
-   - For the ecosystem `npm`: use pnpm through corepack, always with `--dir prototype`, for example `corepack pnpm --dir prototype update <package>@<version>`. When no update of a direct dependency brings the target version of a transitive package, add an entry under `pnpm.overrides` in `prototype/package.json` and run `corepack pnpm --dir prototype install`.
 2. Run `.agents/scripts/pipeline.verdict.sh` and read its output.
-3. Change code only when the verdict fails because of the update. Change only `src/`, `tests/`, or `prototype/src/`, and keep each change as small as the update needs. Then run the verdict again.
+3. Change code only when the verdict fails because of the update. Change only `src/` or `tests/`, and keep each change as small as the update needs. Then run the verdict again.
 4. End your answer with one JSON object on its own line, and nothing after it, with exactly these fields:
 
 ```

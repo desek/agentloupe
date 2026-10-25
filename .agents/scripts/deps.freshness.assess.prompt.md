@@ -10,7 +10,7 @@ You assess one dependency of the repository in the current directory. Its latest
 
 Do these steps:
 
-1. Read the places where the project uses the dependency, under `src/`, `tests/`, `build.rs`, `prototype/src/`, or `.github/workflows/`. Use the counts above; do not count again.
+1. Read the places where the project uses the dependency, under `src/`, `tests/`, `build.rs`, or `.github/workflows/`. Use the counts above; do not count again.
 2. Estimate how many lines of own code a replacement needs, with its tests.
 3. Name the risks of a replacement: for example protocol or constant-time rules, data that changes (such as time zone data), platform cases, or security fixes that the project would then own.
 4. Recommend one of: `keep` (the project keeps the dependency), `replace` (a replacement with own code is small and safe enough to propose in a change request), or `watch` (keep it for now and assess it again later).

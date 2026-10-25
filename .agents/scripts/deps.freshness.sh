@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# @agents-index Weekly dependency freshness: scans the direct cargo, npm, and action dependencies against their registries, updates each stale one with one claude -p run judged by the verdict, and writes zero-dep assessments of the aged ones.
+# @agents-index Weekly dependency freshness: scans the direct cargo and action dependencies against their registries, updates each stale one with one claude -p run judged by the verdict, and writes zero-dep assessments of the aged ones.
 #
 # Usage: deps.freshness.sh scan|update|assess [--repo OWNER/NAME] [--human] [--json] [--report PATH] [--dry-run]
 #                          [--retry-failed] [--run-url URL] [--fixtures DIR]
 #   scan             Only reads: one line per direct dependency with its freshness class, then one summary line.
 #                    Starts no claude -p run, writes nothing to the tree or to GitHub, needs no
 #                    CLAUDE_CODE_OAUTH_TOKEN.
-#   update           The scan, then one claude -p update run per stale cargo or npm dependency (and per aged one
+#   update           The scan, then one claude -p update run per stale cargo dependency (and per aged one
 #                    that is behind its latest), the checks of the script, one commit per green update on the
 #                    branch deps/freshness-<YYYY-MM-DD> (UTC), its pull request and merge, the release pull
 #                    request step, and the issue "Dependency freshness: breaking updates".
@@ -20,11 +20,11 @@
 #   --dry-run        update and assess: do the scan and print the plan (each planned run with its prompt fields,
 #                    the order, the caps, the branch, the issue actions, the cryptography rule). Starts no
 #                    claude -p run, writes nothing to the tree, pushes nothing, and writes nothing to GitHub.
-#                    Needs no claude, cargo, corepack, or CLAUDE_CODE_OAUTH_TOKEN.
+#                    Needs no claude, cargo, or CLAUDE_CODE_OAUTH_TOKEN.
 #   --retry-failed   update: end the hold time of the breaking items for this run (a manual run of a person).
 #   --run-url URL    The link of the workflow run, for the pull request, the issues, and the report.
-#   --fixtures DIR   For the tests only. Exports DEPS_FRESHNESS_FIXTURES=DIR to the fake curl, gh, claude, cargo,
-#                    and corepack that the test puts first on PATH; reads the scan time from DIR/now, a lower
+#   --fixtures DIR   For the tests only. Exports DEPS_FRESHNESS_FIXTURES=DIR to the fake curl, gh, claude, and
+#                    cargo that the test puts first on PATH; reads the scan time from DIR/now, a lower
 #                    request interval from DIR/registry_interval_ms, lower process timeouts from
 #                    DIR/claude_timeout_secs and DIR/smoke_timeout_secs, and the elapsed job time from
 #                    DIR/job_elapsed_min when they exist; polls with no delay; refuses a git remote that is not
@@ -43,16 +43,16 @@
 #
 # Purpose: the flow of docs/specification/dependencies.md, sections "Freshness scan", "Freshness update",
 # "Zero-dep assessment", "Freshness workflow", and "Freshness script interface". The scan reads Cargo.toml with
-# Cargo.lock, prototype/package.json with prototype/pnpm-lock.yaml, and the action pins of .github/workflows/; it
-# asks crates.io (with a User-Agent), the npm registry (the field time), and the GitHub releases of each action,
+# Cargo.lock and the action pins of .github/workflows/; it asks crates.io (with a User-Agent) and the GitHub
+# releases of each action,
 # at most one request per second per registry, with at most 3 retries; the latest version is the highest
 # release that is not a pre-release and not withdrawn. Each dependency gets one class: unknown (lookup failed),
 # stale (pin mismatch, or a yanked or deprecated pinned version), else aged, stale, or fresh by the two
 # thresholds below. The script, not Claude Code, decides if the app breaks: its own verdict, the smoke check of
-# the debug binary, or the prototype check.
+# the debug binary. The scan reads no npm manifest, so no npm item exists.
 #
 # Output (stdout, key: value):
-#   ecosystem: <cargo|npm|github-actions> name: <n> kind: normal|dev|build|action pinned: <v> pinned_date: <d>
+#   ecosystem: <cargo|github-actions> name: <n> kind: normal|dev|build|action pinned: <v> pinned_date: <d>
 #     pinned_age_days: <n> latest: <v> latest_date: <d> latest_age_days: <n> behind: yes|no
 #     class: fresh|stale|aged|unknown yanked: yes|no [pin_check: ok|mismatch date_source: release|commit]
 #   summary: fresh: <n> stale: <n> aged: <n> unknown: <n> aged_behind: <n> total: <n> scan_secs: <n>
@@ -129,8 +129,8 @@ RELEASE_TOKEN_VAR=RELEASE_TOKEN
 COMMIT_NAME="github-actions[bot]"
 COMMIT_EMAIL="41898282+github-actions[bot]@users.noreply.github.com"
 # The variables that the claude -p process and the verdict of the script may see: the allowlist of the autofix.
-ENV_ALLOW="PATH HOME USER LOGNAME LANG LC_ALL TERM TMPDIR SHELL CI CARGO_HOME RUSTUP_HOME RUSTUP_TOOLCHAIN CARGO_TERM_COLOR COREPACK_HOME COREPACK_ENABLE_DOWNLOAD_PROMPT MISE_DATA_DIR MISE_CONFIG_DIR MISE_CACHE_DIR XDG_CONFIG_HOME XDG_CACHE_HOME XDG_DATA_HOME"
-ALWAYS_PATHS="Cargo.toml Cargo.lock prototype/package.json prototype/pnpm-lock.yaml"
+ENV_ALLOW="PATH HOME USER LOGNAME LANG LC_ALL TERM TMPDIR SHELL CI CARGO_HOME RUSTUP_HOME RUSTUP_TOOLCHAIN CARGO_TERM_COLOR MISE_DATA_DIR MISE_CONFIG_DIR MISE_CACHE_DIR XDG_CONFIG_HOME XDG_CACHE_HOME XDG_DATA_HOME"
+ALWAYS_PATHS="Cargo.toml Cargo.lock"
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 # The shared steps: GitHub calls, redaction, branch, push, pull request, merge rule, release pull request step.
@@ -200,9 +200,9 @@ fi
 tools="curl gh git jq perl"; real_run=0
 [[ "$act" != scan && $dry_run -eq 0 ]] && real_run=1
 [[ $real_run -eq 1 ]] && tools="$tools claude"
-[[ $real_run -eq 1 && "$act" == update ]] && tools="$tools cargo corepack"
+[[ $real_run -eq 1 && "$act" == update ]] && tools="$tools cargo"
 for t in $tools; do
-  command -v "$t" >/dev/null 2>&1 || die "$t is not installed, so deps.freshness.sh $act cannot run. Fix: install $t (the workflow installs claude from .tool-versions with mise; curl, gh, git, jq, and perl are on the runner; cargo with rustup; corepack with Node). Verify: $t --version." 3
+  command -v "$t" >/dev/null 2>&1 || die "$t is not installed, so deps.freshness.sh $act cannot run. Fix: install $t (the workflow installs claude from .tool-versions with mise; curl, gh, git, jq, and perl are on the runner; cargo with rustup). Verify: $t --version." 3
 done
 release_token="${!RELEASE_TOKEN_VAR:-}"
 if [[ $real_run -eq 1 ]]; then
@@ -320,18 +320,6 @@ lock_version() {
     indeps { x = $0; gsub(/[",]/, "", x); sub(/^ +/, "", x); n = split(x, p, " "); if (p[1] == want && n >= 2) pinned = p[2] }
     END { if (pinned != "") print pinned; else if (nv == 1) print vers[1]; else print "-" }' Cargo.lock
 }
-list_npm() {
-  [[ -f prototype/package.json ]] || return 0
-  jq -r '((.dependencies // {}) | keys[] | "\(.) normal"), ((.devDependencies // {}) | keys[] | "\(.) dev")' prototype/package.json | sort
-}
-pnpm_version() {
-  awk -v want="$1" '
-    /^importers:/ { imp = 1; next }
-    imp && /^[^ ]/ { imp = 0 }
-    imp && /^  [^ ]/ { root = ($0 ~ /^  \.:/); next }
-    imp && root && /^      [^ ]/ { n = $0; sub(/^ +/, "", n); sub(/:$/, "", n); gsub(/\047/, "", n); next }
-    imp && root && /^        version:/ && n == want { v = $2; sub(/\(.*/, "", v); gsub(/\047/, "", v); print v; exit }' prototype/pnpm-lock.yaml 2>/dev/null
-}
 # The distinct external action pins: name, commit SHA, and the tag of the version comment.
 list_actions() {
   local f
@@ -383,7 +371,6 @@ gh_lane() {
   done
 }
 lane_record_error() { jq -nc --arg e "$1" --arg n "$2" --arg k "$3" --arg p "$4" --arg x "$5" '{ecosystem: $e, name: $n, kind: $k, pinned: $p, error: $x}'; }
-urlenc_npm() { sed 's#/#%2f#g' <<<"$1"; }
 
 lane_cargo() {
   local name kind pinned f
@@ -403,25 +390,6 @@ lane_cargo() {
         || lane_record_error cargo "$name" "$kind" "$pinned" "the crates.io answer is not readable"
     else lane_record_error cargo "$name" "$kind" "$pinned" "crates.io: $lane_error"; fi
   done <"$work/deps.cargo"
-}
-lane_npm() {
-  local name kind pinned f
-  while read -r name kind; do
-    pinned="$(pnpm_version "$name")"
-    if [[ -z "$pinned" ]]; then lane_record_error npm "$name" "$kind" "-" "the resolved version is not in prototype/pnpm-lock.yaml"; continue; fi
-    f="$work/reg/npm.$(tr '/@' '__' <<<"$name").json"
-    if fetch_url "https://registry.npmjs.org/$(urlenc_npm "$name")" "$f"; then
-      jq -c --arg name "$name" --arg kind "$kind" --arg pinned "$pinned" "$JQ_LIB"'
-        def deprecated: (.deprecated // false) | if type == "string" then . != "" else . == true end;
-        . as $d | [($d.versions // {}) | to_entries[] | select((.key | ispre | not) and (.value | deprecated | not) and ($d.time[.key] != null))] as $rel
-        | ($rel | max_by(.key | vkey)) as $l | ($d.versions[$pinned] // null) as $p
-        | {ecosystem: "npm", name: $name, kind: $kind, pinned: $pinned, pinned_ts: ($d.time[$pinned] | ts),
-           latest: ($l.key // null), latest_ts: ($d.time[$l.key // ""] | ts), yanked: (($p // {}) | deprecated), repository: ""}
-        | if $p == null or .pinned_ts == null then . + {error: "the pinned version is not in the npm registry document"}
-          elif .latest == null then . + {error: "the npm registry document has no release"} else . end' "$f" 2>/dev/null \
-        || lane_record_error npm "$name" "$kind" "$pinned" "the npm registry document is not readable"
-    else lane_record_error npm "$name" "$kind" "$pinned" "registry.npmjs.org: $lane_error"; fi
-  done <"$work/deps.npm"
 }
 lane_actions() {
   local name sha tag r f rc resolved pdate tl obj typ
@@ -476,24 +444,22 @@ scan() {
   local t0 t1
   t0="$(now_ms)"
   root_pkg="$(sed -n '/^\[package\]/,/^\[/ s/^name *= *"\([^"]*\)".*/\1/p' Cargo.toml | head -n 1)"
-  list_cargo >"$work/deps.cargo"; list_npm >"$work/deps.npm"; list_actions >"$work/deps.actions"
-  # Three lanes, one per registry, in parallel; each keeps its own rate.
+  list_cargo >"$work/deps.cargo"; list_actions >"$work/deps.actions"
+  # Two lanes, one per registry, in parallel; each keeps its own rate.
   lane_cargo >"$work/scan.cargo.jsonl" 2>"$work/lane.cargo.err" &
   local p1=$!
-  lane_npm >"$work/scan.npm.jsonl" 2>"$work/lane.npm.err" &
-  local p2=$!
   lane_actions >"$work/scan.actions.jsonl" 2>"$work/lane.actions.err" &
   local p3=$!
-  wait "$p1" "$p2" "$p3"
+  wait "$p1" "$p3"
   t1="$(now_ms)"
-  cat "$work/scan.cargo.jsonl" "$work/scan.npm.jsonl" "$work/scan.actions.jsonl" \
+  cat "$work/scan.cargo.jsonl" "$work/scan.actions.jsonl" \
     | jq -s -c --argjson now "$now_epoch" --argjson fresh "$FRESH_DAYS" --argjson aged "$AGED_DAYS" "$JQ_LIB"'
       map(. + {pinned_date: (.pinned_ts | day), pinned_age_days: (.pinned_ts | age($now)), latest_date: (.latest_ts | day),
                latest_age_days: (.latest_ts | age($now))}
         | .behind = (if .error then false else ((.pinned | vkey) < (.latest | vkey)) end)
         | .class = (if .error then "unknown" elif .pin_check == "mismatch" then "stale" elif .yanked then "stale"
                     elif .latest_age_days > $aged then "aged" elif .pinned_age_days > $fresh and .behind then "stale" else "fresh" end))
-      | sort_by([({"cargo": 0, "npm": 1, "github-actions": 2}[.ecosystem]), .name, .pinned])' >"$work/scan.json"
+      | sort_by([({"cargo": 0, "github-actions": 2}[.ecosystem]), .name, .pinned])' >"$work/scan.json"
   jq --argjson secs "$(( (t1 - t0 + 500) / 1000 ))" '{fresh: map(select(.class == "fresh")) | length, stale: map(select(.class == "stale")) | length,
       aged: map(select(.class == "aged")) | length, unknown: map(select(.class == "unknown")) | length,
       aged_behind: map(select(.class == "aged" and .behind)) | length, total: length, scan_secs: $secs}' "$work/scan.json" >"$work/summary.json"
@@ -589,10 +555,10 @@ run_claude() {
   claude_runs=$((claude_runs + 1)); t0="$(date +%s)"
   if [[ "$kind" == update ]]; then
     timeout=$claude_update_timeout
-    ( clean_env --exec CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_CODE_OAUTH_TOKEN" BASH_DEFAULT_TIMEOUT_MS="$BASH_TIMEOUT_MS" BASH_MAX_TIMEOUT_MS="$BASH_TIMEOUT_MS" COREPACK_ENABLE_DOWNLOAD_PROMPT=0 -- \
+    ( clean_env --exec CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_CODE_OAUTH_TOKEN" BASH_DEFAULT_TIMEOUT_MS="$BASH_TIMEOUT_MS" BASH_MAX_TIMEOUT_MS="$BASH_TIMEOUT_MS" -- \
         claude -p --output-format json --model "$MODEL" --max-turns "$MAX_TURNS" --max-budget-usd "$RUN_BUDGET_USD" \
         --no-session-persistence \
-        --allowedTools Read Edit Write Grep Glob "Bash(cargo:*)" "Bash(pnpm --dir prototype:*)" "Bash(corepack pnpm --dir prototype:*)" \
+        --allowedTools Read Edit Write Grep Glob "Bash(cargo:*)" \
           "Bash(git diff:*)" "Bash(git status:*)" "Bash(git log:*)" "Bash(.agents/scripts/pipeline.verdict.sh:*)" \
           "Bash(.agents/scripts/pipeline.format.sh:*)" "Bash(.agents/scripts/pipeline.lint.sh:*)" "Bash(.agents/scripts/pipeline.test.sh:*)" \
           "Bash(.agents/scripts/pipeline.web.sh:*)" "Bash(.agents/scripts/pipeline.image.sh:*)" \
@@ -647,10 +613,10 @@ if [[ "$act" == update ]]; then
   nothing_open=0; merged_fix_sha=""; planned_fix_merge=0; planned_records=0; branch_ready=0; main_ref=HEAD
   git rev-parse --verify -q origin/main >/dev/null && main_ref=origin/main
 
-  # The update items: stale cargo and npm dependencies, and aged ones behind their latest; groups normal and
-  # build, then dev, then npm; the oldest pinned version first.
-  jq -c '[.[] | select((.ecosystem == "cargo" or .ecosystem == "npm") and (.class == "stale" or (.class == "aged" and .behind)))
-    | . + {group: (if .ecosystem == "npm" then 3 elif .kind == "dev" then 2 else 1 end)}] | sort_by([.group, .pinned_ts]) | .[]' "$work/scan.json" >"$work/updates.jsonl"
+  # The update items: stale cargo dependencies, and aged ones behind their latest; groups normal and build,
+  # then dev; the oldest pinned version first. The scan has no npm lane, so no npm item reaches this list.
+  jq -c '[.[] | select(.ecosystem == "cargo" and (.class == "stale" or (.class == "aged" and .behind)))
+    | . + {group: (if .kind == "dev" then 2 else 1 end)}] | sort_by([.group, .pinned_ts]) | .[]' "$work/scan.json" >"$work/updates.jsonl"
 
   # held_reason <key> <latest>: the reason and the date of a held breaking item, or nothing.
   held_reason() {
@@ -674,11 +640,10 @@ if [[ "$act" == update ]]; then
   }
 
   # ---- the checks of the script ------------------------------------------------------------------------------------
-  direct_names() { { list_cargo | awk '{print "cargo:" $1}'; list_npm | awk '{print "npm:" $1}'; } | sort -u; }
+  direct_names() { list_cargo | awk '{print "cargo:" $1}' | sort -u; }
   direct_pins() {
     root_pkg="$(sed -n '/^\[package\]/,/^\[/ s/^name *= *"\([^"]*\)".*/\1/p' Cargo.toml | head -n 1)"
     list_cargo | while read -r n k; do echo "cargo:$n $(lock_version "$n" "$root_pkg")"; done
-    list_npm | while read -r n k; do echo "npm:$n $(pnpm_version "$n")"; done
   }
   count_tests() { { grep -rhoE '#\[(tokio::)?test(\(|\])' src tests 2>/dev/null || true; } | wc -l | tr -d ' '; }
   run_verdict() { clean_env -- "$ROOT/.agents/scripts/pipeline.verdict.sh" >"$work/verdict.out" 2>&1 </dev/null; local rc=$?; cat "$work/verdict.out" >>"$1"; return $rc; }
@@ -689,10 +654,6 @@ if [[ "$act" == update ]]; then
     [[ -n "$l" ]] || l="$(grep -m 1 -vE '^(stage|verdict):' "$work/verdict.out" 2>/dev/null | grep -m 1 -iE 'error|fail|panicked')"
     [[ -n "$l" ]] || l="$(grep -m 1 -E '^verdict:' "$work/verdict.out" 2>/dev/null)"
     redact <<<"$l" | head -c 300 | tr '\n' ' ' | sed 's/ *$//'
-  }
-  run_prototype() {
-    ( cd "$ROOT/prototype" && clean_env COREPACK_ENABLE_DOWNLOAD_PROMPT=0 -- corepack pnpm install --frozen-lockfile \
-        && clean_env COREPACK_ENABLE_DOWNLOAD_PROMPT=0 -- corepack pnpm build ) >>"$1" 2>&1 </dev/null
   }
   # smoke_check <log>: the binary check of release.md on one host with the debug build: --version, the line
   # listening, GET /healthz with 200 and {"status":"ok"}, and on SIGTERM the line "database closed, exit" with
@@ -731,11 +692,11 @@ if [[ "$act" == update ]]; then
   # update_item <item json> <log>: one claude -p run and the checks; sets up_status (updated|breaks|failed),
   # up_reason, up_check, up_stage, up_error, up_result, up_to, up_raised (lines "ecosystem:name version").
   update_item() {
-    local it="$1" log="$2" last_good eco name pinned latest kind manifest changed p code_changed=0 proto_changed=0 cargo_changed=0
+    local it="$1" log="$2" last_good eco name pinned latest kind manifest changed p code_changed=0 cargo_changed=0
     local tests_before deps_before pins_before type summary body cc
     eco="$(jq -r .ecosystem <<<"$it")"; name="$(jq -r .name <<<"$it")"; pinned="$(jq -r .pinned <<<"$it")"
     latest="$(jq -r .latest <<<"$it")"; kind="$(jq -r .kind <<<"$it")"
-    manifest=Cargo.toml; [[ "$eco" == npm ]] && manifest=prototype/package.json
+    manifest=Cargo.toml
     up_status=failed; up_reason=""; up_check=""; up_stage=""; up_error=""; up_result=""; up_to=""; up_raised=""
     last_good="$(git rev-parse HEAD)"
     tests_before="$(count_tests)"; direct_names >"$work/names.before"; direct_pins >"$work/pins.before"
@@ -755,8 +716,8 @@ if [[ "$act" == update ]]; then
     # The guards: allowed paths, no credential, no removed dependency, no removed test.
     if [[ -z "$up_reason" ]]; then
       for p in $changed; do
-        case " $ALWAYS_PATHS " in *" $p "*) [[ "$p" == prototype/* ]] && proto_changed=1 || cargo_changed=1; continue ;; esac
-        case "$p" in src/*|tests/*) code_changed=1; cargo_changed=1; continue ;; prototype/src/*) code_changed=1; proto_changed=1; continue ;; esac
+        case " $ALWAYS_PATHS " in *" $p "*) cargo_changed=1; continue ;; esac
+        case "$p" in src/*|tests/*) code_changed=1; cargo_changed=1; continue ;; esac
         up_reason=path_not_allowed; break
       done
     fi
@@ -770,13 +731,13 @@ if [[ "$act" == update ]]; then
       # A code change is allowed only when the verdict fails after the version change alone (the autofix rule).
       git diff --cached --binary "$last_good" >"$work/full.patch"
       git reset -q --hard "$last_good"
-      git apply --include=Cargo.toml --include=Cargo.lock --include=prototype/package.json --include=prototype/pnpm-lock.yaml "$work/full.patch" 2>>"$log"
+      git apply --include=Cargo.toml --include=Cargo.lock "$work/full.patch" 2>>"$log"
       echo "verdict: the version change alone" >>"$log"
       if run_verdict "$log"; then up_reason=path_not_allowed; fi
       git reset -q --hard "$last_good"; git clean -fdq
       git apply "$work/full.patch" 2>>"$log" && git add -A >/dev/null 2>&1
     fi
-    # The break checks: the verdict of the script, then the smoke check or the prototype check.
+    # The break checks: the verdict of the script, then the smoke check.
     if [[ -z "$up_reason" ]]; then
       echo "verdict: the update" >>"$log"
       if ! run_verdict "$log"; then
@@ -784,9 +745,6 @@ if [[ "$act" == update ]]; then
         up_stage="$(awk '$1 == "stage:" && $4 == "failed" {print $2; exit}' "$work/verdict.out")"; up_error="$(first_error_of "$up_stage")"
       elif [[ $cargo_changed -eq 1 ]] && ! smoke_check "$log"; then
         up_status=breaks; up_check=smoke; up_stage=smoke; up_error="$(redact <<<"$smoke_error")"
-      elif [[ $proto_changed -eq 1 ]] && ! run_prototype "$log"; then
-        up_status=breaks; up_check=prototype; up_stage=prototype
-        up_error="$(grep -m 1 -iE 'error|ERR_' "$log" | redact | head -c 300 | tr '\n' ' ')"
       fi
     fi
     if [[ -z "$up_reason" && "$up_status" != breaks ]]; then
@@ -830,8 +788,8 @@ code changed: yes"
     if [[ $((planned_claude + claude_runs)) -ge $UPDATE_RUN_CAP || $((UPDATE_JOB_MIN - elapsed_min)) -lt $MIN_REMAINING_MIN ]]; then
       item "$key" update "$name" "$eco" waiting run_cap "$extra"; continue; fi
     if over_budget "$UPDATE_JOB_BUDGET_USD"; then item "$key" update "$name" "$eco" waiting budget_cap "$extra"; continue; fi
-    type=fix; [[ "$eco" == npm ]] && type=chore
-    manifest=Cargo.toml; [[ "$eco" == npm ]] && manifest=prototype/package.json
+    type=fix
+    manifest=Cargo.toml
     if [[ $dry_run -eq 1 ]]; then
       if [[ $planned_claude -eq 0 ]]; then
         if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then action branch "$branch" planned "reuse the branch of an earlier run today"
@@ -948,7 +906,6 @@ count_use() {
   local files
   case "$1" in
     cargo) files="$( { find src tests -type f -name '*.rs' 2>/dev/null; [[ -f build.rs ]] && echo build.rs; } | sort)" ;;
-    npm) files="$(find prototype/src -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.ts' -o -name '*.jsx' -o -name '*.tsx' -o -name '*.css' -o -name '*.html' \) 2>/dev/null | sort)" ;;
     *) files="$(ls .github/workflows/*.yml .github/workflows/*.yaml 2>/dev/null | sort)" ;;
   esac
   # shellcheck disable=SC2086
@@ -968,13 +925,6 @@ count_use() {
           next if $l =~ /^\s*\/\//;
           if ($l =~ /\b${q}::/ || (@names && $l =~ /\b(?:@{[join "|", map { quotemeta } @names]})\b/)) { $calls++; $hit = 1;
             $sym{$1} = 1 while $l =~ /\b${q}::([A-Za-z_][A-Za-z0-9_]*)/g; } }
-      } elsif ($eco eq "npm") {
-        my @local;
-        while ($t =~ /import\s+(?:([^;]*?)\s+from\s+)?["\x27]$nq(?:\/[^"\x27]*)?["\x27]|require\(\s*["\x27]$nq(?:\/[^"\x27]*)?["\x27]\s*\)|\@import\s+(?:url\()?["\x27]$nq(?:\/[^"\x27]*)?["\x27]/g) {
-          $imports++; $hit = 1; my $c = defined $1 ? $1 : "";
-          for my $w ($c =~ /([A-Za-z_\$][A-Za-z0-9_\$]*)/g) { next if $w =~ /^(as|from)$/; $sym{$w} = 1; push @local, $w; } }
-        if (@local) { for my $l (split /\n/, $t) { next if $l =~ /^\s*import\b|\@import|require\(/;
-          if ($l =~ /(?<![A-Za-z0-9_\$])(?:@{[join "|", map { quotemeta } @local]})(?![A-Za-z0-9_\$])/) { $calls++; $hit = 1; } } }
       } else {
         for my $l (split /\n/, $t) { if ($l =~ /uses:\s*["\x27]?$nq(?:\/[^@\s]*)?@/) { $imports++; $calls++; $hit = 1; } }
       }

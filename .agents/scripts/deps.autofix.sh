@@ -35,11 +35,12 @@
 # the open Dependabot alerts (an error that names disabled alerts stops the run with the setting named) and the
 # open Dependabot pull requests; an alert that a pull request moves to a patched version is handled through the
 # pull request; (4) with nothing open, prints a zero count line and exits 0; (5) orders the items by severity,
-# then age; an alert with no patched version starts no run; a held failed item waits (7 days, a new input, or
+# then age; an alert with no patched version starts no run; an npm item is skipped with the reason
+# ecosystem_removed, because the project has no npm code; a held failed item waits (7 days, a new input, or
 # --retry-failed); (6) makes or reuses the branch deps/autofix-<YYYY-MM-DD> (UTC) from main, builds the crate
 # once, and gives each alert, and each red Dependabot pull request, one claude -p run with the prompt template
 # deps.autofix.prompt.md; (7) checks each result: the structured result, the allowed paths, no credential in the
-# diff, its own verdict (and the frozen install and build of the prototype), then commits
+# diff, its own verdict, then commits
 # "<type>(deps): bump <package> to <version> (<GHSA id>)" or resets the branch; (8) merges each green Dependabot
 # pull request with squash, after the rebase command of Dependabot when it is behind (when no new head comes
 # within 5 minutes, the run continues with the current head: a green one merges, a red one goes to claude -p, and
@@ -52,7 +53,7 @@
 #   repo: <owner/name> visibility: public|private mode: dry-run|run
 #   count: alerts: <n> pull_requests: <n>
 #   item: <alert:N|pr:N|branch:NAME|release:N> path: alert|pull_request|autofix|release package: <name>
-#     ecosystem: <e> status: planned|fixed|merged|failed|held|waiting|closed [reason: <reason>] [fields...]
+#     ecosystem: <e> status: planned|fixed|merged|failed|held|waiting|closed|skipped [reason: <reason>] [fields...]
 #     A claude -p run adds: model, input_tokens, cache_creation_input_tokens, cache_read_input_tokens,
 #     output_tokens, turns, cost_usd (API-equivalent, from the vendored price file), total_cost_usd (of the result).
 #   action: branch|claude|commit|rebase|merge|pull_request|release|issue|comment target: <t> status: planned|done|failed
@@ -62,7 +63,8 @@
 # Item reasons: no_patched_version, timeout, invalid_result, path_not_allowed, credential_in_diff, pin_not_sha,
 #   claude_auth, release_needs_human, release_pending, and claude_failed (the result says failed), no_change (the
 #   result says fixed and the diff is empty), verdict_failed (the verdict of the script, or a red check that no run
-#   may fix), prototype_failed, run_cap and budget_cap (the item waits for the next run).
+#   may fix), run_cap and budget_cap (the item waits for the next run), and ecosystem_removed (status skipped:
+#   an npm item, recorded on its item line, not fixed and not a failure).
 # Exit codes: 0 no failure: nothing open, or each item fixed or merged; 1 one or more items failed or held, and
 #   the autofix issue holds them; 2 bad usage; 3 a tool or a credential is missing, or claude -p failed with an
 #   authentication error; 4 a GitHub API call failed, or the Dependabot alerts are off; 5 the verdict workflow is
@@ -100,9 +102,9 @@ COMMIT_EMAIL="41898282+github-actions[bot]@users.noreply.github.com"
 HELD_OPEN="<!-- deps-autofix:held"
 HELD_CLOSE="-->"
 # The variables that the claude -p process and the verdict of the script may see; no GitHub token is in it.
-ENV_ALLOW="PATH HOME USER LOGNAME LANG LC_ALL TERM TMPDIR SHELL CI CARGO_HOME RUSTUP_HOME RUSTUP_TOOLCHAIN CARGO_TERM_COLOR COREPACK_HOME COREPACK_ENABLE_DOWNLOAD_PROMPT MISE_DATA_DIR MISE_CONFIG_DIR MISE_CACHE_DIR XDG_CONFIG_HOME XDG_CACHE_HOME XDG_DATA_HOME"
-ALWAYS_PATHS="Cargo.toml Cargo.lock prototype/package.json prototype/pnpm-lock.yaml"
-CODE_PREFIXES="src/ tests/ prototype/src/"
+ENV_ALLOW="PATH HOME USER LOGNAME LANG LC_ALL TERM TMPDIR SHELL CI CARGO_HOME RUSTUP_HOME RUSTUP_TOOLCHAIN CARGO_TERM_COLOR MISE_DATA_DIR MISE_CONFIG_DIR MISE_CACHE_DIR XDG_CONFIG_HOME XDG_CACHE_HOME XDG_DATA_HOME"
+ALWAYS_PATHS="Cargo.toml Cargo.lock"
+CODE_PREFIXES="src/ tests/"
 CRED_PATTERNS="sk-ant- ghp_ github_pat_ gho_ ghs_"
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -156,9 +158,9 @@ branch="$BRANCH_PREFIX$today"
 [[ -f "$ROOT/$VERDICT_WORKFLOW" ]] || die "the verdict workflow $VERDICT_WORKFLOW is absent from the tree, so no fix can be judged and the run stops before any API write and any claude -p run. Fix: implement the release governance that adds $VERDICT_WORKFLOW (docs/specification/release.md, Release flow; docs/specification/operations.md, Hosted workflows). Verify: ls $VERDICT_WORKFLOW." 5
 
 # ---- (2) tools and credentials -------------------------------------------------------------------------------
-tools="gh git jq"; [[ $dry_run -eq 0 ]] && tools="$tools claude cargo corepack"
+tools="gh git jq"; [[ $dry_run -eq 0 ]] && tools="$tools claude cargo"
 for t in $tools; do
-  command -v "$t" >/dev/null 2>&1 || die "$t is not installed, so the dependency autofix cannot run. Fix: install $t (the workflow installs claude from .tool-versions with mise; gh, git, and jq are on the runner; cargo with rustup; corepack with Node). Verify: $t --version." 3
+  command -v "$t" >/dev/null 2>&1 || die "$t is not installed, so the dependency autofix cannot run. Fix: install $t (the workflow installs claude from .tool-versions with mise; gh, git, and jq are on the runner; cargo with rustup). Verify: $t --version." 3
 done
 release_token="${!RELEASE_TOKEN_VAR:-}"
 if [[ $dry_run -eq 0 ]]; then
@@ -242,7 +244,7 @@ jq -e 'type == "array"' "$work/pulls.json" >/dev/null 2>&1 || { echo "the pull r
 
 jq -c '.[] | select(.state == "open") | {kind: "alert", key: ("alert:" + (.number | tostring)), number,
     package: .security_vulnerability.package.name,
-    ecosystem: ({"rust": "cargo", "npm": "npm", "actions": "github-actions"}[.security_vulnerability.package.ecosystem] // .security_vulnerability.package.ecosystem),
+    ecosystem: ({"rust": "cargo", "actions": "github-actions"}[.security_vulnerability.package.ecosystem] // .security_vulnerability.package.ecosystem),
     range: (.security_vulnerability.vulnerable_version_range // ""), patched: (.security_vulnerability.first_patched_version.identifier // ""),
     manifest: (.dependency.manifest_path // ""), ghsa: (.security_advisory.ghsa_id // ""),
     severity: (.security_advisory.severity // .security_vulnerability.severity // "low"), created: (.created_at // "")}' \
@@ -337,7 +339,7 @@ prompt_fields() {
   jq -r 'if .kind == "alert" then "package=\(.package) ecosystem=\(.ecosystem) range=\(.range | gsub(" "; "")) patched=\(.patched) manifest=\(.manifest) advisory=\(.ghsa)"
     else "package=\(.package) ecosystem=\(.ecosystem) target=\(.target) pull_request=\(.number)\(if .ghsa != "" then " advisory=\(.ghsa)" else "" end)" end' <<<"$1"
 }
-commit_type_of_eco() { [[ "$1" == npm ]] && echo chore || echo fix; }
+commit_type_of_eco() { echo fix; }
 summary_of() {
   # <type> <item json>: the commit summary from the alert or pull request data, never from Claude Code.
   jq -r --arg t "$1" 'if .kind == "alert" then "\($t)(deps): bump \(.package) to \(.patched) (\(.ghsa))"
@@ -350,7 +352,7 @@ render_prompt() {
   DEPS_PACKAGE="$(jq -r .package <<<"$it")" DEPS_ECOSYSTEM="$(jq -r .ecosystem <<<"$it")" \
   DEPS_RANGE="$(jq -r '.range // "not given: a version update of Dependabot"' <<<"$it")" \
   DEPS_PATCHED="$(jq -r 'if .kind == "alert" then .patched else .target end' <<<"$it")" \
-  DEPS_MANIFEST="$(jq -r 'if .kind == "alert" then .manifest elif .ecosystem == "npm" then "prototype/package.json" else "Cargo.toml" end' <<<"$it")" \
+  DEPS_MANIFEST="$(jq -r 'if .kind == "alert" then .manifest else "Cargo.toml" end' <<<"$it")" \
   DEPS_ADVISORY="$(jq -r 'if .ghsa != "" then .ghsa else "none: a version update of Dependabot" end' <<<"$it")" \
   DEPS_KIND="$(jq -r 'if .kind == "alert" then "Dependabot security alert \(.number)" else "Dependabot pull request \(.number) whose check verdict failed" end' <<<"$it")" \
   awk 'BEGIN { split("package ecosystem vulnerable_range target_version manifest_path advisory_id item", k, " ")
@@ -376,10 +378,6 @@ clean_env() {
   if [[ $ex -eq 1 ]]; then exec env -i "${args[@]}" "$@"; else env -i "${args[@]}" "$@"; fi
 }
 run_verdict() { clean_env -- "$ROOT/.agents/scripts/pipeline.verdict.sh" >>"$1" 2>&1 </dev/null; }
-run_prototype() {
-  ( cd "$ROOT/prototype" && clean_env COREPACK_ENABLE_DOWNLOAD_PROMPT=0 -- corepack pnpm install --frozen-lockfile \
-      && clean_env COREPACK_ENABLE_DOWNLOAD_PROMPT=0 -- corepack pnpm build ) >>"$1" 2>&1 </dev/null
-}
 # The model of the run, the four token counts, the turns, the API-equivalent cost from the vendored price file
 # (the base fields of cost.md on the totals per model), and total_cost_usd of the result.
 usage_fields() {
@@ -414,10 +412,10 @@ fix_item() {
   render_prompt "$it" >"$work/prompt.txt"
   rm -f "$marker" "$out"
   claude_runs=$((claude_runs + 1))
-  ( clean_env --exec CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_CODE_OAUTH_TOKEN" BASH_DEFAULT_TIMEOUT_MS="$BASH_TIMEOUT_MS" BASH_MAX_TIMEOUT_MS="$BASH_TIMEOUT_MS" COREPACK_ENABLE_DOWNLOAD_PROMPT=0 -- \
+  ( clean_env --exec CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_CODE_OAUTH_TOKEN" BASH_DEFAULT_TIMEOUT_MS="$BASH_TIMEOUT_MS" BASH_MAX_TIMEOUT_MS="$BASH_TIMEOUT_MS" -- \
       claude -p --output-format json --model "$MODEL" --max-turns "$max_turns" --max-budget-usd "$RUN_BUDGET_USD" \
       --no-session-persistence \
-      --allowedTools Read Edit Write Grep Glob "Bash(cargo:*)" "Bash(pnpm --dir prototype:*)" "Bash(corepack pnpm --dir prototype:*)" \
+      --allowedTools Read Edit Write Grep Glob "Bash(cargo:*)" \
         "Bash(git diff:*)" "Bash(git status:*)" "Bash(git log:*)" "Bash(.agents/scripts/pipeline.verdict.sh:*)" \
         "Bash(.agents/scripts/pipeline.format.sh:*)" "Bash(.agents/scripts/pipeline.lint.sh:*)" "Bash(.agents/scripts/pipeline.test.sh:*)" \
         "Bash(.agents/scripts/pipeline.web.sh:*)" "Bash(.agents/scripts/pipeline.image.sh:*)" \
@@ -448,10 +446,10 @@ fix_item() {
     if [[ -z "$changed" ]]; then fix_reason=no_change; fi
   fi
   if [[ -z "$fix_reason" ]]; then
-    local code_changed=0 proto_changed=0
+    local code_changed=0
     for p in $changed; do
-      case " $ALWAYS_PATHS " in *" $p "*) [[ "$p" == prototype/* ]] && proto_changed=1; continue ;; esac
-      case "$p" in src/*|tests/*) code_changed=1; continue ;; prototype/src/*) code_changed=1; proto_changed=1; continue ;; esac
+      case " $ALWAYS_PATHS " in *" $p "*) continue ;; esac
+      case "$p" in src/*|tests/*) code_changed=1; continue ;; esac
       fix_reason=path_not_allowed; break
     done
     if [[ -z "$fix_reason" ]] && git diff --cached "$last_good" | grep '^+' | grep -v '^+++' | has_credential; then fix_reason=credential_in_diff; fi
@@ -459,16 +457,15 @@ fix_item() {
       # A code change is allowed only when the verdict failed after the version change alone.
       git diff --cached --binary "$last_good" >"$work/full.patch"
       git reset -q --hard "$last_good"
-      git apply --include=Cargo.toml --include=Cargo.lock --include=prototype/package.json --include=prototype/pnpm-lock.yaml "$work/full.patch" 2>>"$log"
+      git apply --include=Cargo.toml --include=Cargo.lock "$work/full.patch" 2>>"$log"
       echo "verdict: the version change alone" >>"$log"
       if run_verdict "$log"; then fix_reason=path_not_allowed; fi
       git reset -q --hard "$last_good"; git clean -fdq
       git apply "$work/full.patch" 2>>"$log" && git add -A >/dev/null 2>&1
     fi
     if [[ -z "$fix_reason" ]]; then echo "verdict: the fix" >>"$log"; run_verdict "$log" || fix_reason=verdict_failed; fi
-    if [[ -z "$fix_reason" && $proto_changed -eq 1 ]]; then run_prototype "$log" || fix_reason=prototype_failed; fi
     if [[ -z "$fix_reason" ]]; then
-      local type=chore; for p in $changed; do [[ "$p" == prototype/* ]] || type=fix; done
+      local type=fix
       local summary; summary="$(summary_of "$type" "$it")"
       if git -c user.name="$COMMIT_NAME" -c user.email="$COMMIT_EMAIL" commit -q -m "$summary" >>"$log" 2>&1; then
         fix_status=fixed; echo "$summary" >>"$work/fixlines"
@@ -495,6 +492,11 @@ while IFS= read -r it; do
     # A held item: no new claude -p run; its line stays in the issue with its first date.
     item "$key" "$path" "$pkg" "$eco" held "${hr% *}" "$extra since: ${hr#* }"
     awk -v k="$key" '$1 == k' "$work/held.old" >>"$work/held.new"
+    continue
+  fi
+  if [[ "$eco" == npm ]]; then
+    # The project has no npm code, so an npm item from an old alert or pull request is skipped, not fixed.
+    item "$key" "$path" "$pkg" "$eco" skipped ecosystem_removed "$extra"
     continue
   fi
   if [[ "$kind" == alert && "$(jq -r .patched <<<"$it")" == "" ]]; then
