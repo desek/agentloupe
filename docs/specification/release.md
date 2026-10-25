@@ -102,14 +102,18 @@ The weekly freshness flow of `dependencies.md` is a second source of `fix(deps)`
 
 The changelog starts after the commit `446f065`. The configuration sets `bootstrap-sha` to this commit and `release-as` to `0.1.0`. The first release pull request proposes `0.1.0`, which equals `Cargo.toml`. Right after `v0.1.0` publishes, a `chore(release)` commit removes `release-as`. This commit goes to `main` through the admin bypass of the main ruleset. The work before the first release is in `docs/cr/`.
 
-The repository is private before the first release. On the free plan, the rulesets and the security features exist only on a public repository. Thus the first release follows this order:
+The repository is private before the first release. On the free plan, the rulesets and the security features exist only on a public repository. The history of the first repository holds content that must not become public. Thus the first release follows this order:
 
 1. All file changes for the release land on `main`. Each stale remote branch is deleted.
-2. The owner makes the repository public. No script and no workflow changes the visibility.
-3. The owner runs `.agents/scripts/repo.settings.sh` (see "Repository settings"). Then `repo.settings.sh --check` exits with code 0.
-4. The owner merges the first release pull request.
+2. The supervisor rewrites the history of `main` with `git filter-repo` on a fresh clone. The rewrite removes the early prototype archive and the city name of the old example zone from every commit.
+3. The owner renames the old repository to `desek/agentloupe-archive` and keeps it private. The owner makes a new, empty, private repository `desek/agentloupe`.
+4. The supervisor pushes only the rewritten `main` to the new repository, with no other ref.
+5. The owner adds the secrets `RELEASE_PLEASE_TOKEN` (a fine-grained token for the new repository) and `CLAUDE_CODE_OAUTH_TOKEN`, and the variable `LOUPE_TELEMETRY_HOST`, to the new repository.
+6. The owner makes the new repository public. No script and no workflow changes the visibility.
+7. The owner runs `.agents/scripts/repo.settings.sh` (see "Repository settings"). Then `repo.settings.sh --check` exits with code 0.
+8. The owner merges the first release pull request.
 
-The first release pull request does not merge before step 3 is complete. The human sets the registry package to public one time after the first push. The release workflow does not change a visibility.
+The first release pull request does not merge before step 7 is complete. The human sets the registry package to public one time after the first push. The release workflow does not change a visibility.
 
 ## Release assets
 
