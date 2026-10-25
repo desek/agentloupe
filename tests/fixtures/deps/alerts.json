@@ -29,7 +29,7 @@
     "state": "open",
     "dependency": {
       "package": { "ecosystem": "npm", "name": "esbuild" },
-      "manifest_path": "prototype/pnpm-lock.yaml",
+      "manifest_path": "package-lock.json",
       "scope": "development"
     },
     "security_advisory": {

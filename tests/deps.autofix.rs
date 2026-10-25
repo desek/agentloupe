@@ -1,4 +1,4 @@
-//! @agents-index Integration test: runs the shell tests of deps.autofix.sh against a fake gh, claude, cargo, and corepack, in four parallel groups, and asserts that every test passes.
+//! @agents-index Integration test: runs the shell tests of deps.autofix.sh against a fake gh, claude, and cargo, in four parallel groups, and asserts that every test passes.
 
 use std::path::Path;
 use std::process::Command;
@@ -32,13 +32,14 @@ fn shell_tests(names: &[&str]) {
 }
 
 /// Discovery and the dry run: nothing open, the planned actions, one item for an alert with a pull request,
-/// the precondition, the credentials, the alerts setting, the interface, and the thin caller workflow.
+/// the skip of an npm alert, the precondition, the credentials, the alerts setting, the interface, and the thin caller workflow.
 #[test]
 fn deps_autofix_discovery() {
     shell_tests(&[
         "nothing_open_prints_zero_and_exits_0",
         "dry_run_lists_actions_for_alert",
         "alert_with_pr_is_handled_once",
+        "npm_alert_is_skipped_with_reason",
         "absent_verdict_workflow_exits_5",
         "missing_token_exits_3_without_value",
         "alerts_off_names_the_setting",

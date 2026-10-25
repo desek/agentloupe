@@ -1,9 +1,9 @@
 #!/bin/bash
-# @agents-index Shell tests of deps.autofix.sh with a fake gh, claude, cargo, and corepack on recorded answers: empty, alert, Dependabot pull request, hold time, release step, issue, credentials.
+# @agents-index Shell tests of deps.autofix.sh with a fake gh, claude, and cargo on recorded answers: empty, alert, npm skip, Dependabot pull request, hold time, release step, issue, credentials.
 #
 # Usage: deps.autofix.test.sh [name...]. With names, only those tests run. Each test makes a scratch git repository with a local bare origin, copies
 # deps.autofix.sh and its prompt template into it with a stand-in pipeline.verdict.sh and a small price file, and
-# puts a fake gh, claude, cargo, and corepack first on PATH. The fake gh answers GET calls from the recorded
+# puts a fake gh, claude, and cargo first on PATH. The fake gh answers GET calls from the recorded
 # files of tests/fixtures/deps/ and records every call; a call with another method is a write. The fake claude
 # records its arguments, its environment, and its prompt, applies the edit of the test, and prints a recorded
 # claude -p result. The script runs with --fixtures, so it polls with no delay and uses no network. Prints one
@@ -89,12 +89,8 @@ CLAUDE
 #!/bin/bash
 echo "cargo \$*" >>"$D/cargo.calls"; exit 0
 CARGO
-  cat >"$D/bin/corepack" <<COREPACK
-#!/bin/bash
-echo "corepack \$*" >>"$D/corepack.calls"; exit "\$(cat "$D/corepack_rc" 2>/dev/null || echo 0)"
-COREPACK
   chmod +x "$D/bin/"*
-  G="$D/git"; mkdir -p "$G/.agents/scripts" "$G/.github/workflows" "$G/vendor/litellm" "$G/src" "$G/prototype"
+  G="$D/git"; mkdir -p "$G/.agents/scripts" "$G/.github/workflows" "$G/vendor/litellm" "$G/src"
   cp "$ROOT/.agents/scripts/deps.autofix.sh" "$ROOT/.agents/scripts/deps.autofix.prompt.md" "$ROOT/.agents/scripts/deps.common.sh" "$G/.agents/scripts/"
   cat >"$G/.agents/scripts/pipeline.verdict.sh" <<VERDICT
 #!/bin/bash
@@ -111,8 +107,6 @@ VERDICT
   printf '[package]\nname = "agent-loupe"\nversion = "0.1.0"\n' >"$G/Cargo.toml"
   printf '[[package]]\nname = "smallvec"\nversion = "1.13.2"\n' >"$G/Cargo.lock"
   echo 'pub fn f() {}' >"$G/src/lib.rs"
-  echo '{"name": "p", "packageManager": "pnpm@12.9.0"}' >"$G/prototype/package.json"
-  echo 'lockfileVersion: 9.0' >"$G/prototype/pnpm-lock.yaml"
   (cd "$G" && git init -q -b main && git config user.email t@example.com && git config user.name t && git add -A && git commit -qm init \
     && git init -q --bare "$D/origin.git" && git remote add origin "$D/origin.git" && git push -q origin main && git fetch -q origin) || exit 1
   serve "repos/$REPO" '{"private": false, "visibility": "public"}'
@@ -200,6 +194,18 @@ run
   && grep -l 'deps-autofix:held' "$D/bodies/"* | xargs grep -q "^alert:13 input:patched=none;main=[0-9a-f]* date:$DAY reason:no_patched_version$" \
   && [ -z "$(remote_commits)" ]
 result no_patched_version_starts_no_run $?
+fi
+
+# An npm alert: the project has no npm code, so the item is skipped with its reason; no claude -p run, no issue, exit 0.
+if want npm_alert_is_skipped_with_reason; then
+setup; alerts '.number == 12'
+run --dry-run; ok=1
+[ $rc -eq 0 ] && echo "$out" | grep -q '^item: alert:12 path: alert package: esbuild ecosystem: npm status: skipped reason: ecosystem_removed number: 12 ' \
+  && ! echo "$out" | grep -q '^action: claude' && [ "$(writes)" -eq 0 ] && ok=0
+run
+[ $ok -eq 0 ] && [ $rc -eq 0 ] && echo "$out" | grep -q '^item: alert:12 .* status: skipped reason: ecosystem_removed' \
+  && [ "$(claude_runs)" -eq 0 ] && ! grep -qx "POST repos/$REPO/issues" "$D/calls" && [ -z "$(remote_commits)" ]
+result npm_alert_is_skipped_with_reason $?
 fi
 
 # The verdict workflow absent from the tree: exit 5 before any API call; not active on the repository: exit 5.
@@ -430,6 +436,8 @@ fi
 # An authentication error of claude -p: no more claude -p runs, the issue names claude setup-token, exit 3.
 if want claude_auth_stops_runs_and_exits_3; then
 setup; alerts '.number == 11 or .number == 12'; cp "$FIX/claude.result.auth.json" "$D/claude.out"
+# A second cargo alert: alert 12 as a cargo alert, because an npm alert is skipped before any run.
+f="$D/api/$(key "repos/$REPO/dependabot/alerts")"; jq -c 'map(if .number == 12 then .security_vulnerability.package.ecosystem = "rust" | .dependency.manifest_path = "Cargo.lock" else . end)' "$f" >"$D/x" && mv "$D/x" "$f"
 run
 [ $rc -eq 3 ] && [ "$(claude_runs)" -eq 1 ] && echo "$out" | grep -q 'status: failed reason: claude_auth' && echo "$out" | grep -q 'status: waiting reason: claude_auth' \
   && grep -q 'claude setup-token' "$D/bodies/"*

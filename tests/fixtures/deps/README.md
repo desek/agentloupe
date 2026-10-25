@@ -5,7 +5,7 @@ The shell tests of `.agents/scripts/deps.autofix.sh` (`tests/scripts/deps.autofi
 
 | File | Shape of |
 |---|---|
-| `alerts.json` | `GET /repos/{owner}/{repo}/dependabot/alerts?state=open`: a cargo alert with a patched version, an npm alert of the prototype, and a cargo alert with no patched version |
+| `alerts.json` | `GET /repos/{owner}/{repo}/dependabot/alerts?state=open`: a cargo alert with a patched version, an npm alert (the flows skip it, because the project has no npm code), and a cargo alert with no patched version |
 | `alerts.empty.json` | the same call with no open alert |
 | `alerts.disabled.json` | the 403 answer of the same call when the alerts are off |
 | `pulls.json` | `GET /repos/{owner}/{repo}/pulls?state=open`: a cargo bump, an action pin bump, and a grouped cargo bump, each by Dependabot |

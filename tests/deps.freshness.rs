@@ -1,4 +1,4 @@
-//! @agents-index Integration test: runs the shell tests of deps.freshness.sh against a fake curl, gh, claude, cargo, and corepack on recorded registry answers, in two parallel groups, and asserts that every test passes.
+//! @agents-index Integration test: runs the shell tests of deps.freshness.sh against a fake curl, gh, claude, and cargo on recorded registry answers, in two parallel groups, and asserts that every test passes.
 
 use std::path::Path;
 use std::process::Command;
@@ -33,7 +33,7 @@ fn shell_tests(names: &[&str]) {
 }
 
 /// The scan and the update runs: the classes, the latest rule, yanked and pre-release versions, the two
-/// tables, npm, the action pins, the polite rate, a registry error, the JSON output, the dry run, the order
+/// tables, the action pins, the polite rate, a registry error, the JSON output, the dry run, the order
 /// and the cap, a green commit, a red verdict, the smoke check, and the guards of the script. Two groups, not
 /// four: the shell tests start many short processes, and fewer parallel groups keep the timing tests of the
 /// same test stage within their thresholds on a busy machine.
@@ -45,7 +45,6 @@ fn deps_freshness_scan_and_update() {
         "yanked_latest_skipped",
         "yanked_pinned_is_stale",
         "crate_in_two_tables_counted_once",
-        "npm_time_field",
         "action_pin_resolved",
         "action_pin_mismatch",
         "user_agent_and_rate",

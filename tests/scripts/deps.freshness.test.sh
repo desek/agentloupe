@@ -1,8 +1,8 @@
 #!/bin/bash
-# @agents-index Shell tests of deps.freshness.sh with a fake curl, gh, claude, cargo, and corepack on recorded registry answers: classes, latest rule, rate, errors, update runs and guards, issues, assessments, workflow.
+# @agents-index Shell tests of deps.freshness.sh with a fake curl, gh, claude, and cargo on recorded registry answers: classes, latest rule, rate, errors, update runs and guards, issues, assessments, workflow.
 #
 # Usage: deps.freshness.test.sh [name...]. With names, only those tests run. Each test makes a scratch git
-# repository with a local bare origin: a Cargo.toml and Cargo.lock of chosen crates, a prototype with vite, a
+# repository with a local bare origin: a Cargo.toml and Cargo.lock of chosen crates, a
 # workflow with one action pin, the script, its shared helper, its two prompt templates, a stand-in
 # pipeline.verdict.sh, and a small price file. A fake curl answers the registries from the recorded files of
 # tests/fixtures/freshness/ and records the time, the User-Agent, and the URL of each request; it also answers
@@ -55,9 +55,9 @@ crates() {
   (cd "$G" && git add -A && git commit -qm crates && git push -q origin main && git fetch -q origin)
 }
 setup() {
-  D="$(mktemp -d)"; mkdir -p "$D/bin" "$D/api" "$D/bodies" "$D/reg/crates" "$D/reg/npm" "$D/git"; : >"$D/calls"; : >"$D/registry.calls"
+  D="$(mktemp -d)"; mkdir -p "$D/bin" "$D/api" "$D/bodies" "$D/reg/crates" "$D/git"; : >"$D/calls"; : >"$D/registry.calls"
   echo "${DAY}T10:00:00Z" >"$D/now"; echo 0 >"$D/registry_interval_ms"
-  cp "$FIX"/crates/*.json "$D/reg/crates/"; cp "$FIX/npm/vite.json" "$D/reg/npm/vite.json"
+  cp "$FIX"/crates/*.json "$D/reg/crates/"
   cat >"$D/bin/curl" <<CURL
 #!/bin/bash
 # Fake curl: records the time, the User-Agent, and the URL; answers the registries and /healthz from files.
@@ -73,7 +73,6 @@ echo "$(perl -MTime::HiRes=time -e 'printf "%d", time * 1000') ua=[$ua] $url" >>
 code=200; body=""
 case "$url" in
   https://crates.io/api/v1/crates/*) f="$F/reg/crates/${url##*/}.json" ;;
-  https://registry.npmjs.org/*) n="${url#https://registry.npmjs.org/}"; f="$F/reg/npm/$(echo "$n" | sed 's#%2f#_#g; s#@##g').json" ;;
   http://127.0.0.1:*/healthz) f="$F/healthz"; [ -f "$f" ] || { body='{"status":"ok"}'; f=""; } ;;
   *) echo "curl: (6) no network in the tests: $url" >&2; exit 6 ;;
 esac
@@ -154,10 +153,6 @@ echo "cargo \$*" >>"$D/cargo.calls"
 if [ "\$1" = build ]; then mkdir -p target/debug && cp "$D/loupe.stub" target/debug/loupe && chmod +x target/debug/loupe; fi
 exit 0
 CARGO
-  cat >"$D/bin/corepack" <<COREPACK
-#!/bin/bash
-echo "corepack \$*" >>"$D/corepack.calls"; exit "\$(cat "$D/corepack_rc" 2>/dev/null || echo 0)"
-COREPACK
   cat >"$D/loupe.stub" <<'STUB'
 #!/bin/bash
 # Stand-in loupe: the version, a key, and a serve that writes listening and closes on SIGTERM.
@@ -168,7 +163,7 @@ case "$1" in
 esac
 STUB
   chmod +x "$D/bin/"*
-  G="$D/git"; mkdir -p "$G/.agents/scripts" "$G/.github/workflows" "$G/vendor/litellm" "$G/src" "$G/tests" "$G/prototype/src"
+  G="$D/git"; mkdir -p "$G/.agents/scripts" "$G/.github/workflows" "$G/vendor/litellm" "$G/src" "$G/tests"
   cp "$ROOT/.agents/scripts/deps.freshness.sh" "$ROOT/.agents/scripts/deps.common.sh" "$ROOT/.agents/scripts/deps.freshness.update.prompt.md" \
     "$ROOT/.agents/scripts/deps.freshness.assess.prompt.md" "$G/.agents/scripts/"
   cat >"$G/.agents/scripts/pipeline.verdict.sh" <<VERDICT
@@ -188,9 +183,6 @@ VERDICT
     >"$G/vendor/litellm/model_prices_and_context_window.json"
   printf 'use hex::encode;\npub fn f(b: &[u8]) -> String { encode(b) }\npub fn g(b: &[u8]) -> String { hex::encode(b) }\n#[test]\nfn t1() {}\n#[test]\nfn t2() {}\n' >"$G/src/lib.rs"
   printf '#[tokio::test]\nasync fn t3() {}\n' >"$G/tests/a.rs"
-  echo '{"name": "p", "packageManager": "pnpm@12.9.0", "devDependencies": {"vite": "8.3.4"}}' >"$G/prototype/package.json"
-  printf "lockfileVersion: '9.0'\n\nimporters:\n\n  .:\n    devDependencies:\n      vite:\n        specifier: 8.3.4\n        version: 8.3.4(@types/node@24.0.0)\n\npackages:\n" >"$G/prototype/pnpm-lock.yaml"
-  echo 'console.log(1);' >"$G/prototype/src/main.js"
   (cd "$G" && git init -q -b main && git config user.email t@example.com && git config user.name t && git add -A && git commit -qm init \
     && git init -q --bare "$D/origin.git" && git remote add origin "$D/origin.git" && git push -q origin main && git fetch -q origin) || exit 1
   crates "$DEFAULT_CRATES"
@@ -239,7 +231,7 @@ setup; run scan
   && [ "$(field "$(line cargo hmac)" class)" = aged ] && [ "$(field "$(line cargo hmac)" behind)" = yes ] \
   && line cargo aes-gcm | grep -q 'pinned: 0.10.3 pinned_date: 2023-09-21 pinned_age_days: 1128 latest: 0.11.1 latest_date: 2026-08-21 latest_age_days: 63 behind: yes class: stale yanked: no$' \
   && line cargo tokio-tungstenite | grep -q 'kind: dev .* class: stale' \
-  && echo "$out" | grep -qx 'summary: fresh: 4 stale: 5 aged: 3 unknown: 0 aged_behind: 1 total: 12 scan_secs: [0-9]*' \
+  && echo "$out" | grep -qx 'summary: fresh: 3 stale: 5 aged: 3 unknown: 0 aged_behind: 1 total: 11 scan_secs: [0-9]*' \
   && [ "$(writes)" -eq 0 ] && [ "$(claude_runs)" -eq 0 ] && [ -z "$(git -C "$D/git" status --porcelain)" ]
 result scan_classes $?
 fi
@@ -276,15 +268,6 @@ setup; crates "tokio:normal:1.54.1 tokio:dev:1.54.1 smallvec:normal:1.16.4" "sma
 [ $rc -eq 0 ] && [ "$(echo "$out" | grep -c '^ecosystem: cargo name: tokio ')" -eq 1 ] && [ "$(field "$(line cargo tokio)" kind)" = normal ] \
   && [ "$(field "$(line cargo smallvec)" pinned)" = 1.16.4 ] && [ "$(grep -c 'crates/tokio$' "$D/registry.calls")" -eq 1 ]
 result crate_in_two_tables_counted_once $?
-fi
-
-# The npm dates come from the field time; a pre-release and a deprecated version are never the latest.
-if want npm_time_field; then
-setup; run scan; l1="$(line npm vite)"
-jq '.versions["8.3.5"].deprecated = "use 8.3.6"' "$FIX/npm/vite.json" >"$D/reg/npm/vite.json"; run scan; l2="$(line npm vite)"
-[ $rc -eq 0 ] && echo "$l1" | grep -q 'kind: dev pinned: 8.3.4 pinned_date: 2026-10-08 pinned_age_days: 15 latest: 8.3.5 latest_date: 2026-10-21 latest_age_days: 3 behind: yes class: fresh yanked: no$' \
-  && [ "$(field "$l2" latest)" = 8.3.4 ] && [ "$(field "$l2" behind)" = no ] && grep -q 'https://registry.npmjs.org/vite$' "$D/registry.calls"
-result npm_time_field $?
 fi
 
 # An action pin resolves to its tag and date; a draft, a pre-release, and a tag v9 are not the latest; a local
@@ -326,15 +309,15 @@ fi
 # --json prints one JSON document with the fields of each line, and --report writes the same document.
 if want json_output; then
 setup; run scan --json --report "$D/report.json"
-[ $rc -eq 0 ] && echo "$out" | jq -e '.dependencies | length == 12' >/dev/null \
+[ $rc -eq 0 ] && echo "$out" | jq -e '.dependencies | length == 11' >/dev/null \
   && echo "$out" | jq -e '.dependencies[] | select(.name == "hmac") | [.ecosystem, .name, .kind, .pinned, .pinned_date, .pinned_age_days, .latest, .latest_date, .latest_age_days, .behind, .class, .yanked] == ["cargo","hmac","normal","0.12.1","2022-02-17",1709,"0.13.0","2026-03-29",208,true,"aged",false]' >/dev/null \
-  && echo "$out" | jq -e '.summary.aged == 3 and .summary.total == 12' >/dev/null && jq -e '.action == "scan"' "$D/report.json" >/dev/null
+  && echo "$out" | jq -e '.summary.aged == 3 and .summary.total == 11' >/dev/null && jq -e '.action == "scan"' "$D/report.json" >/dev/null
 result json_output $?
 fi
 
-# The dry run plans and writes nothing: no claude, no cargo, no corepack, no token, no write call, a clean tree.
+# The dry run plans and writes nothing: no claude, no cargo, no token, no write call, a clean tree.
 if want dry_run_starts_no_claude; then
-setup; rm "$D/bin/claude" "$D/bin/cargo" "$D/bin/corepack"; head0="$(git -C "$D/git" rev-parse HEAD)"
+setup; rm "$D/bin/claude" "$D/bin/cargo"; head0="$(git -C "$D/git" rev-parse HEAD)"
 CCT="" RELT="" run update --dry-run; o1="$out"; r1=$rc
 CCT="" RELT="" run assess --dry-run
 [ $r1 -eq 0 ] && [ $rc -eq 0 ] && echo "$o1" | grep -qx "action: branch target: $BRANCH status: planned detail: from the head of main" \
@@ -349,14 +332,14 @@ CCT="" RELT="" run assess --dry-run
 result dry_run_starts_no_claude $?
 fi
 
-# The order of the runs (normal and build, then dev, then npm; the oldest pinned first) and the run cap of 4.
+# The order of the runs (normal and build, then dev; the oldest pinned first) and the run cap of 4.
 if want update_order_and_cap; then
-setup; jq '.time["8.3.4"] = "2026-06-01T00:00:00.000Z"' "$FIX/npm/vite.json" >"$D/reg/npm/vite.json"
+setup
 run update --dry-run
 order="$(echo "$out" | sed -nE 's/^item: ([^ ]+) path: update .* status: (planned|waiting).*/\1/p' | tr '\n' ' ')"
-[ $rc -eq 0 ] && [ "$order" = "cargo:hmac cargo:aes-gcm cargo:sha2 cargo:rusqlite cargo:reqwest cargo:tokio-tungstenite npm:vite " ] \
-  && [ "$(echo "$out" | grep -c 'status: planned pinned')" -eq 4 ] && [ "$(echo "$out" | grep -c 'status: waiting reason: run_cap')" -eq 3 ] \
-  && echo "$out" | grep -q '^item: cargo:reqwest .* status: waiting reason: run_cap' && echo "$out" | grep -q '^item: npm:vite .* status: waiting reason: run_cap'
+[ $rc -eq 0 ] && [ "$order" = "cargo:hmac cargo:aes-gcm cargo:sha2 cargo:rusqlite cargo:reqwest cargo:tokio-tungstenite " ] \
+  && [ "$(echo "$out" | grep -c 'status: planned pinned')" -eq 4 ] && [ "$(echo "$out" | grep -c 'status: waiting reason: run_cap')" -eq 2 ] \
+  && echo "$out" | grep -q '^item: cargo:reqwest .* status: waiting reason: run_cap'
 result update_order_and_cap $?
 fi
 
