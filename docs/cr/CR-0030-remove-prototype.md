@@ -83,7 +83,7 @@ The owner wrote, on 2026-10-25, after CR-0029: "the "prototype/" also seems redu
 
 * `prototype/`, `.gitignore`, `.github/dependabot.yml`.
 * `.agents/scripts/deps.autofix.sh`, `deps.freshness.sh`, `deps.common.sh` if it holds npm code, and the three prompts.
-* `tests/scripts/deps.autofix.test.sh`, `tests/scripts/deps.freshness.test.sh`, `tests/fixtures/deps/`.
+* `tests/scripts/deps.autofix.test.sh`, `tests/scripts/deps.freshness.test.sh`, `tests/fixtures/deps/`, and the Rust wrappers `tests/deps.autofix.rs` and `tests/deps.freshness.rs` (their `@agents-index` lines name a fake corepack).
 * `docs/specification/dependencies.md`, `docs/specification/release.md`, `.taxonomy`, `SECURITY.md`.
 * `release-please-config.json` (`bootstrap-sha`), and each tracked file with a commit hash.
 
@@ -132,6 +132,7 @@ None.
 ### Tests to Modify
 
 * `tests/scripts/deps.autofix.test.sh`, `tests/scripts/deps.freshness.test.sh`, `tests/fixtures/deps/alerts.json`: no prototype in the scratch repositories.
+* `tests/deps.autofix.rs` and `tests/deps.freshness.rs`: their `@agents-index` lines name no corepack.
 
 ### Tests to Remove
 
@@ -252,3 +253,4 @@ None.
 
 The first reviewer found two blocking findings, each with the smallest edit: the grep of the target "npm lane" matches the path `prototype/`, not the word, so the records of the early prototype archive stay (target row and AC-2); and requirement 5 names the manifest path of the npm alert in the fixture.
 
+The second reviewer found one more blocking finding: `tests/deps.autofix.rs` and `tests/deps.freshness.rs` match the grep target and were not in scope. Edit: both are in "Affected Components" and in "Tests to Modify".
