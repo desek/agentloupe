@@ -2,7 +2,7 @@
 name: "CR-0029 Public repository cleanup"
 description: "Before the first public release, the README becomes a short entry page with a screenshot of the dashboard, and its detail moves to user guides under docs/guide/. brainstorm/ leaves the tree and the whole git history. The old example time zone becomes Europe/Stockholm in the tree and in the history. The rewritten history goes to a new, clean GitHub repository, so no old pull request ref publishes the removed content."
 id: "CR-0029"
-status: "approved"
+status: "implemented"
 date: 2026-10-25
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, owner of the GitHub account), reviewer agent (approver), readers of the public repository
@@ -379,4 +379,8 @@ The first reviewer found two blocking findings. Each got the smallest edit:
 ### Hashes in this record
 
 Each commit hash in this CR and in `CR-0029-rollback-log.md` names a commit of the history before the rewrite, which the archive repository `desek/agentloupe-archive` keeps. The hash commit of requirement 18 does not change these two files, because they describe the old history. The other tracked files name the new hashes. The new hash of the old commit `446f065` is `c3e95d3`.
+
+### Verification, 2026-10-25
+
+The targets, measured: README 54 lines (at most 120); the screenshot on line 5 (before 15); the archive directory in the tree 0 and in the history 0 commits; the old zone in the tree 0 lines and in the history 0 trees, 0 messages, and 0 file objects; 356 rewritten commits with the same tree, authors, and dates, plus 1 hash commit; the new remote lists only `refs/heads/main`; the verdict passed on the new `main`. The scenario `.agents/scenarios/public.repository.md` passed. The owner still makes `RELEASE_PLEASE_TOKEN` for the new repository (requirement 22); the release then follows `release.md`.
 
