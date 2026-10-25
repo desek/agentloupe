@@ -1,6 +1,6 @@
 ---
 name: "CR-0029 Public repository cleanup"
-description: "Before the first public release, the README becomes a short entry page with a screenshot of the dashboard, and its detail moves to user guides under docs/guide/. brainstorm/ leaves the tree and the whole git history. Europe/Stockholm becomes Europe/Stockholm in the tree and in the history. The rewritten history goes to a new, clean GitHub repository, so no old pull request ref publishes the removed content."
+description: "Before the first public release, the README becomes a short entry page with a screenshot of the dashboard, and its detail moves to user guides under docs/guide/. brainstorm/ leaves the tree and the whole git history. The old example time zone becomes Europe/Stockholm in the tree and in the history. The rewritten history goes to a new, clean GitHub repository, so no old pull request ref publishes the removed content."
 id: "CR-0029"
 status: "proposed"
 date: 2026-10-25
@@ -21,25 +21,27 @@ The repository becomes public with the first release `0.1.0`. Before that, five 
 1. `README.md` becomes a short entry page: the name, the tagline, a screenshot of the dashboard at the top, what the product does, a short quickstart, and links. The detail moves to user guides under `docs/guide/`, one file per topic.
 2. The sentence "The product domain is `agentloupe.dev`." goes.
 3. `brainstorm/` leaves the tree, every reference to it in the tracked files goes, `.gitignore` lists it, and a history rewrite removes it from every commit.
-4. `Europe/Stockholm` becomes `Europe/Stockholm` in every tracked file, with the test values that depend on the offset changed to match. The same history rewrite replaces it in every commit.
+4. The old example time zone becomes `Europe/Stockholm` in every tracked file, with the test values that depend on the offset changed to match. The same history rewrite replaces it in every commit.
 5. The rewritten history goes to a new GitHub repository. The old repository keeps its pull request refs, which hold the removed content, so it stays private as an archive.
 
 ## Motivation and Background
 
 The owner wrote, on 2026-10-25, before the switch of the repository to public:
 
-> We need to cleanup the README.md before we make it public. Currently it feels like README.md should be simpler and decomposed to several documents. References to anything with brainstorm/ should be removed, removed from git history and gitignore. brainstorm/ is not relevant anymore and should not be part of the public package. The text "The product domain is agentloupe.dev." is also redundant and doesn't provide any value for the user. Change the "Europe/Stockholm" references to the Stockholm time zone instead. Add a screenshot of the dashboard at the top so the user knows what to expect. Adjust the project accordingly
+> We need to cleanup the README.md before we make it public. Currently it feels like README.md should be simpler and decomposed to several documents. References to anything with brainstorm/ should be removed, removed from git history and gitignore. brainstorm/ is not relevant anymore and should not be part of the public package. The text "The product domain is agentloupe.dev." is also redundant and doesn't provide any value for the user. Change the "[old zone]" references to the Stockholm time zone instead. Add a screenshot of the dashboard at the top so the user knows what to expect. Adjust the project accordingly
 
 The owner then answered two questions:
 
 1. GitHub keeps 24 pull request refs (`refs/pull/N/head`) on `desek/agentloupe`. Each points to commits that hold `brainstorm/`, and the early ones hold the removed mockup archive. A force push of `main` does not delete them, and only GitHub can. The owner chose: "New clean repository". The rewritten history goes to a new repository, and the old one stays private.
-2. The owner chose to replace `Europe/Stockholm` with `Europe/Stockholm` in the history too, in the same rewrite.
+2. The owner chose to replace the old zone with `Europe/Stockholm` in the history too, in the same rewrite.
+
+In this record, **the old zone** is the example time zone that the history audit of 2026-10-23 names a location hint. This record does not write its name, because the rewrite replaces that name in every commit, also in this file. The commands match it with the pattern `nic[o]sia`, which does not match itself.
 
 ## Change Drivers
 
 * A new reader opens the README first. Today it has 655 lines and 20 sections, so the reader does not see quickly what the product does or how it looks.
 * `brainstorm/agent-ledger.zip` is an old prototype archive with no use for a user. The audit of 2026-10-23 (`.agents/explore/2026-10-23-history-audit.md`) found it and the removed mockup archive, which names a domain of the owner, in the history.
-* `Europe/Stockholm` appears in the README, `.env.example`, an error message, the specification, tests, the prototype, and the records. The audit names it a location hint.
+* The old zone appears in the README, `.env.example`, an error message, the specification, tests, the prototype, and the records. The audit names it a location hint.
 * A pull request ref on GitHub keeps each old commit reachable. A new repository is the only way that the owner can control which commits are public.
 
 ## Current State
@@ -48,7 +50,7 @@ The owner then answered two questions:
 * `README.md` line 12 holds the domain sentence.
 * `git ls-files brainstorm` lists `brainstorm/agent-ledger.zip`. Two commits touch `brainstorm/`: `81755b6` adds both archives, and `27fa389` removes the mockup archive. `.gitignore` has no `brainstorm` line.
 * Tracked files that name `brainstorm`: `README.md`, `SECURITY.md`, `docs/specification/operations.md` (row "Owner paths and mockup"), `docs/cr/CR-0001`, `CR-0008`, `CR-0024`, and `.agents/explore/2026-10-23-history-audit.md`.
-* `Europe/Stockholm` or `Stockholm` is in `README.md`, `.env.example`, `src/config/validate.rs` (the example of the time zone error), `src/github/range.rs` (unit tests), `tests/day.boundary.rs`, `tests/live.events.rs`, `tests/publish.due.rs`, `web/test/api.days.test.js`, `docs/specification/configuration.md`, `docs/specification/days.md`, `docs/specification/operations.md`, `prototype/`, `docs/cr/`, and `.agents/`.
+* The old zone, or its city name alone, is in `README.md`, `.env.example`, `src/config/validate.rs` (the example of the time zone error), `src/github/range.rs` (unit tests), `tests/day.boundary.rs`, `tests/live.events.rs`, `tests/publish.due.rs`, `web/test/api.days.test.js`, `docs/specification/configuration.md`, `docs/specification/days.md`, `docs/specification/operations.md`, `prototype/`, `docs/cr/`, and `.agents/`.
 * `release-please-config.json` sets `bootstrap-sha` to `446f065bc73da084952f76be80aaf80a1973cb63`. A history rewrite gives that commit a new hash.
 * `src/github/` writes an error that names "README.md, section GitHub", and `tests/github.fetch.rs` checks it. `.agents/scripts/pi.session.sh` names "README, section Connect an agent".
 * `.agents/scripts/release.build.sh` puts `README.md` into each release archive.
@@ -59,8 +61,8 @@ The owner then answered two questions:
 1. Write the user guides under `docs/guide/` from the sections of the README, and make the README short with a screenshot.
 2. Change the error messages and scripts that name a README section to name the new guide file.
 3. Remove `brainstorm/`, its references, and add it to `.gitignore`.
-4. Change `Europe/Stockholm` to `Europe/Stockholm` in the tracked files, with correct test values.
-5. With `git filter-repo`, rewrite the history of `main`: remove the path `brainstorm/` and replace the text `Stockholm` with `Stockholm` in every commit. Update `bootstrap-sha` and the commit hashes in the tracked files to the new hashes.
+4. Change the old zone to `Europe/Stockholm` in the tracked files, with correct test values.
+5. With `git filter-repo`, rewrite the history of `main`: remove the path `brainstorm/` and replace the city name of the old zone with `Stockholm` in every commit. Update `bootstrap-sha` and the commit hashes in the tracked files to the new hashes.
 6. The owner renames the old repository and makes the new one. The rewritten `main` goes to the new repository. The release then follows `release.md`.
 
 ## Requirements
@@ -81,19 +83,19 @@ The owner then answered two questions:
 **brainstorm**
 
 9. `brainstorm/` **MUST NOT** be in the tree. `.gitignore` **MUST** list `brainstorm/`.
-10. No tracked file **MUST** hold the text `brainstorm`, also not the records under `docs/cr/` and `.agents/`. A record that cites the archive **MUST** describe it as "an early prototype archive, removed".
+10. No tracked file **MUST** hold the text `brainstorm`, also not the records under `docs/cr/` and `.agents/`, with three exceptions: `.gitignore`, which must list it, and this CR and its rollback log, which record the removal. A record that cites the archive **MUST** describe it as "an early prototype archive, removed".
 
 **Time zone**
 
-11. No tracked file **MUST** hold the text `Stockholm`. Each example and each fixture **MUST** use `Europe/Stockholm`.
+11. No tracked file **MUST** hold the city name of the old zone (`git grep -i 'nic[o]sia'` finds nothing). Each example and each fixture **MUST** use `Europe/Stockholm`.
 12. Each test that depends on the offset of the zone **MUST** change its expected values to the offsets of `Europe/Stockholm` (UTC+1 in winter, UTC+2 in summer), so the test asserts the same rule as before. The date of the end of summer time, 2026-10-25, is the same in the two zones.
 13. The default of `LOUPE_TZ` **MUST** stay `UTC`.
 
 **History rewrite**
 
 14. Before the rewrite, the supervisor **MUST** write the rollback log `docs/cr/CR-0029-rollback-log.md` and a git bundle of all refs outside the repository.
-15. The rewrite **MUST** use `git filter-repo` on a fresh clone of the old repository. It **MUST** remove the path `brainstorm/` from every commit, and **MUST** replace the text `Stockholm` with `Stockholm` in every file of every commit and in every commit message.
-16. After the rewrite, `git log --all -- brainstorm` **MUST** be empty, and `git grep Stockholm $(git rev-list --all)` **MUST** find nothing.
+15. The rewrite **MUST** use `git filter-repo` on a fresh clone of the old repository. It **MUST** remove the path `brainstorm/` from every commit, and **MUST** replace the city name of the old zone with `Stockholm` in every file of every commit and in every commit message. The replacement rules live in a file outside the repository.
+16. After the rewrite, `git log --all -- brainstorm` **MUST** be empty, and `git grep -i 'nic[o]sia' $(git rev-list --all)` and `git log --all -i --grep 'nic[o]sia'` **MUST** find nothing.
 17. The tree of the new `main` **MUST** equal the tree of the old `main` after steps 1 to 13, except for the hash updates of requirement 18.
 18. `bootstrap-sha` in `release-please-config.json` **MUST** be the new hash of the old commit `446f065`. Each short or full commit hash in a tracked file that names a commit of the old history **MUST** change to the new hash of that commit, from the commit map of `git filter-repo`.
 19. The number of commits and their order, authors, and dates **MUST** stay the same.
@@ -125,10 +127,10 @@ The owner then answered two questions:
 | Screenshot at the top | the first image reference of `README.md` and its line number | none | a PNG under `docs/images/` before line 15 |
 | Lost content | a review that maps each rule and step of each old section to its guide file | none | 0 lost |
 | Broken links | the link test | none | 0 |
-| brainstorm in the tree | `git grep -c brainstorm` and `git ls-files brainstorm` | 15 lines in 8 files, 1 file | 0 |
+| brainstorm in the tree | `git grep -c brainstorm -- . ':!.gitignore' ':!docs/cr/CR-0029-*'` and `git ls-files brainstorm` | 15 lines in 8 files, 1 file | 0 |
 | brainstorm in the history | `git log --all --oneline -- brainstorm` on the new repository | 2 commits | 0 |
-| Stockholm in the tree | `git grep -c Stockholm` | about 60 lines | 0 |
-| Stockholm in the history | `git grep -l Stockholm $(git rev-list --all)` and `git log --all --grep Stockholm` | many | 0 |
+| Old zone in the tree | `git grep -ci 'nic[o]sia'` | about 60 lines | 0 |
+| Old zone in the history | `git grep -li 'nic[o]sia' $(git rev-list --all)` and `git log --all -i --grep 'nic[o]sia'` | many | 0 |
 | Commit count | `git rev-list --count main` before and after | the old count | the same |
 | Refs on the new remote | `git ls-remote <new>` before the first workflow run | none | only `refs/heads/main` |
 | Verdict | `.agents/scripts/pipeline.verdict.sh` | passed at `b5ec076` | passed |
@@ -161,7 +163,7 @@ The owner then answered two questions:
 
 * **Force push the rewritten history to the old repository.** Rejected by the owner: the 24 pull request refs keep the old commits public.
 * **Ask GitHub Support to remove the refs.** Rejected by the owner: slow, and not sure for data that is not sensitive.
-* **Replace Stockholm only in the tree.** Rejected by the owner: the history keeps the hint.
+* **Replace the old zone only in the tree.** Rejected by the owner: the history keeps the hint.
 * **One README with a table of contents.** Rejected: the owner asked for several documents.
 
 ## Impact Assessment
@@ -213,7 +215,7 @@ None.
 The surfaces are the README as a reader opens it, and the new repository as a user clones it.
 
 1. Open `README.md` in a Markdown viewer. Check that the screenshot shows at the top, and that each link of the guide table opens its guide.
-2. Clone the new repository into a new directory. Run `git log --all --oneline -- brainstorm`, `git grep Stockholm $(git rev-list --all)`, and `git log --all --grep Stockholm`. Check that each prints nothing.
+2. Clone the new repository into a new directory. Run `git log --all --oneline -- brainstorm`, `git grep -i 'nic[o]sia' $(git rev-list --all)`, and `git log --all -i --grep 'nic[o]sia'`. Check that each prints nothing.
 3. Run `git ls-remote` on the new repository. Check that it lists only `main` before the first workflow run.
 
 Success condition: each check passes in 2 of 2 runs.
@@ -249,11 +251,11 @@ Then each prints nothing
 And .gitignore lists brainstorm/
 ```
 
-### AC-4: Stockholm replaces Stockholm
+### AC-4: Stockholm replaces the old zone
 
 ```gherkin
 Given the new repository
-When git grep Stockholm runs on every commit and git log --all --grep Stockholm runs
+When git grep -i 'nic[o]sia' runs on every commit and git log --all -i --grep 'nic[o]sia' runs
 Then each prints nothing
 And the tests of the day boundary, the live events, the publish time, and the GitHub range pass with Europe/Stockholm
 And the default of LOUPE_TZ is UTC
@@ -313,7 +315,7 @@ A reviewer agent checks blocking findings only.
 ```bash
 .agents/scripts/pipeline.verdict.sh
 git log --all --oneline -- brainstorm
-git grep -l Stockholm $(git rev-list --all)
+git grep -li 'nic[o]sia' $(git rev-list --all)
 ```
 
 ## Risks and Mitigation
@@ -324,7 +326,7 @@ Mitigation: the rollback log, the bundle, the old repository as an archive, the 
 
 ### Risk 2: A text replacement changes code behaviour
 
-`Stockholm` in history commits changes old test files, so an old commit can fail its tests. Only the new `main` must pass. Mitigation: the tree of `main` is changed by hand first, with correct values, so the rewrite does not change it (requirement 17).
+The replacement in history commits changes old test files, so an old commit can fail its tests. Only the new `main` must pass. Mitigation: the tree of `main` is changed by hand first, with correct values, so the rewrite does not change it (requirement 17).
 
 ### Risk 3: A link breaks after the split
 
@@ -360,6 +362,6 @@ None. The owner answered the two questions of the history and the time zone on 2
 2. **The screenshot data.** The seeded demo data, so the image is the same on each run and shows no data of the owner.
 3. **The README length.** At most 120 lines, so a reader sees the whole entry page in two screens.
 4. **The repository names.** The new repository keeps `desek/agentloupe`, so no URL in the files changes. The archive is `desek/agentloupe-archive`.
-5. **The text replacement.** `Stockholm` to `Stockholm` as a plain text rule, which also covers `Europe/Stockholm` and `chrono_tz::Europe::Stockholm`.
+5. **The text replacement.** The city name of the old zone to `Stockholm` as a plain text rule, which also covers the IANA name and the `chrono_tz` constant.
 6. **The records.** `docs/cr/` and `.agents/` records change their text too, because the owner asked that no reference stays.
 7. **The commit hashes in files.** They follow the map, so a reader of a record finds the commit.
