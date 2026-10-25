@@ -290,6 +290,10 @@ name = "calls_readers"
 path = "tests/calls.readers.rs"
 
 [[test]]
+name = "live_poll"
+path = "tests/live.poll.rs"
+
+[[test]]
 name = "live_route"
 path = "tests/live.route.rs"
 

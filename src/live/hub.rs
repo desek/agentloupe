@@ -98,6 +98,13 @@ impl Hub {
             .map_or(0, |i| i.in_flight.load(Ordering::Relaxed).max(0))
     }
 
+    /// Sets the in-flight count; the live poller of the role public calls it at each pass.
+    pub fn set_in_flight(&self, n: i64) {
+        if let Some(i) = &self.inner {
+            i.in_flight.store(n, Ordering::Relaxed);
+        }
+    }
+
     /// The count of exchanges that ended since start; 0 when the hub is off.
     pub fn ended(&self) -> i64 {
         self.inner

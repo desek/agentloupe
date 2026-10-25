@@ -21,13 +21,27 @@ pub fn run(cfg: &Config) -> Result<(), Box<dyn Error>> {
         tz: cfg.summary.tz,
         subscriptions: cfg.days.subscriptions.clone(),
     });
-    // Until the poller exists, the hub is off, so a socket on /live answers 404.
+    // The live poller is the only sender of the local hub; with the live feed off, nothing starts.
+    let hub = match cfg.live.enabled {
+        true => crate::live::hub::Hub::new(cfg.live.buffer),
+        false => crate::live::hub::Hub::off(),
+    };
+    let poller = match cfg.live.enabled {
+        true => Some(crate::live::poll::Poller::new(
+            mirror()?,
+            hub.clone(),
+            Box::new(check_or_stop),
+        )),
+        false => None,
+    };
     let live = match cfg.live.enabled {
-        true => Some(crate::live::route::LiveState::new(
-            crate::live::hub::Hub::off(),
+        true => Some(crate::live::route::LiveState::with_source(
+            hub,
             cfg.live.clone(),
             cfg.summary.tz,
             mirror()?,
+            crate::clock::system(),
+            crate::live::route::Source::Mirror,
         )),
         false => None,
     };
@@ -38,6 +52,13 @@ pub fn run(cfg: &Config) -> Result<(), Box<dyn Error>> {
         let listener = tokio::net::TcpListener::bind(cfg.listen).await?;
         tracing::info!(listen = %listener.local_addr()?, "listening");
         crate::telemetry::start();
+        if let Some(p) = poller {
+            tokio::spawn(crate::live::poll::run(
+                p,
+                crate::clock::system(),
+                Arc::new(crate::publish::clock::System),
+            ));
+        }
         super::shutdown::serve_until_signal(listener, router::router(api, site, live)).await
     })?;
     tracing::info!("exit");

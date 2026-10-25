@@ -6,5 +6,8 @@ pub mod config;
 pub mod event;
 pub mod hub;
 pub mod origin;
+pub mod poll;
 pub mod route;
 pub mod snapshot;
+#[path = "snapshot.mirror.rs"]
+pub mod snapshot_mirror;

@@ -14,13 +14,23 @@ use std::sync::{Arc, Mutex};
 /// The largest client message that the socket reads before the client loop closes it with 1009.
 const READ_LIMIT: usize = 64 * 1024;
 
+/// Where the snapshot of a new socket comes from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Source {
+    /// The role full: the calls and the sessions of loupe.db, and the hub.
+    Store,
+    /// The role public: the live_state row of the public mirror.
+    Mirror,
+}
+
 /// What the live route needs; built once in serve when the live feed is enabled.
 pub struct LiveState {
     pub hub: Hub,
     pub cfg: LiveConfig,
     pub tz: chrono_tz::Tz,
-    /// Reads the calls and the sessions for the snapshot only.
+    /// Reads the snapshot only: loupe.db in the role full, the mirror in the role public.
     conn: Mutex<Connection>,
+    source: Source,
     connections: AtomicUsize,
     /// Drives the heartbeat and the write timeout of each client.
     clock: Arc<dyn crate::clock::Clock>,
@@ -40,7 +50,20 @@ impl LiveState {
         conn: Connection,
         clock: Arc<dyn crate::clock::Clock>,
     ) -> Arc<LiveState> {
+        Self::with_source(hub, cfg, tz, conn, clock, Source::Store)
+    }
+
+    /// The state with the snapshot from `source`; the role public passes `Source::Mirror`.
+    pub fn with_source(
+        hub: Hub,
+        cfg: LiveConfig,
+        tz: chrono_tz::Tz,
+        conn: Connection,
+        clock: Arc<dyn crate::clock::Clock>,
+        source: Source,
+    ) -> Arc<LiveState> {
         Arc::new(LiveState {
+            source,
             hub,
             cfg,
             tz,
@@ -114,12 +137,11 @@ pub async fn handle(state: Arc<LiveState>, req: Request<Body>) -> Response {
     let s = state.clone();
     let snap = tokio::task::spawn_blocking(move || {
         let conn = s.conn.lock().unwrap_or_else(|p| p.into_inner());
-        super::snapshot::read(
-            &conn,
-            s.tz,
-            chrono::Utc::now().timestamp_millis(),
-            s.hub.in_flight(),
-        )
+        let now = chrono::Utc::now().timestamp_millis();
+        match s.source {
+            Source::Store => super::snapshot::read(&conn, s.tz, now, s.hub.in_flight()),
+            Source::Mirror => super::snapshot_mirror::read(&conn, s.tz, now),
+        }
     })
     .await;
     let snap = match snap {

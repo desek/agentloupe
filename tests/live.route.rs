@@ -6,6 +6,8 @@ mod fake;
 mod live;
 #[path = "common/loupe.rs"]
 mod loupe;
+#[path = "common/public.rs"]
+mod public;
 
 use live::{frame, next, open, send, status};
 use loupe::Loupe;
@@ -230,4 +232,30 @@ async fn no_cookie_set() {
     let l = Loupe::start(fake::spawn().await, &[], &[]);
     let (_, r) = open(l.port, "/live", &[]).await.unwrap();
     assert!(!r.headers().contains_key("set-cookie"));
+}
+
+/// The role full reads the snapshot from loupe.db; the role public reads the live_state row of the mirror.
+#[tokio::test(flavor = "multi_thread")]
+async fn snapshot_source_by_role() {
+    let data = tempfile::tempdir().unwrap();
+    let err = tempfile::tempdir().unwrap();
+    let mut w = agent_loupe::mirror::schema::open(data.path()).unwrap();
+    let mut row = agent_loupe::mirror::live::Row::default();
+    row.snapshot.date = "2026-09-21".into();
+    row.snapshot.calls = 7;
+    agent_loupe::mirror::live::write(&mut w, &row, chrono::Utc::now().timestamp_millis()).unwrap();
+    let p = public::Public::start(data.path(), err.path(), &[]);
+    let (mut ws, r) = open(p.port, "/live", &[]).await.unwrap();
+    assert_eq!(r.status(), 101);
+    let f = frame(&mut ws, 5).await;
+    assert_eq!(
+        (&f["kind"], &f["data"]["date"], &f["data"]["calls"]),
+        (&"snapshot".into(), &"2026-09-21".into(), &7.into())
+    );
+    drop(p);
+    let p = public::Public::start(data.path(), err.path(), &[("LOUPE_LIVE_ENABLED", "false")]);
+    assert_eq!(reqwest::get(p.url("/live")).await.unwrap().status(), 404);
+    let l = Loupe::start(fake::spawn().await, &[], &[]);
+    let (mut ws, _) = open(l.port, "/live", &[]).await.unwrap();
+    assert_eq!(frame(&mut ws, 5).await["data"]["calls"], 0);
 }

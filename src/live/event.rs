@@ -106,6 +106,18 @@ pub enum Event {
         ts: i64,
         count: i64,
     },
+    /// The live poller of the role public: the growth of the call totals since its last pass.
+    CallsBatch {
+        ts: i64,
+        batch: CallsBatch,
+    },
+    /// The live poller of the role public: the exchange counts since its last pass.
+    ExchangesBatch {
+        ts: i64,
+        batch: ExchangesBatch,
+    },
+    /// The live poller of the role public: the totals of a new day, for each client.
+    Snapshot(Snapshot),
 }
 
 /// The totals of the current day that the first frame of a socket carries.
@@ -153,12 +165,18 @@ impl Event {
             Event::ExchangeEnd { .. } => "exchange.end",
             Event::CallStored { .. } => "call.stored",
             Event::SegmentsOpen { .. } => "segments.open",
+            Event::CallsBatch { .. } => "calls.batch",
+            Event::ExchangesBatch { .. } => "exchanges.batch",
+            Event::Snapshot(_) => "snapshot",
         }
     }
 
     /// The public frame of the event.
     pub fn frame(&self) -> String {
         let data = match self {
+            Event::CallsBatch { ts, batch } => return batch.frame(*ts),
+            Event::ExchangesBatch { ts, batch } => return batch.frame(*ts),
+            Event::Snapshot(s) => return s.frame(),
             Event::ExchangeStart { ts } => json!({"ts": ts}),
             Event::ExchangeEnd { ts, status } => json!({"ts": ts, "status": status}),
             Event::CallStored {
@@ -200,6 +218,15 @@ impl CallsBatch {
         self.calls += 1;
         self.tokens.add(tokens);
         if let Some(c) = c {
+            self.cost_usd = Some(self.cost_usd.unwrap_or_default() + c);
+        }
+    }
+
+    /// Adds a sum of the live poller to this sum.
+    pub fn merge(&mut self, o: &CallsBatch) {
+        self.calls += o.calls;
+        self.tokens.add(&o.tokens);
+        if let Some(c) = o.cost_usd {
             self.cost_usd = Some(self.cost_usd.unwrap_or_default() + c);
         }
     }
