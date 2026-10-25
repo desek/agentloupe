@@ -2,7 +2,7 @@
 name: "CR-0029 Public repository cleanup"
 description: "Before the first public release, the README becomes a short entry page with a screenshot of the dashboard, and its detail moves to user guides under docs/guide/. brainstorm/ leaves the tree and the whole git history. The old example time zone becomes Europe/Stockholm in the tree and in the history. The rewritten history goes to a new, clean GitHub repository, so no old pull request ref publishes the removed content."
 id: "CR-0029"
-status: "proposed"
+status: "approved"
 date: 2026-10-25
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, owner of the GitHub account), reviewer agent (approver), readers of the public repository
@@ -351,7 +351,7 @@ Medium: about 15 guide files from the README, one screenshot script, about 20 te
 
 ## Decision Outcome
 
-Pending: review by a reviewer agent, separate from the author.
+Approved on 2026-10-25 by a second reviewer agent in a dynamic workflow, separate from the author, after the edits of the first review. It found no blocking finding.
 
 ## Open Questions
 
