@@ -103,5 +103,8 @@ fn version_change_during_a_run_stops_the_process() {
     assert_eq!(status.code(), Some(1));
     let text = p.stderr();
     assert!(text.contains("the public mirror changed"), "{text}");
-    assert!(text.contains("99"), "the error names the version found: {text}");
+    assert!(
+        text.contains("99"),
+        "the error names the version found: {text}"
+    );
 }

@@ -611,7 +611,8 @@ private page.
 The public container reaches only the public mirror, read-only, with the published days and the
 live counters. It cannot reach `loupe.db`, the raw requests, the session data, the spill files,
 the logs of the role `full`, or the secrets. It never mounts the volume `loupe-data` and never
-reads `.env`.
+reads `.env`. A local `compose.override.yaml` that mounts the session logs for `loupe backfill`
+must name only the service `loupe`, never `loupe-public`.
 
 A Cloudflare Tunnel is later work. Put only the public port, or the service `loupe-public`,
 behind the tunnel. A tunnel on the compose network can reach the service `loupe`, so the tunnel

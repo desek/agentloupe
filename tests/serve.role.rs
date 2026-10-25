@@ -136,3 +136,36 @@ fn each_secret_stops_the_start_without_its_value() {
         assert!(!data.path().join("logs").exists(), "{name}");
     }
 }
+
+/// The role public starts no worker and never reads the upstreams file: a file that is not valid
+/// TOML does not stop it, and no start line of a worker of the role full appears.
+#[test]
+fn starts_no_worker_and_reads_no_upstreams_file() {
+    let data = tempfile::tempdir().unwrap();
+    let err = tempfile::tempdir().unwrap();
+    public::seed_mirror(data.path());
+    let bad = data.path().join("bad-upstreams.toml");
+    std::fs::write(&bad, "this is [not toml").unwrap();
+    let p = Public::start(
+        data.path(),
+        err.path(),
+        &[("LOUPE_UPSTREAMS_FILE", bad.to_str().unwrap())],
+    );
+    // Each worker of the role full logs its start line before the line listening, which
+    // Public::start waits for, so no further wait is needed.
+    let log = p.stderr();
+    for line in [
+        "\"database open and migrated\"",
+        "\"bootstrap token step done\"",
+        "\"price index loaded\"",
+        "\"providers detected\"",
+        "\"github: disabled, no token\"",
+        "\"github: enabled\"",
+        "\"public mirror open\"",
+        "\"private page state\"",
+    ] {
+        assert!(!log.contains(line), "the role public logged {line}: {log}");
+    }
+    assert!(!data.path().join("spill").exists());
+    assert!(!data.path().join("loupe.db").exists());
+}
