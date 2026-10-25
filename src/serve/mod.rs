@@ -98,6 +98,15 @@ pub fn run(cfg: &Config, upstreams: Upstreams) -> Result<(), Box<dyn Error>> {
         Box::new(crate::publish::clock::System),
         cfg.days.publish_interval,
     );
+    // The public mirror is open and current before the port opens; its task runs in its own thread.
+    let mirror = crate::mirror::worker::start(crate::mirror::worker::Task::new(
+        crate::store::open::open(&cfg.data_dir)?,
+        crate::mirror::schema::open(&cfg.data_dir)?,
+        cfg.summary.tz,
+        hub.clone(),
+        Box::new(crate::publish::clock::System),
+    ));
+    tracing::info!(path = %crate::mirror::path(&cfg.data_dir).display(), "public mirror open");
     let _retention = crate::retention::worker::start(
         crate::store::open::open(&cfg.data_dir)?,
         cfg.summary.raw_retention_hours,
@@ -163,6 +172,8 @@ pub fn run(cfg: &Config, upstreams: Upstreams) -> Result<(), Box<dyn Error>> {
     // The runtime drop ends every open stream, which drops the last capture handle; the writer
     // then drains the queue and stops.
     drop(rt);
+    // No exchange is open after the drain, so the mirror shows none.
+    mirror.stop();
     let _ = writer.join();
     conn.close().map_err(|(_, e)| e)?;
     tracing::info!("database closed, exit");

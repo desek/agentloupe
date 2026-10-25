@@ -11,6 +11,7 @@ pub mod day;
 pub mod github;
 pub mod live;
 pub mod log;
+pub mod mirror;
 pub mod parse;
 pub mod price;
 pub mod private;

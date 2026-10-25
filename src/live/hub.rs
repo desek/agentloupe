@@ -10,6 +10,8 @@ struct Inner {
     tx: broadcast::Sender<Event>,
     /// Exchanges that started and did not end.
     in_flight: AtomicI64,
+    /// Exchanges that ended since the process started; the public mirror carries it.
+    ended: AtomicI64,
     /// The open segment count of the last parse pass; -1 before the first pass.
     segments: AtomicI64,
 }
@@ -38,6 +40,7 @@ impl Hub {
             inner: Some(Arc::new(Inner {
                 tx,
                 in_flight: AtomicI64::new(0),
+                ended: AtomicI64::new(0),
                 segments: AtomicI64::new(-1),
             })),
         }
@@ -61,6 +64,7 @@ impl Hub {
     pub fn exchange_end(&self, status: u16) {
         if let Some(i) = &self.inner {
             i.in_flight.fetch_sub(1, Ordering::Relaxed);
+            i.ended.fetch_add(1, Ordering::Relaxed);
         }
         self.send(Event::ExchangeEnd {
             ts: now_ms(),
@@ -92,6 +96,13 @@ impl Hub {
         self.inner
             .as_ref()
             .map_or(0, |i| i.in_flight.load(Ordering::Relaxed).max(0))
+    }
+
+    /// The count of exchanges that ended since start; 0 when the hub is off.
+    pub fn ended(&self) -> i64 {
+        self.inner
+            .as_ref()
+            .map_or(0, |i| i.ended.load(Ordering::Relaxed))
     }
 
     /// A receiver for one client, or None when the hub is off.

@@ -16,6 +16,10 @@ name = "loupe"
 path = "src/main.rs"
 
 [[test]]
+name = "live_state"
+path = "tests/live.state.rs"
+
+[[test]]
 name = "serve_health"
 path = "tests/serve.health.rs"
 

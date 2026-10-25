@@ -125,3 +125,15 @@ fn legacy_name_stops_serve() {
     );
     assert!(!err.contains("legacy-Vq3Zr8"));
 }
+
+#[test]
+fn public_mirror_exists_after_start() {
+    let l = loupe::Loupe::start(1, &[], &[]);
+    let p = l.data.path().join("public").join("public.db");
+    assert!(p.is_file(), "no mirror at {}", p.display());
+    let c = agent_loupe::mirror::open::open(l.data.path()).unwrap();
+    let mode: String = c
+        .query_row("PRAGMA journal_mode", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(mode, "delete");
+}
