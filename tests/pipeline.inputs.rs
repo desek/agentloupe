@@ -173,6 +173,8 @@ fn rust_files(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
 const NOT_READ: &[(&str, &str)] = &[
     // An expected part of an error message.
     ("private.off.rs", ".env.example"),
+    ("config.role.rs", ".env.example"),
+    ("serve.role.rs", "compose.yaml"),
     // An expected entry of the image inputs.
     ("pipeline.inputs.rs", ".dockerignore"),
     ("pipeline.inputs.rs", "LICENSE"),

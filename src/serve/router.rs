@@ -3,7 +3,7 @@
 use crate::proxy::ProxyState;
 use axum::Router;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
 use axum::response::Response;
 use std::sync::Arc;
 
@@ -61,10 +61,7 @@ async fn dispatch(
     }
     if first.is_empty() || RESERVED.contains(&first) {
         // A reserved name that no route serves, for example /v1/other, is not found.
-        return crate::proxy::error::json(
-            StatusCode::NOT_FOUND,
-            serde_json::json!({"error": "not_found", "path": req.uri().path()}),
-        );
+        return super::not_found::response(req.uri().path());
     }
     crate::proxy::handle(state, req).await
 }

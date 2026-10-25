@@ -34,3 +34,18 @@ fn healthz_status_independent_of_providers() {
     assert_eq!(res.status(), 200);
     assert_eq!(res.text().unwrap(), r#"{"status":"ok"}"#);
 }
+
+#[path = "common/public.rs"]
+mod public;
+
+#[test]
+fn healthz_same_body_in_role_public() {
+    let data = tempfile::tempdir().unwrap();
+    let err = tempfile::tempdir().unwrap();
+    public::seed_mirror(data.path());
+    let p = public::Public::start(data.path(), err.path(), &[]);
+    let res = reqwest::blocking::get(p.url("/healthz")).unwrap();
+    assert_eq!(res.status(), 200);
+    assert_eq!(res.headers()["access-control-allow-origin"], "*");
+    assert_eq!(res.text().unwrap(), r#"{"status":"ok"}"#);
+}

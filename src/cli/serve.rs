@@ -10,29 +10,39 @@ const EXIT_CONFIG: u8 = 2;
 const EXIT_RUNTIME: u8 = 1;
 
 pub fn run(args: &ConfigArgs) -> ExitCode {
+    // The guards of the role public run before the validation of the values and before any file opens.
     let cfg = match crate::provider::legacy::check_process()
         .and_then(|()| loader::load_from_process(&args.as_flags()))
-        .and_then(|c| c.role().and_then(|r| c.validate_for(r)))
-    {
+        .map_err(|e| e.to_string())
+        .and_then(|c| {
+            let role = c.role().map_err(|e| e.to_string())?;
+            if role == crate::config::role::Role::Public {
+                crate::serve::public::guard::no_secrets()?;
+            }
+            let cfg = c.validate_for(role).map_err(|e| e.to_string())?;
+            if role == crate::config::role::Role::Public {
+                crate::serve::public::guard::no_private_db(&cfg.data_dir)?;
+            }
+            Ok(cfg)
+        }) {
         Ok(c) => c,
         Err(e) => {
             eprintln!("{e}");
             return ExitCode::from(EXIT_CONFIG);
         }
     };
-    if cfg.role == crate::config::role::Role::Public {
-        eprintln!(
-            "error: the role public of loupe serve is not yet implemented in this build. Fix 1: unset LOUPE_ROLE or set LOUPE_ROLE=full. Fix 2: use a build that implements the role public. Reference: docs/specification/configuration.md (section Role). Verify: run `loupe config show` and see role full."
-        );
-        return ExitCode::from(EXIT_CONFIG);
-    }
+    let public = cfg.role == crate::config::role::Role::Public;
     // The allowlist is checked before the log starts and before the port opens.
-    let upstreams = match crate::proxy::upstreams::load(&cfg.upstreams_file) {
-        Ok(u) => u,
-        Err(e) => {
-            eprintln!("{e}");
-            return ExitCode::from(EXIT_CONFIG);
-        }
+    // The role public never loads the upstreams file.
+    let upstreams = match public {
+        true => None,
+        false => match crate::proxy::upstreams::load(&cfg.upstreams_file) {
+            Ok(u) => Some(u),
+            Err(e) => {
+                eprintln!("{e}");
+                return ExitCode::from(EXIT_CONFIG);
+            }
+        },
     };
     if let Err(e) = crate::log::init_file(&cfg.data_dir, cfg.role.log_file()) {
         eprintln!(
@@ -47,7 +57,11 @@ pub fn run(args: &ConfigArgs) -> ExitCode {
         role = cfg.role.name(),
         "loupe serve starting"
     );
-    match crate::serve::run(&cfg, upstreams) {
+    let result = match upstreams {
+        Some(u) => crate::serve::run(&cfg, u),
+        None => crate::serve::public::run(&cfg),
+    };
+    match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             tracing::error!(error = %e, "serve stopped with an error");

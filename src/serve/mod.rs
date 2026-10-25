@@ -1,6 +1,8 @@
 //! @agents-index Runs the HTTP server: migrates the store, bootstrap token, starts capture, parser, summary, ping, publisher, retention workers, binds, serves, then the start telemetry.
 
 mod health;
+pub mod not_found;
+pub mod public;
 pub mod router;
 pub mod shutdown;
 

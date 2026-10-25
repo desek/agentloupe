@@ -171,3 +171,31 @@ async fn telemetry_log_line_has_host_only() {
         assert!(!text.contains(bad), "a log line holds {bad}: {text}");
     }
 }
+
+#[path = "common/public.rs"]
+mod public;
+
+/// The role public writes one line telemetry after the line listening, as the role full does;
+/// the decision of that line is the only start request of the process.
+#[test]
+fn telemetry_one_start_in_role_public() {
+    let data = tempfile::tempdir().unwrap();
+    let err = tempfile::tempdir().unwrap();
+    public::seed_mirror(data.path());
+    let p = public::Public::start(data.path(), err.path(), &[]);
+    assert_eq!(
+        reqwest::blocking::get(p.url("/healthz")).unwrap().status(),
+        200
+    );
+    let text = p.stderr();
+    let lines: Vec<&str> = text.lines().collect();
+    let listen = lines
+        .iter()
+        .position(|l| l.contains("\"message\":\"listening\""))
+        .unwrap();
+    let tel: Vec<usize> = (0..lines.len())
+        .filter(|&i| lines[i].contains("\"message\":\"telemetry\""))
+        .collect();
+    assert_eq!(tel.len(), 1, "{text}");
+    assert!(tel[0] > listen, "{text}");
+}

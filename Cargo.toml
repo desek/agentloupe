@@ -430,3 +430,15 @@ lto = "fat"
 codegen-units = 1
 panic = "abort"
 debug = false
+
+[[test]]
+name = "serve_role"
+path = "tests/serve.role.rs"
+
+[[test]]
+name = "serve_role_imports"
+path = "tests/serve.role.imports.rs"
+
+[[test]]
+name = "mirror_readonly"
+path = "tests/mirror.readonly.rs"
