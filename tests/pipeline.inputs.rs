@@ -175,6 +175,7 @@ const NOT_READ: &[(&str, &str)] = &[
     ("private.off.rs", ".env.example"),
     ("config.role.rs", ".env.example"),
     ("serve.role.rs", "compose.yaml"),
+    ("serve.role.rs", ".env.public.example"),
     // An expected entry of the image inputs.
     ("pipeline.inputs.rs", ".dockerignore"),
     ("pipeline.inputs.rs", "LICENSE"),
