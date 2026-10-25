@@ -33,7 +33,7 @@ mod tests {
     fn range_has_offset_of_each_end() {
         assert_eq!(
             range(d("2026-10-17"), chrono_tz::Europe::Stockholm),
-            "2026-10-17T00:00:00+03:00..2026-10-17T23:59:59+03:00"
+            "2026-10-17T00:00:00+02:00..2026-10-17T23:59:59+02:00"
         );
     }
 
@@ -41,7 +41,7 @@ mod tests {
     fn range_on_offset_change_day() {
         assert_eq!(
             range(d("2026-10-25"), chrono_tz::Europe::Stockholm),
-            "2026-10-25T00:00:00+03:00..2026-10-25T23:59:59+02:00"
+            "2026-10-25T00:00:00+02:00..2026-10-25T23:59:59+01:00"
         );
     }
 }

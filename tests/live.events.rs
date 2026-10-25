@@ -249,12 +249,12 @@ async fn allowlist_per_kind() {
 async fn snapshot_matches_day_rules() {
     let (_d, c) = days::db();
     let tz: chrono_tz::Tz = "Europe/Stockholm".parse().unwrap();
-    // 2026-10-20 in Stockholm (UTC+3) is 2026-10-19T21:00Z to 2026-10-20T21:00Z.
+    // 2026-10-20 in Stockholm (UTC+2) is 2026-10-19T22:00Z to 2026-10-20T22:00Z.
     for (at, cost) in [
-        ("2026-10-19T20:59:59.000Z", "1"),
-        ("2026-10-19T21:00:00.000Z", "0.25"),
-        ("2026-10-20T20:59:59.999Z", "0.5"),
-        ("2026-10-20T21:00:00.000Z", "2"),
+        ("2026-10-19T21:59:59.000Z", "1"),
+        ("2026-10-19T22:00:00.000Z", "0.25"),
+        ("2026-10-20T21:59:59.999Z", "0.5"),
+        ("2026-10-20T22:00:00.000Z", "2"),
     ] {
         let s = days::session(&c, "pi", at, false);
         days::call(

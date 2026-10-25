@@ -110,7 +110,7 @@ GitHub client
 
 5. Each request **MUST** send `Authorization: Bearer <token>`, `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`, and a `User-Agent` of `agent-loupe/<crate version>`.
 6. The client **MUST** get the login of the token user from `GET /user` one time per fetch.
-7. The day range **MUST** be the start and the end of the day in `LOUPE_TZ`, written as ISO 8601 with the UTC offset of that moment, for example `2026-10-17T00:00:00+03:00..2026-10-17T23:59:59+03:00`. On a day with a change of the UTC offset, each end **MUST** carry its own offset. The client **MUST** use the day boundary function of CR-0007 for the two ends.
+7. The day range **MUST** be the start and the end of the day in `LOUPE_TZ`, written as ISO 8601 with the UTC offset of that moment, for example `2026-10-17T00:00:00+02:00..2026-10-17T23:59:59+02:00`. On a day with a change of the UTC offset, each end **MUST** carry its own offset. The client **MUST** use the day boundary function of CR-0007 for the two ends.
 8. The client **MUST** search with the query `is:pr author:<login> created:<range>` for the opened pull requests and `is:pr author:<login> merged:<range>` for the merged pull requests, with `per_page=100`, and **MUST** follow every page until a page has fewer than 100 items.
 9. If `total_count` of a search is more than 1000, the fetch **MUST** fail with the cause `search_limit`, because the search API returns at most 1000 results and a part count is wrong.
 10. For each merged pull request, the client **MUST** get `additions` and `deletions` from `GET /repos/{owner}/{repo}/pulls/{pull_number}`. It **MUST** take `owner`, `repo`, and `number` from the `repository_url` and `number` fields of the search item.
@@ -256,8 +256,8 @@ flowchart LR
 
 | Test File | Test Name | Description | Inputs | Expected Output |
 |-----------|-----------|-------------|--------|-----------------|
-| `src/github/range.rs` (unit) | `range_has_offset_of_each_end` | Day range | `2026-10-17`, `Europe/Stockholm` | `2026-10-17T00:00:00+03:00..2026-10-17T23:59:59+03:00` |
-| `src/github/range.rs` (unit) | `range_on_offset_change_day` | Offset change | `2026-10-25`, `Europe/Stockholm` | start `+03:00`, end `+02:00` |
+| `src/github/range.rs` (unit) | `range_has_offset_of_each_end` | Day range | `2026-10-17`, `Europe/Stockholm` | `2026-10-17T00:00:00+02:00..2026-10-17T23:59:59+02:00` |
+| `src/github/range.rs` (unit) | `range_on_offset_change_day` | Offset change | `2026-10-25`, `Europe/Stockholm` | start `+02:00`, end `+01:00` |
 | `src/github/hash.rs` (unit) | `hash_is_hmac_of_lowercase_ref` | Hash | `Owner/Repo#7` and `owner/repo#7` | same 64-char hex |
 | `src/github/search.rs` (unit) | `query_text_for_opened_and_merged` | Queries | login `u`, range | `is:pr author:u created:...`, `is:pr author:u merged:...` |
 | `tests/github.fetch.rs` | `fetch_follows_all_pages` | Pages | fake with 230 items | 230 hashes |
@@ -362,7 +362,7 @@ Then the day is built again and "failed_tokens" is 0
 ```gherkin
 Given LOUPE_TZ is "Europe/Stockholm"
 When the worker fetches 2026-10-17
-Then the fake GitHub log shows the query range "2026-10-17T00:00:00+03:00..2026-10-17T23:59:59+03:00"
+Then the fake GitHub log shows the query range "2026-10-17T00:00:00+02:00..2026-10-17T23:59:59+02:00"
 ```
 
 ### AC-8: No token value is stored

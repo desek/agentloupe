@@ -12,14 +12,14 @@ fn at() -> chrono::NaiveTime {
 #[test]
 fn day_not_due_before_publish_at() {
     let tz: chrono_tz::Tz = "Europe/Stockholm".parse().unwrap();
-    // 00:59 local on 2026-10-19 is 21:59 UTC on 2026-10-18.
-    let now = days::ms("2026-10-18T21:59:00Z");
+    // 00:59 local on 2026-10-19 is 22:59 UTC on 2026-10-18.
+    let now = days::ms("2026-10-18T22:59:00Z");
     assert!(!is_due(days::date("2026-10-18"), now, tz, at()));
 }
 
 #[test]
 fn day_due_at_publish_at() {
     let tz: chrono_tz::Tz = "Europe/Stockholm".parse().unwrap();
-    let now = days::ms("2026-10-18T22:00:00Z");
+    let now = days::ms("2026-10-18T23:00:00Z");
     assert!(is_due(days::date("2026-10-18"), now, tz, at()));
 }

@@ -24,7 +24,7 @@ The operator sees the PR counts and the line counts of one day in the public API
 1. Run `set -a; . ./.env; set +a`. Set `LOUPE_DATA_DIR=S/data`, `LOUPE_UPSTREAMS_FILE=S/upstreams.toml`, `LOUPE_TZ=Europe/Stockholm`.
 2. Run `loupe aggregate --date D`.
 3. Start `loupe serve`. Run `curl -s http://127.0.0.1:8787/v1/days/D`. Stop `loupe serve`.
-4. Run `gh api -X GET search/issues -f q="author:@me type:pr created:R" -q .total_count`, with `R` equal to `DT00:00:00+03:00..DT23:59:59+03:00`. Do it again with `merged:R`.
+4. Run `gh api -X GET search/issues -f q="author:@me type:pr created:R" -q .total_count`, with `R` equal to `DT00:00:00+HH:00..DT23:59:59+HH:00`, where `HH` is `02` in summer time and `01` in winter time. Do it again with `merged:R`.
 5. For each repository of the user in the last ten days, run `sqlite3 S/data/loupe.db .dump | grep -ci <owner/repo>`. Print only the sum.
 
 ### Success condition
