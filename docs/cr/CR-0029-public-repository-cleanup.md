@@ -96,9 +96,9 @@ In this record, **the old zone** is the example time zone that the history audit
 14. Before the rewrite, the supervisor **MUST** write the rollback log `docs/cr/CR-0029-rollback-log.md` and a git bundle of all refs outside the repository.
 15. The rewrite **MUST** use `git filter-repo` on a fresh clone of the old repository. It **MUST** remove the path `brainstorm/` from every commit, and **MUST** replace the city name of the old zone with `Stockholm` in every file of every commit and in every commit message. The replacement rules live in a file outside the repository.
 16. After the rewrite, `git log --all -- brainstorm` **MUST** be empty, and `git grep -i 'nic[o]sia' $(git rev-list --all)` and `git log --all -i --grep 'nic[o]sia'` **MUST** find nothing.
-17. The tree of the new `main` **MUST** equal the tree of the old `main` after steps 1 to 13, except for the hash updates of requirement 18.
-18. `bootstrap-sha` in `release-please-config.json` **MUST** be the new hash of the old commit `446f065`. Each short or full commit hash in a tracked file that names a commit of the old history **MUST** change to the new hash of that commit, from the commit map of `git filter-repo`.
-19. The number of commits and their order, authors, and dates **MUST** stay the same.
+17. The tree of the rewritten copy of the old `main` **MUST** equal the tree of the old `main` after steps 1 to 13. The rewrite leaves it unchanged, because steps 1 to 13 already removed each match.
+18. One new commit on top of the rewritten history **MUST** do the hash updates of this requirement, because the new hashes exist only after the rewrite. `bootstrap-sha` in `release-please-config.json` **MUST** be the new hash of the old commit `446f065`. Each short or full commit hash in a tracked file that names a commit of the old history **MUST** change to the new hash of that commit, from the commit map of `git filter-repo`.
+19. The rewritten commits **MUST** keep their number, order, authors, and dates. The new `main` is those commits plus the one commit of requirement 18, so its count is the old count plus 1.
 
 **New repository**
 
@@ -131,7 +131,7 @@ In this record, **the old zone** is the example time zone that the history audit
 | brainstorm in the history | `git log --all --oneline -- brainstorm` on the new repository | 2 commits | 0 |
 | Old zone in the tree | `git grep -ci 'nic[o]sia'` | about 60 lines | 0 |
 | Old zone in the history | `git grep -li 'nic[o]sia' $(git rev-list --all)` and `git log --all -i --grep 'nic[o]sia'` | many | 0 |
-| Commit count | `git rev-list --count main` before and after | the old count | the same |
+| Commit count | `git rev-list --count main` before and after | the old count | the old count plus 1, the hash commit of requirement 18 |
 | Refs on the new remote | `git ls-remote <new>` before the first workflow run | none | only `refs/heads/main` |
 | Verdict | `.agents/scripts/pipeline.verdict.sh` | passed at `b5ec076` | passed |
 
@@ -246,7 +246,7 @@ And the link test passes
 
 ```gherkin
 Given the new repository
-When git ls-files brainstorm, git grep brainstorm, and git log --all -- brainstorm run
+When git ls-files brainstorm, git grep brainstorm -- . ':!.gitignore' ':!docs/cr/CR-0029-*', and git log --all -- brainstorm run
 Then each prints nothing
 And .gitignore lists brainstorm/
 ```
@@ -266,7 +266,8 @@ And the default of LOUPE_TZ is UTC
 ```gherkin
 Given the old main and the new main
 When the commit count, the order, the authors, and the dates are compared
-Then they are the same
+Then the rewritten commits are the same
+And the new main has one more commit on top, which only updates the commit hashes
 And bootstrap-sha is the new hash of the old commit 446f065
 And each commit hash in a tracked file names a commit of the new history
 ```
@@ -365,3 +366,13 @@ None. The owner answered the two questions of the history and the time zone on 2
 5. **The text replacement.** The city name of the old zone to `Stockholm` as a plain text rule, which also covers the IANA name and the `chrono_tz` constant.
 6. **The records.** `docs/cr/` and `.agents/` records change their text too, because the owner asked that no reference stays.
 7. **The commit hashes in files.** They follow the map, so a reader of a record finds the commit.
+
+## Notes
+
+### Review notes, 2026-10-25
+
+The first reviewer found two blocking findings. Each got the smallest edit:
+
+1. AC-3 had no exception for `.gitignore` and this CR, so it could not pass with requirement 10. Edit: AC-3 uses the exceptions of the target row.
+2. The hash updates of requirement 18 need the new hashes, which exist only after the rewrite, so they need a new commit. Edit: requirements 17 to 19, the commit count target, and AC-5 state one hash commit on top of the rewritten commits.
+
