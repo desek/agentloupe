@@ -54,7 +54,7 @@ The owner wrote, on 2026-10-25, after CR-0029: "the "prototype/" also seems redu
 2. `.github/dependabot.yml` **MUST** have the entries `cargo` and `github-actions` only.
 3. `deps.autofix.sh` and `deps.freshness.sh` **MUST** have no npm lane: no `prototype` path, no `run_prototype`, no status `prototype_failed`, no break check `prototype`, no pnpm or corepack permission, and no npm use count. A Dependabot alert or a stale dependency of the ecosystem `npm` **MUST** be skipped with a recorded reason, not fixed.
 4. The three prompts **MUST NOT** name the npm ecosystem or `prototype/`.
-5. The script tests and the fixtures **MUST** make no prototype. A test **MUST** show that an `npm` alert is skipped with its reason.
+5. The script tests and the fixtures **MUST** make no prototype. A test **MUST** show that an `npm` alert is skipped with its reason. The npm alert in the fixture uses a manifest path without `prototype` or `pnpm`, for example `package-lock.json`.
 6. `docs/specification/dependencies.md`, `docs/specification/release.md`, `.taxonomy`, `SECURITY.md`, the README, and the guides **MUST NOT** state that `prototype/` exists. The records under `docs/cr/` and `.agents/` stay as records of earlier work.
 7. The specification **MUST** change before the scripts.
 8. Before the rewrite, the supervisor **MUST** write `docs/cr/CR-0030-rollback-log.md` and a git bundle of all refs outside the repository.
@@ -74,7 +74,7 @@ The owner wrote, on 2026-10-25, after CR-0029: "the "prototype/" also seems redu
 |---|---|---|---|
 | Prototype in the tree | `git ls-files prototype` | 28 files | 0 |
 | Prototype in the history | `git log --all --oneline -- prototype` on a fresh clone | 2 commits | 0 |
-| npm lane | `git grep -n -i -E 'prototype\|pnpm\|corepack' -- .github .agents/scripts tests docs/specification .taxonomy SECURITY.md README.md docs/guide` | many lines | 0 |
+| npm lane | `git grep -n -i -E 'prototype/\|pnpm\|corepack' -- .github .agents/scripts tests docs/specification .taxonomy SECURITY.md README.md docs/guide` (the path, not the word, so the records of the early prototype archive of CR-0029 stay) | many lines | 0 |
 | Commit count | `git rev-list --count main` before and after the rewrite | the count before | the count before minus the commits that become empty |
 | Refs on the fresh remote | `git ls-remote` before the first workflow run | none | only `refs/heads/main` |
 | Verdict | `.agents/scripts/pipeline.verdict.sh` | passed at `9834837` | passed |
@@ -152,7 +152,7 @@ And .gitignore lists prototype/
 
 ```gherkin
 Given .github/dependabot.yml, the autofix and freshness scripts, their prompts, and their tests
-When the grep of the target "npm lane" runs
+When the grep of the target "npm lane" runs, with the pattern prototype/ or pnpm or corepack
 Then it finds nothing
 And an npm alert is skipped with its reason in the autofix test
 ```
@@ -233,7 +233,7 @@ Small to medium: one directory, one configuration entry, two scripts, three prom
 
 ## Decision Outcome
 
-Pending: review by a reviewer agent, separate from the author.
+Pending: a second review after the edits of the first review.
 
 ## Open Questions
 
@@ -245,3 +245,10 @@ None.
 2. **Empty commits dropped.** The default of `git filter-repo`. The commit `9a13499` changes only `prototype/`.
 3. **Records keep their text.** The CRs and scenarios of earlier work describe the prototype as it was. The owner asked to remove the directory, not the history of the decisions.
 4. **The temporary repository name.** `desek/agentloupe-tmp`, private, for the owner to delete.
+
+## Notes
+
+### Review notes, 2026-10-25
+
+The first reviewer found two blocking findings, each with the smallest edit: the grep of the target "npm lane" matches the path `prototype/`, not the word, so the records of the early prototype archive stay (target row and AC-2); and requirement 5 names the manifest path of the npm alert in the fixture.
+
