@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "high"
 target-version: 0.10.0
 source-branch: main
-source-commit: fe431b0
+source-commit: 16886c8
 ---
 
 # Fast verdict by content

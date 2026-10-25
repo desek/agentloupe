@@ -37,6 +37,6 @@ The rewrite is reversible until the new repository becomes public. The old histo
 * Bundle: `~/Repo/backups/agentloupe-before-cr0029.bundle`, 10 253 872 bytes, `git bundle verify` printed "is okay", heads `refs/heads/main` at `61f449e` and the release branch at `cc566da`.
 * Rewrite: 2026-10-25 21:04:20 CET, `git filter-repo` finished in 0.68 seconds. 356 commits; the tree of `main` stayed `1c1f5915b02c54bb8d302ad84c676ea936249a0a`; authors and dates the same.
 * Checks of the rewrite: 0 commits touch the archive directory; 0 commit trees, 0 commit messages, and 0 file objects hold the old zone name; one ref, `refs/heads/main`.
-* Hash commit: `353307c`, 138 hashes in 38 files; `bootstrap-sha` is `c3e95d3bb4111efa3883f529f028122ee84cd3f6`. The new `main` has 357 commits. The verdict passed on it at 21:10 CET (261.0 seconds).
+* Hash commit: `36fa730`, 138 hashes in 38 files; `bootstrap-sha` is `8611e9ad021bb17920895adee7f750f252f78d66`. The new `main` has 357 commits. The verdict passed on it at 21:10 CET (261.0 seconds).
 * GitHub, 2026-10-25 21:15:44 CET: `desek/agentloupe` renamed to `desek/agentloupe-archive`, private; new private `desek/agentloupe`; variable `LOUPE_TELEMETRY_HOST` and secret `CLAUDE_CODE_OAUTH_TOKEN` set; `main` pushed at 21:16; `git ls-remote` listed only `refs/heads/main`.
 * A fresh clone of the new repository showed 357 commits and the same check results.

@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "medium"
 target-version: 0.10.0
 source-branch: main
-source-commit: 8ac95c6
+source-commit: bf86aff
 ---
 
 # Dashboard readability

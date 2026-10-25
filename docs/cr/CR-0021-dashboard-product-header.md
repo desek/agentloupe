@@ -9,14 +9,14 @@ stakeholders: Daniel Grenemark (owner, reader, approver)
 priority: "medium"
 target-version: 0.12.0
 source-branch: main
-source-commit: 617b2c0
+source-commit: 1816317
 ---
 
 # Dashboard product header
 
 ## Change Summary
 
-The owner reviewed the live dashboard on 2026-10-23 and asked for six changes in a fast iteration. The implementer made each change in the same session, and the owner approved the result live. This CR records the change after the fact. The working tree diff against `617b2c0` in `web`, `src`, and `tests` is the authority for the behaviour that this CR describes.
+The owner reviewed the live dashboard on 2026-10-23 and asked for six changes in a fast iteration. The implementer made each change in the same session, and the owner approved the result live. This CR records the change after the fact. The working tree diff against `1816317` in `web`, `src`, and `tests` is the authority for the behaviour that this CR describes.
 
 The site title now defaults to the product name "Agentloupe". The header is one product row: an SVG mark, the wordmark, and the range buttons. The updated line is gone. The headline has an eyebrow, the figure, and a sparkline as tall as the digits. The live card is "Today", with a connection dot, a short status note, five figures in one row, and a sparkline as tall as the digits of a figure. A new range `1M` of 30 days is the default.
 
@@ -43,7 +43,7 @@ These six points are the requirements. The implemented diff decides each layout 
 
 ## Current State
 
-At `617b2c0`:
+At `1816317`:
 
 * `src/config/vars.rs` gives `LOUPE_SITE_TITLE` the default "AI agent activity". `src/config/validate.rs` uses "AI agent activity" as the example in the error hint. The default page does not show the product name.
 * `web/index.html` has a header with a text block (the `h1` title in the class `title` at `--size-title`, and a paragraph `#updated` with the text "Loading") and the range buttons `3M`, `6M`, and `1Y`.

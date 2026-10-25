@@ -254,3 +254,8 @@ None.
 The first reviewer found two blocking findings, each with the smallest edit: the grep of the target "npm lane" matches the path `prototype/`, not the word, so the records of the early prototype archive stay (target row and AC-2); and requirement 5 names the manifest path of the npm alert in the fixture.
 
 The second reviewer found one more blocking finding: `tests/deps.autofix.rs` and `tests/deps.freshness.rs` match the grep target and were not in scope. Edit: both are in "Affected Components" and in "Tests to Modify".
+
+### Hashes in this record
+
+Each commit hash in this CR and in `CR-0030-rollback-log.md` names a commit of the history before this rewrite, which `desek/agentloupe-tmp` and the bundle keep. The rewrite dropped `9a13499`, which changed only `prototype/`. The hash commit of requirement 11 does not change these two files. The other tracked files name the new hashes; `bootstrap-sha` is `8611e9a`.
+

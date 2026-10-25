@@ -1,11 +1,11 @@
 ---
 date: 2026-10-23
 branch: main
-commit: 35833c3
+commit: 84c2284
 ---
 
 <!--
-@agents-index: Cached local rehearsal of the release workflow at 35833c3 (version 0.1.0, no tag, repository
+@agents-index: Cached local rehearsal of the release workflow at 84c2284 (version 0.1.0, no tag, repository
 private): the three binary assets built with release.build.sh (macOS natively, Linux in rust:1.97.1-bookworm
 per platform), both platform images built with the release.image.sh command and a local load instead of a
 push, each run and probed (--version, /healthz, first log line), release.check.sh in its local modes, and
@@ -36,12 +36,12 @@ touch the container on port 8787 or the compose stack.
 - Host: macOS 27.0 arm64 (Apple M1 Pro class, 10 CPUs), Docker Desktop 4.80.0 (engine 29.6.1, containerd
   image store, buildx 0.35.0), rustc/cargo 1.97.1 via `rust-toolchain.toml`.
 - Scratch: `/private/tmp/loupe-relcheck-20261023195419`, holding three `git clone --no-hardlinks`
-  clones of the repository at `35833c3` (one for macOS, one per Linux platform, 0.8 s each), so the build
+  clones of the repository at `84c2284` (one for macOS, one per Linux platform, 0.8 s each), so the build
   sees only tracked files, as `actions/checkout` does. Each command ran through a timing wrapper. Durations
   are wall clock.
 - **Tag check.** In real mode, `release.build.sh` and `release.image.sh` require the tag `v0.1.0` to exist,
   and it does not. No tag was made anywhere. Instead, a `git` shim on `PATH` answered only
-  `git rev-parse -q --verify refs/tags/v0.1.0^{commit}` with `HEAD` (35833c3) and passed every other call
+  `git rev-parse -q --verify refs/tags/v0.1.0^{commit}` with `HEAD` (84c2284) and passed every other call
   to the real git. The scripts themselves ran unmodified. Cargo.toml holds `version = "0.1.0"`, so the
   version check ran for real.
 - **Concurrent commit.** Another session committed `e13351f` on `main` at 20:03, during this check. It
@@ -124,10 +124,10 @@ registry digest), so no local tag could move.
 OCI labels. They are the same on both platforms and match the table in `release.md`:
 
 ```
-org.opencontainers.image.created=2026-10-23T17:49:46Z      (commit time of 35833c3 in UTC, not the wall clock)
+org.opencontainers.image.created=2026-10-23T17:49:46Z      (commit time of 84c2284 in UTC, not the wall clock)
 org.opencontainers.image.description=A minimal AI gateway that gives you the illusion that you can keep up with your agents.
 org.opencontainers.image.licenses=MIT
-org.opencontainers.image.revision=35833c3d61903d525d9d35171bca8523dad94767
+org.opencontainers.image.revision=84c22846fc6f9cd5deddd5341b4a2effb4f8e030
 org.opencontainers.image.source=https://github.com/desek/agentloupe
 org.opencontainers.image.title=Agentloupe
 org.opencontainers.image.version=0.1.0

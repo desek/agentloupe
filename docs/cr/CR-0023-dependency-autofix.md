@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, release manager), reviewer agent (approve
 priority: "high"
 target-version: 0.2.0
 source-branch: main
-source-commit: 092344c
+source-commit: 2827449
 ---
 
 # Dependency autofix
@@ -955,7 +955,7 @@ CR-0024 (Public release readiness, approved on 2026-10-23) amends this CR before
 
 ### Implementation notes, 2026-10-24
 
-The implementation covers the parts that a private repository can complete (the specification commit `ad70368`): requirements 1 and 2 with the amendment, 4 to 44 in code and tests, 46 to 50 (in the specification commit), and the non-functional requirements 1, 2, and 6. The run log is `.agents/scenarios/deps.autofix.md` with `.agents/scenarios/deps.autofix.dryrun.log`; the measured values are in `docs/specification/operations.md` (Dependency autofix targets), and the results of the checks at implementation in `docs/specification/dependencies.md` (Checks at implementation).
+The implementation covers the parts that a private repository can complete (the specification commit `2ed2b8e`): requirements 1 and 2 with the amendment, 4 to 44 in code and tests, 46 to 50 (in the specification commit), and the non-functional requirements 1, 2, and 6. The run log is `.agents/scenarios/deps.autofix.md` with `.agents/scenarios/deps.autofix.dryrun.log`; the measured values are in `docs/specification/operations.md` (Dependency autofix targets), and the results of the checks at implementation in `docs/specification/dependencies.md` (Checks at implementation).
 
 Parts that wait:
 

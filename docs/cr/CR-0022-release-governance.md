@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, release manager), reviewer agent (approve
 priority: "high"
 target-version: 0.1.0
 source-branch: main
-source-commit: c3e95d3
+source-commit: 8611e9a
 ---
 
 # Release governance
@@ -171,7 +171,7 @@ sequenceDiagram
 
 23. The release-please workflow **MUST** start on each push to `main`, and **MUST** use the manifest configuration: `release-please-config.json` and `.release-please-manifest.json` at the root.
 24. The configuration **MUST** set the release type `rust` for the root package, so release-please updates the version in `Cargo.toml` and `Cargo.lock`.
-25. The configuration **MUST** make the first release `0.1.0` and **MUST** start the changelog at the source commit `c3e95d3` (judgement call 9).
+25. The configuration **MUST** make the first release `0.1.0` and **MUST** start the changelog at the source commit `8611e9a` (judgement call 9).
 26. The configuration **MUST** set the changelog sections: `feat` as "Features", `fix` as "Bug Fixes", `perf` as "Performance", and `revert` as "Reverts". The types `checkpoint`, `docs`, `chore`, `test`, `ci`, `build`, `refactor`, and `style` **MUST** be hidden. A breaking change **MUST** show in the breaking changes section of release-please.
 27. The configuration **MUST** set the bump rules of `docs/specification/release.md`: from 1.0.0, `fix` bumps the patch, `feat` bumps the minor, and a breaking change bumps the major. Below 1.0.0, release-please applies its pre-1.0 rules with `bump-minor-pre-major` set to true and `bump-patch-for-minor-pre-major` set to false: `fix` bumps the patch, `feat` bumps the minor, and a breaking change bumps the minor, not the major. The move to `1.0.0` is a decision of the human, made with a `Release-As: 1.0.0` footer.
 28. release-please **MUST** keep at most one open release pull request. Its title **MUST** have the form `chore(release): release <version>`, for example `chore(release): release 0.1.0`.
@@ -405,9 +405,9 @@ Success condition: each check passes in one run of the first release. The releas
 ### AC-1: The history stays and the home path goes (requirements 1 to 3)
 
 ```gherkin
-Given the published history of main at commit c3e95d3
+Given the published history of main at commit 8611e9a
 When the CR is implemented
-Then git log of main still holds commit c3e95d3 and every commit before it with the same hashes
+Then git log of main still holds commit 8611e9a and every commit before it with the same hashes
 And no force push to main happened
 And git grep -nE "/Users/[d]esek" on the tree returns no match
 And decision D6a in CR-0010 keeps all its other words
@@ -511,7 +511,7 @@ Then the same pull request is updated and no second release pull request opens
 Given Cargo.toml at 0.1.0, no tag, and the release-please configuration of this CR
 When the first release pull request opens
 Then its version is 0.1.0
-And its changelog lists no commit at or before c3e95d3
+And its changelog lists no commit at or before 8611e9a
 ```
 
 ### AC-11: The changelog hides the work commits (requirement 26)
@@ -660,7 +660,7 @@ And each binary is at most 25 MiB
 And each platform image is at most 200 MB
 And the workflow files hold 0 secret values
 And pipeline.verdict.sh on the machine of the owner gives the same stage lines as before the CR
-And git diff c3e95d3 of each stage entry point is empty, or each change has its reason in the implementation notes of this CR
+And git diff 8611e9a of each stage entry point is empty, or each change has its reason in the implementation notes of this CR
 And pipeline.verdict.sh calls no release script
 And the billing usage of the account for GitHub Actions and GitHub Packages is 0 USD, with a budget of 0 USD that stops usage for each
 ```
@@ -747,7 +747,7 @@ gh release view v0.1.0
 
 **Likelihood:** low
 **Impact:** low
-**Mitigation:** The changelog starts at the source commit `c3e95d3` (judgement call 9). The earlier work is in `docs/cr/`, CR-0001 to CR-0021.
+**Mitigation:** The changelog starts at the source commit `8611e9a` (judgement call 9). The earlier work is in `docs/cr/`, CR-0001 to CR-0021.
 
 ### Risk 9: An action pinned by SHA gets a security fix that the repository does not take
 
@@ -791,7 +791,7 @@ Status: decided by the owner on 2026-10-23 (D5): the fine-grained personal acces
 6. **Release pull request branch name.** The default branch of release-please for a root package with no component: `release-please--branches--main`.
 7. **Release pull request title.** `chore(release): release <version>`. The type `chore` keeps the squash commit of the release out of the next notes.
 8. **Image tag form.** The version with no `v` (`0.1.0`) and `latest`. The git tag keeps the `v` (`v0.1.0`).
-9. **Handling of the first release.** The configuration sets `bootstrap-sha` to `c3e95d3` and `release-as` to `0.1.0`. The first release pull request proposes `0.1.0`, which equals `Cargo.toml`, and its changelog lists only the commits after `c3e95d3`. The commit after the release removes `release-as` with a `chore(release)` commit. The earlier work is in `docs/cr/`.
+9. **Handling of the first release.** The configuration sets `bootstrap-sha` to `8611e9a` and `release-as` to `0.1.0`. The first release pull request proposes `0.1.0`, which equals `Cargo.toml`, and its changelog lists only the commits after `8611e9a`. The commit after the release removes `release-as` with a `chore(release)` commit. The earlier work is in `docs/cr/`.
 10. **Package visibility.** The human sets the ghcr.io package to public one time after the first push. The workflow does not change the visibility.
 11. **Bump below 1.0.0.** A breaking change bumps the minor below 1.0.0 (`bump-minor-pre-major`), so a `feat!` cannot publish `1.0.0` by accident. The move to `1.0.0` is a human decision with `Release-As: 1.0.0`.
 12. **Asset form.** A `.tar.gz` archive with the binary and its run-time files, and a checksum of the archive, because the binary reads `upstreams.toml` and `config/` and a bare binary loses its execute bit.
@@ -835,13 +835,13 @@ Reviewer: a reviewer agent in a Pi session through the proxy, separate from the 
 9. Measurement not testable: the target "Size of each binary" read a `binary_bytes` field of `release.check.sh` that no requirement defines. The method now reads the binary size that `release.build.sh` prints per requirement 44.
 10. Requirements without an acceptance criterion: requirement 22 (credential sources) and non-functional requirements 2, 3, and 4 had no line in AC-8 and AC-21. Added one line each.
 
-Non-blocking remarks, not edited: D1 says 267 commits and "Current State" says 268 (268 is the count at `c3e95d3`); the `Dockerfile` itself does not name `agent-loupe:local`, `pipeline.image.sh` and `compose.yaml` do; the `sk-` pattern of the target "Secrets in the workflow files" also matches words such as `task-`; AC-17 and the test table give `release.check.sh` a `--dry-run` that requirement 46 does not state.
+Non-blocking remarks, not edited: D1 says 267 commits and "Current State" says 268 (268 is the count at `8611e9a`); the `Dockerfile` itself does not name `agent-loupe:local`, `pipeline.image.sh` and `compose.yaml` do; the `sk-` pattern of the target "Secrets in the workflow files" also matches words such as `task-`; AC-17 and the test table give `release.check.sh` a `--dry-run` that requirement 46 does not state.
 
 Open blocking findings: none.
 
 ### Implementation notes, 2026-10-23
 
-1. Non-functional requirement 2: no stage entry point changed (`git diff c3e95d3 -- .agents/scripts/pipeline.*.sh` is empty). One helper of the web stage changed: `.agents/scripts/web.size.sh` counted bytes with `stat -f%z`, which is the BSD form; on the Linux runner `stat -f` reads the file system, the pipe failed under `pipefail`, and the web job failed with no size line. It now counts with `cat` and `wc -c`, which give the same values on macOS and Linux (76.1, 52.0, 232.0, and 12.9 KiB before and after). `web.size.sh` is not a declared input of the web stage, so the local verdict cache did not see this change; the verdict workflow ran the stage in full.
+1. Non-functional requirement 2: no stage entry point changed (`git diff 8611e9a -- .agents/scripts/pipeline.*.sh` is empty). One helper of the web stage changed: `.agents/scripts/web.size.sh` counted bytes with `stat -f%z`, which is the BSD form; on the Linux runner `stat -f` reads the file system, the pipe failed under `pipefail`, and the web job failed with no size line. It now counts with `cat` and `wc -c`, which give the same values on macOS and Linux (76.1, 52.0, 232.0, and 12.9 KiB before and after). `web.size.sh` is not a declared input of the web stage, so the local verdict cache did not see this change; the verdict workflow ran the stage in full.
 2. The first start line is written in `src/cli/serve.rs`, right after the log starts, as `loupe serve starting` with the key field `version` from `CARGO_PKG_VERSION`. `tests/cli.version.rs` checks the flag, the first line of the log file and of stderr, and the health body.
 3. `release.build.sh` and `release.image.sh` use exit code 4 for a failed tag check. With `--dry-run` and no tag yet, they check the version against `Cargo.toml` at `HEAD` and say so in the plan line; a real run needs the tag. `release.build.sh` reads the binary from `CARGO_TARGET_DIR` when it is set.
 4. `release.check.sh --dir DIR` keeps the downloads and does not download a file that is already in `DIR`, so scenario step 16 can change one byte of a copy and check again. The pull uses an empty Docker configuration with the endpoint of the current context, so it holds no credential.

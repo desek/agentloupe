@@ -378,7 +378,7 @@ The first reviewer found two blocking findings. Each got the smallest edit:
 
 ### Hashes in this record
 
-Each commit hash in this CR and in `CR-0029-rollback-log.md` names a commit of the history before the rewrite, which the archive repository `desek/agentloupe-archive` keeps. The hash commit of requirement 18 does not change these two files, because they describe the old history. The other tracked files name the new hashes. The new hash of the old commit `446f065` is `c3e95d3`.
+Each commit hash in this CR and in `CR-0029-rollback-log.md` names a commit of the history before the rewrite, which the archive repository `desek/agentloupe-archive` keeps. The hash commit of requirement 18 does not change these two files, because they describe the old history. The other tracked files name the new hashes. The new hash of the old commit `446f065` is `8611e9a`.
 
 ### Verification, 2026-10-25
 

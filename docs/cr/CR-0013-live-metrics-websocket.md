@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "medium"
 target-version: 0.9.0
 source-branch: main
-source-commit: 33229da
+source-commit: 11dacf4
 ---
 
 # Live metrics over a WebSocket on the dashboard

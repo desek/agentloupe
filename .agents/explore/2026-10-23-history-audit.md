@@ -1,7 +1,7 @@
 ---
 date: 2026-10-23
 branch: main
-commit: 35833c3d61903d525d9d35171bca8523dad94767
+commit: 84c22846fc6f9cd5deddd5341b4a2effb4f8e030
 ---
 
 # History audit before the first public release
@@ -14,7 +14,7 @@ Is the git history of this repository fit to publish? Before the first public re
 
 ### Scope
 
-* Refs: `main` and `origin/main` at `35833c3`, and `feat/cr-0022-release` and `origin/feat/cr-0022-release` at `05ea40b`. There are no tags and no stash. The remote `github.com/desek/agentloupe` is private (`gh repo view` → `"visibility":"PRIVATE"`).
+* Refs: `main` and `origin/main` at `84c2284`, and `feat/cr-0022-release` and `origin/feat/cr-0022-release` at `05ea40b`. There are no tags and no stash. The remote `github.com/desek/agentloupe` is private (`gh repo view` → `"visibility":"PRIVATE"`).
 * `git rev-list --all --count` → 301 commits. `git rev-list --all --merges --count` → 0.
 * No path under `target/` or `node_modules/` was ever committed: `git log --all --name-only --format= | sort -u | grep -cE '(^|/)(target|node_modules)/'` → 0. The history dump for the searches below was made with the pathspec `-- . ':!target' ':!**/node_modules/**'`, saved to `/tmp/histpatch.txt` (7.7 MB).
 
@@ -28,17 +28,17 @@ Each finding was read at its commit with `git show <commit>:<file>`:
 
 | # | Commit | File:line | Rule | What is there | Class |
 |---|---|---|---|---|---|
-| 1–3 | db23db5 | src/config/show.rs:193–195 | generic-api-key | `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, and `OPENAI_API_KEY` set to 15-character random strings in the unit test `masks_every_secret` | test fixture |
-| 4–10 | 984652d | src/config/show.rs:54–60 | generic-api-key | the same test, at an earlier commit: `LOUPE_DATA_KEY`, `LOUPE_ACCOUNT_KEY`, `LOUPE_BOOTSTRAP_TOKEN`, `LOUPE_GITHUB_TOKEN_PERSONAL`, `LOUPE_SUMMARY_API_KEY`, `LOUPE_SUMMARY_OAUTH_TOKEN`, and `LOUPE_ADMIN_TOKEN` | test fixture |
-| 11 | fd6951c | tests/config_show.rs:93 | generic-api-key | `"legacy-Kp4Wn7"` for the legacy-name rejection test | test fixture |
-| 12 | fd6951c | tests/serve_start.rs:111 | generic-api-key | `"legacy-Vq3Zr8"` for the legacy-name rejection test | test fixture |
-| 13 | db23db5 | src/summary/worker.rs:105 | generic-api-key | `AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=`, the base64 of bytes 0x00–0x1f, the test key of the project | test fixture |
-| 14 | a740a5d | tests/common/days.rs:99 | generic-api-key | the same 0x00–0x1f test key | test fixture |
-| 15 | 0af7291 | .agents/scripts/summary.session_days.scenario.py:17 | generic-api-key | the same 0x00–0x1f test key | test fixture |
-| 16 | 67b94b1 | .agents/scripts/backfill.bench.sh:63 | generic-api-key | the same 0x00–0x1f test key | test fixture |
-| 17 | 8196fd5 | tests/live.route.rs:210 | generic-api-key | `sec-websocket-key: dGhlIHNhbXBsZSBub25jZQ==`, the sample nonce from RFC 6455 | placeholder |
-| 18–19 | c6c6c9d | .agents/scripts/github.bench.sh:58–59 | curl-auth-header | `Bearer bench-token` sent to the local `fake_github` on 127.0.0.1 | placeholder |
-| 20 | c0b7573 | .agents/scenarios/proxy.redaction.md:20 | curl-auth-header | `x-api-key: sk-test-123` sent to the local proxy | placeholder |
+| 1–3 | 397a7d8 | src/config/show.rs:193–195 | generic-api-key | `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, and `OPENAI_API_KEY` set to 15-character random strings in the unit test `masks_every_secret` | test fixture |
+| 4–10 | 599ac53 | src/config/show.rs:54–60 | generic-api-key | the same test, at an earlier commit: `LOUPE_DATA_KEY`, `LOUPE_ACCOUNT_KEY`, `LOUPE_BOOTSTRAP_TOKEN`, `LOUPE_GITHUB_TOKEN_PERSONAL`, `LOUPE_SUMMARY_API_KEY`, `LOUPE_SUMMARY_OAUTH_TOKEN`, and `LOUPE_ADMIN_TOKEN` | test fixture |
+| 11 | 1a1ddec | tests/config_show.rs:93 | generic-api-key | `"legacy-Kp4Wn7"` for the legacy-name rejection test | test fixture |
+| 12 | 1a1ddec | tests/serve_start.rs:111 | generic-api-key | `"legacy-Vq3Zr8"` for the legacy-name rejection test | test fixture |
+| 13 | 397a7d8 | src/summary/worker.rs:105 | generic-api-key | `AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=`, the base64 of bytes 0x00–0x1f, the test key of the project | test fixture |
+| 14 | b39cf58 | tests/common/days.rs:99 | generic-api-key | the same 0x00–0x1f test key | test fixture |
+| 15 | 71de1f2 | .agents/scripts/summary.session_days.scenario.py:17 | generic-api-key | the same 0x00–0x1f test key | test fixture |
+| 16 | aff3e6c | .agents/scripts/backfill.bench.sh:63 | generic-api-key | the same 0x00–0x1f test key | test fixture |
+| 17 | 412a8dd | tests/live.route.rs:210 | generic-api-key | `sec-websocket-key: dGhlIHNhbXBsZSBub25jZQ==`, the sample nonce from RFC 6455 | placeholder |
+| 18–19 | e519750 | .agents/scripts/github.bench.sh:58–59 | curl-auth-header | `Bearer bench-token` sent to the local `fake_github` on 127.0.0.1 | placeholder |
+| 20 | 3a1d59c | .agents/scenarios/proxy.redaction.md:20 | curl-auth-header | `x-api-key: sk-test-123` sent to the local proxy | placeholder |
 
 Real credentials: **0**.
 
@@ -66,7 +66,7 @@ No literal credential. `.env` was never committed (`git log --all --oneline -- .
 
 **Authors and committers** (`git log --all --format='%an <%ae>' | sort | uniq -c` and the same for `%cn <%ce>`):
 
-* Authors: 300 × `desek <daniel@grenemark.se>` and 1 × `Daniel Grenemark <daniel@grenemark.se>`. The second is `e2bb601`, the squash merge of PR #1 on the GitHub web UI.
+* Authors: 300 × `desek <daniel@grenemark.se>` and 1 × `Daniel Grenemark <daniel@grenemark.se>`. The second is `2c122ba`, the squash merge of PR #1 on the GitHub web UI.
 * Committers: 300 × `desek <daniel@grenemark.se>` and 1 × `GitHub <noreply@github.com>`.
 * There are no `Co-authored-by` trailers. The only trailers are two `Intent:` lines. Commit messages hold no email address.
 
@@ -77,7 +77,7 @@ No literal credential. `.env` was never committed (`git log --all --oneline -- .
 **Home paths** (`grep -oE '(/Users/…|/home/…|C:\\Users\\…)' histpatch.txt`):
 
 * `/Users/marker` (12 matches) is the synthetic fixture `tests/fixtures/backfill/*.jsonl`.
-* `/Users/<owner>` (2 matches) is `-e /Users/<owner>/Repo/desek/experiments/pi-cc-auth/src/index.ts` in decision D6a of `docs/cr/CR-0010-macos-end-to-end-acceptance.md`. It was added in `842906f` and removed in `b7fe856`. It is gone at HEAD: `git grep '/Users/<owner>'` → 0. It remains in history.
+* `/Users/<owner>` (2 matches) is `-e /Users/<owner>/Repo/desek/experiments/pi-cc-auth/src/index.ts` in decision D6a of `docs/cr/CR-0010-macos-end-to-end-acceptance.md`. It was added in `4d444cc` and removed in `0cdd6d3`. It is gone at HEAD: `git grep '/Users/<owner>'` → 0. It remains in history.
 * At HEAD, `.agents/scripts/pi.session.sh:20` has `EXT="$HOME/Repo/desek/experiments/pi-cc-auth/src/index.ts"`, the owner's directory layout.
 
 **Real session text**:
@@ -86,7 +86,7 @@ No literal credential. `.env` was never committed (`git log --all --oneline -- .
 * `acceptance.macos.end-to-end.day.json` has the one summary text in the tracked tree: "two short sessions, both of which were trivial … asked to reply with one word …". It describes the synthetic acceptance run, not real work.
 * `.agents/logs/` is ignored and was never tracked: `git log --all --name-only | grep '\.log$'` lists only the four scenario run logs.
 * The scenarios that ran on the owner's real logs report only counts. `backfill.real-logs.md` gives "calls_added 2448 … the dump search found 0 matches", and `summary.live.md` gives "a line of 8 words, line_safe: yes". `summary.no-text-retry.md` and `parser.real-agents.md` give counts and statuses only. Prompts in these files are synthetic ("say hi", "reply with the single word ready").
-* `docs/cr`: `git grep -nE '^> |line (was|read|said)|the model (wrote|answered|returned) "'` and a search for summary-style verbs found only synthetic test strings in Gherkin ("Fixed the parser in src/main.rs for https://x.io"). The deleted `CR-0014-backfill-transcript-whole-session.md` (removed in `b7d2301`) is design text, not a transcript.
+* `docs/cr`: `git grep -nE '^> |line (was|read|said)|the model (wrote|answered|returned) "'` and a search for summary-style verbs found only synthetic test strings in Gherkin ("Fixed the parser in src/main.rs for https://x.io"). The deleted `CR-0014-backfill-transcript-whole-session.md` (removed in `1e03e4e`) is design text, not a transcript.
 * `tests/fixtures/summary/scrub_corpus.txt` (53 lines) is a hand-written corpus with fictional names and paths.
 * Screenshots: I viewed `private-reports-page.png`, `dashboard.second-pass.1440.png`, the history-only blob `fc2ab96873` (an old `dashboard.second-pass.1440.png`), `dashboard.readability.1440.png`, `acceptance.macos.end-to-end.dashboard.png`, `dashboard.live.follow.png`, and `dashboard.offline.png`. All show seeded data ("Worked on the seeded task number N", groups `ci/desktop/laptop/server`, sessions `agent-0..2`) or the synthetic acceptance day. No real summary text.
 
@@ -153,9 +153,9 @@ A push packs the objects, so the public size will be at or below about 12.6 MiB.
 
 * **Conventional Commits syntax** (`^[a-z]+(\([^()]+\))?!?: \S`): **301 of 301 (100%)**. The specification allows types other than `feat` and `fix`.
 * **Standard types only** (`feat|fix|docs|chore|refactor|test|build|ci|perf|style|revert`): **140 of 301 (46.5%)**. Types used: `checkpoint` 161, `docs` 126, `fix` 7, `feat` 4, `chore` 2, `test` 1.
-* **Subjects that do not use a standard type**: all 161 `checkpoint(CR-XXXX): …` commits. This is the project's own governance type; `release-please-config.json` declares it as a hidden section ("Checkpoints"), with `bootstrap-sha` `c3e95d3`. No subject breaks the syntax.
+* **Subjects that do not use a standard type**: all 161 `checkpoint(CR-XXXX): …` commits. This is the project's own governance type; `release-please-config.json` declares it as a hidden section ("Checkpoints"), with `bootstrap-sha` `8611e9a`. No subject breaks the syntax.
 * **Empty or one-word messages**: none. `git log --all --format='%h|%s' | awk -F'|' '$2=="" || $2 !~ / /'` → no output. The shortest subjects have three words: `docs(cr): approve CR-00NN` (×31 with re-approvals) and `checkpoint(CR-00NN): update specification` (×19). Ten subjects repeat verbatim, for example `docs(cr): approve CR-0010` three times.
-* **Merge commits**: none (`git rev-list --all --merges --count` → 0). PR #1 was squash merged as `e2bb601`.
+* **Merge commits**: none (`git rev-list --all --merges --count` → 0). PR #1 was squash merged as `2c122ba`.
 * **Other observations**:
   * 284 of 301 commits have an empty body. By type: `checkpoint` 154, `docs` 123, `feat` 2, `fix` 2, `chore` 2, `test` 1.
   * 137 subjects are longer than 72 characters.
@@ -184,8 +184,8 @@ A push packs the objects, so the public size will be at or below about 12.6 MiB.
 | 1 | No real credential in history | note | gitleaks: 20 findings, all test fixtures (16) or placeholders (4). Own search: 0 `lpt_`, `AKIA`, private key, or long Bearer token; every `sk-ant-` and `ghp_` value is a fake; no literal value for the five named variables. `.env` was never committed. | None. Keep gitleaks in the verdict workflow. |
 | 2 | Design mockup archive names the owner's domain | should fix (owner's call) | An early prototype archive, removed (212 KB): a design-tool export with sample data, the React production builds, "dashboard.grenemark.se", and "Stockholm time". Cited by `README.md:26` and CR-0008. | Owner decides whether to keep it as the cited design source or remove it (and its README row) in a normal commit. No history rewrite is needed; it holds no secret. |
 | 3 | Script hardcodes the owner's directory layout | should fix | `.agents/scripts/pi.session.sh:20` `EXT="$HOME/Repo/desek/experiments/pi-cc-auth/src/index.ts"` | Read the path from an environment variable (for example `PI_CC_AUTH_EXT`) and fail with a clear message when it is unset. |
-| 4 | Home path of the owner in history | note | `/Users/<owner>/Repo/desek/experiments/pi-cc-auth/src/index.ts` in CR-0010 D6a, added in `842906f` and removed in `b7fe856`. Not at HEAD. The user name equals the public GitHub handle. | Accept. Do not rewrite history for it. |
-| 5 | Owner's personal email in all commit metadata | note | 301 of 301 commits use `daniel@grenemark.se`. 300 are authored as `desek` and 1 (`e2bb601`, the web squash) as `Daniel Grenemark`. | Owner's choice. To keep the address private in future commits, set a GitHub noreply address; changing past commits needs a rewrite, which is not recommended. |
+| 4 | Home path of the owner in history | note | `/Users/<owner>/Repo/desek/experiments/pi-cc-auth/src/index.ts` in CR-0010 D6a, added in `4d444cc` and removed in `0cdd6d3`. Not at HEAD. The user name equals the public GitHub handle. | Accept. Do not rewrite history for it. |
+| 5 | Owner's personal email in all commit metadata | note | 301 of 301 commits use `daniel@grenemark.se`. 300 are authored as `desek` and 1 (`2c122ba`, the web squash) as `Daniel Grenemark`. | Owner's choice. To keep the address private in future commits, set a GitHub noreply address; changing past commits needs a rewrite, which is not recommended. |
 | 6 | Personal data in content is fixtures only | note | Emails are on fixture or reserved domains; IPs are loopback, bind, or fixture; the local hostname is absent; `/Users/marker` is a fixture; run logs, day JSON, and the 7 screenshots I viewed show synthetic or seeded data; scenarios on real logs report counts only. | None. |
 | 7 | Default time zone hints at location | note | `LOUPE_TZ` default `Europe/Stockholm` in README, `.env.example`, and the CRs | Accept, or change the default to `UTC` if the owner prefers. |
 | 8 | Prototype archive | note | An early prototype archive, removed (58 KB): early prototype source, `ledger.example.com`, empty `.env.example`, no secret shapes | Keep as the documented reference, or drop it at the owner's discretion. |

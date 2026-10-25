@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "medium"
 target-version: 0.15.0
 source-branch: main
-source-commit: fc79e60
+source-commit: 06f8673
 ---
 
 # Provider credentials with industry names and a health status per provider

@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "medium"
 target-version: 0.12.0
 source-branch: main
-source-commit: ec6777a
+source-commit: 2f455f0
 ---
 
 # Backfill of calls and sessions from the agent session logs

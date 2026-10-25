@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, operator of the machine, owner of the Clo
 priority: "medium"
 target-version: 0.1.0
 source-branch: main
-source-commit: 93aad79
+source-commit: 04ab10a
 ---
 
 # Public instance
@@ -29,7 +29,7 @@ The owner wrote, on 2026-10-25:
 
 These four points are the requirements. Point 1 is the goal. Point 2 gives the shape: a separate read-only process on data that the proxy process writes. Point 3 gives the deployment: containers on this machine, as today, and a Cloudflare Tunnel later. Point 4 is the security boundary, and it wins over point 2 where they collide: the public process must have no access to non-public data, not only no code path that reads it. Where a point leaves a detail open, this CR states a rule and names the detail a judgement call.
 
-The first approved version of this CR, at commit `93aad79`, gave the public container the volume `loupe-data` and the env file `.env`. Thus that container could open `loupe.db`, with the table `exchanges` and its sealed bodies, and it held `LOUPE_DATA_KEY`, which opens those bodies. Point 4 rejects that design. This version replaces it. The section "Notes" records the amendment.
+The first approved version of this CR, at commit `04ab10a`, gave the public container the volume `loupe-data` and the env file `.env`. Thus that container could open `loupe.db`, with the table `exchanges` and its sealed bodies, and it held `LOUPE_DATA_KEY`, which opens those bodies. Point 4 rejects that design. This version replaces it. The section "Notes" records the amendment.
 
 `README.md`, section "Scope", lists public hosting as out of scope "for now", to be "managed separately later". This CR moves the preparation for public hosting into scope. The tunnel, TLS, and the rate limit stay out of scope.
 

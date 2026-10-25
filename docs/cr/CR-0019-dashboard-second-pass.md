@@ -9,7 +9,7 @@ stakeholders: Daniel Grenemark (owner, reader), reviewer agent (approver)
 priority: "medium"
 target-version: 0.11.0
 source-branch: main
-source-commit: 44c76f6
+source-commit: c281a8d
 ---
 
 # Dashboard second pass
