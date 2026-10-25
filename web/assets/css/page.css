@@ -15,6 +15,12 @@ a:hover { color: var(--color-link-hover); }
 .switch[aria-checked="true"] { background: var(--color-text); }
 .switch-knob { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--color-bg); transition: transform 0.15s; }
 .switch[aria-checked="true"] .switch-knob { transform: translateX(20px); }
+/* The knob shows a sun in the light scheme and a moon in the dark scheme, so the switch explains itself. */
+.switch-knob { display: flex; align-items: center; justify-content: center; }
+.switch .icon { width: 12px; height: 12px; fill: none; stroke: var(--color-text); stroke-width: 1.6; stroke-linecap: round; }
+.switch .icon-moon { display: none; }
+.switch[aria-checked="true"] .icon-sun { display: none; }
+.switch[aria-checked="true"] .icon-moon { display: block; }
 @media (prefers-reduced-motion: reduce) { .switch-knob { transition: none; } }
 .pill { font-family: var(--font-mono); font-size: var(--size-text); font-weight: 500; padding: 0 16px; min-height: 44px; border-radius: var(--radius-pill); cursor: pointer; background: transparent; color: var(--color-text-body); border: 1px solid var(--color-border); }
 .pill[aria-pressed="true"] { background: var(--color-text); color: var(--color-ink-inverse); border-color: var(--color-text); }
