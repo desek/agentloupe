@@ -31,7 +31,7 @@ ARG UID=10001
 ARG GID=10001
 RUN groupadd --gid "$GID" loupe \
  && useradd --uid "$UID" --gid "$GID" --no-create-home --shell /usr/sbin/nologin loupe \
- && mkdir /data && chown loupe:loupe /data
+ && mkdir -p /data/public && chown loupe:loupe /data /data/public
 WORKDIR /app
 COPY --from=build /src/target/release/loupe /usr/local/bin/loupe
 COPY config ./config

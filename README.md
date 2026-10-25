@@ -72,12 +72,14 @@ This README is the authority. Where a source differs from it, the README is corr
 In scope:
 
 - One container that runs on this machine, reached through `localhost`.
+- The public instance: a second container in the role `public` that serves only the public
+  page, the public API, and the live feed from the public mirror (see "Public hosting").
 - Claude Code and Pi, which send their model requests through the proxy.
 - Pull requests from GitHub, read through the GitHub API.
 
 Out of scope for now:
 
-- Public hosting. It will be managed separately later.
+- The Cloudflare Tunnel in front of the public instance. It is later work.
 - claude.ai chats (web, desktop, mobile). They go directly to claude.ai, so the proxy cannot
   record them. The dashboard footer states which sources it covers.
 
@@ -124,9 +126,13 @@ One binary holds the full product: the proxy, the workers, the public API, and t
 - Language: Rust. The crate name is `agent-loupe`, the binary name is `loupe`, and the
   configuration variables start with `LOUPE_`.
 - Storage: SQLite on one volume.
-- Runs as one container (`docker compose`), with the port bound to `127.0.0.1`.
+- Runs in two containers (`docker compose`) from one image, each port bound to `127.0.0.1`.
+  `LOUPE_ROLE` selects the role of `loupe serve`: `full` (the default) runs the proxy, the
+  workers, the private page, and the public routes, and writes the public mirror; `public` reads
+  only the public mirror and serves only the public routes (see "Public hosting").
 - Commands:
-  - `loupe serve`: the proxy, the workers, the public API, and the dashboard.
+  - `loupe serve`: in the role `full`, the proxy, the workers, the public API, and the dashboard;
+    in the role `public`, the dashboard, the public API, and the live feed only.
   - `loupe aggregate [--date YYYY-MM-DD|today] [--dry-run]`: build one day now.
   - `loupe backfill --source claude-code|pi [--path DIR] [--from YYYY-MM-DD] [--to YYYY-MM-DD]
     [--pi-label LABEL] [--dry-run]`: read the session logs on disk into the calls and the sessions,
@@ -156,8 +162,9 @@ Configuration:
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `LOUPE_DATA_KEY` | yes | Encrypts the captured request and response bodies. |
-| `LOUPE_ACCOUNT_KEY` | yes | Secret for the HMAC hashes of accounts and pull requests. |
+| `LOUPE_ROLE` | no | Role of `loupe serve`: `full` (default) or `public`. `compose.yaml` sets `public` for `loupe-public` only. |
+| `LOUPE_DATA_KEY` | yes, in the role `full` | Encrypts the captured request and response bodies. |
+| `LOUPE_ACCOUNT_KEY` | yes, in the role `full` | Secret for the HMAC hashes of accounts and pull requests. |
 | `LOUPE_BOOTSTRAP_TOKEN` | no | A proxy token from a secret (see "Proxy tokens"). |
 | `LOUPE_GITHUB_TOKEN_<LABEL>` | no | One or more GitHub tokens (see "GitHub"). |
 | `LOUPE_GITHUB_API_URL` | no | Base URL of the GitHub API. Default `https://api.github.com`. Must use `https`, except for `127.0.0.1` or `localhost`. |
@@ -209,7 +216,8 @@ Example day record. The pull request and line fields are `null` when no GitHub t
 The dashboard is a stateless single-page app. The `loupe` binary serves its files at `/`, built
 into the binary, so one artifact ships the full product. The page gets all its data from the
 public API. It has no login, no cookies, and no state on the server, because all the data that
-it shows is public.
+it shows is public. The two roles serve the same page: `loupe` on port 8787 and `loupe-public`
+on port 8788, which reads the published days and the live counters from the public mirror.
 
 | Section | Data |
 |---|---|
@@ -542,6 +550,7 @@ Two more routes need the same authorization:
 | Request and response bodies | Encrypted with `LOUPE_DATA_KEY`, deleted 168 hours after parse and summary |
 | Exchange metadata | Agent, upstream, method, path, status, sizes, timing |
 | Calls | Model, status, token counts, cost |
+| Public mirror (`public/public.db`) | A derived copy that the role `full` writes and the role `public` reads, read-only. It has two tables only: `days` (the published day records) and `live_state` (the live counters of today). No raw request, session, call, token, or key |
 | Public data | Daily totals, totals per agent and per model, PR and line counts, one summary line per day |
 | Live feed (`/live`) | Counts and token sums only: exchange start and end with the HTTP status, the five token counts and the cost of each call, the open segment count. No agent, model, prompt, body, path, header, key, or token |
 | Start request (release builds only) | One GET of `https://<host>/<commit>` at each start of `loupe serve`, with no body. It holds the commit of the build in the path and `agentloupe/<version> (<target triple>)` in `User-Agent`. No data of the user, the host, or the dashboard |
@@ -561,6 +570,9 @@ and a count. It stores no IP address, no `User-Agent`, no header, no query, and 
 logs are off, and it has no read route. A build from source and a local image build
 (`docker compose up -d --build`) hold no host and send no request.
 [`docs/specification/telemetry.md`](docs/specification/telemetry.md) states the rules.
+
+The role `public` reads only the public mirror. It stops at start when a secret is set or when
+`loupe.db` is in its data directory, so the public container cannot reach the private data.
 
 A call that `loupe backfill` reads from a session log stores only the token counts, the model, the
 time, and HMAC keys; it stores no prompt, no path, no directory name, and no raw ID of the log.
@@ -583,6 +595,40 @@ day summaries of the day under the same rules.
 A scrubber runs on every line before storage. It removes URLs, email addresses, paths, and every
 token with a digit, except a name in `LOUPE_PUBLIC_PROJECTS`. Raw bodies are deleted 168 hours
 (`LOUPE_RAW_RETENTION_HOURS`) after parse and summary; the calls and sessions stay.
+
+## Public hosting
+
+`compose.yaml` runs two services from one image:
+
+| Service | Role | Port |
+|---|---|---|
+| `loupe` | `full`: the proxy, the workers, the private page, the public routes, and the mirror writer | `127.0.0.1:8787` |
+| `loupe-public` | `public`: the dashboard, the public API, and the live feed only | `127.0.0.1:8788` |
+
+Expose only the port 8788. Never expose the port 8787, because it holds the proxy and the
+private page.
+
+The public container reaches only the public mirror, read-only, with the published days and the
+live counters. It cannot reach `loupe.db`, the raw requests, the session data, the spill files,
+the logs of the role `full`, or the secrets. It never mounts the volume `loupe-data` and never
+reads `.env`.
+
+A Cloudflare Tunnel is later work. Put only the public port, or the service `loupe-public`,
+behind the tunnel. A tunnel on the compose network can reach the service `loupe`, so the tunnel
+configuration must name `loupe-public` only.
+
+A rate limit and a cache in front of the public port are the job of the host, for example the
+rules of Cloudflare. The binary has no rate limit on the public routes beyond the live connection
+limit.
+
+Put the settings of the public service in `.env.public`, from `.env.public.example`, with no
+secret. `LOUPE_LIVE_ALLOWED_ORIGIN` covers a front proxy that changes the `Host` header, and
+`LOUPE_LIVE_MAX_CONNECTIONS` limits the live sockets. Copy `LOUPE_TZ`, `LOUPE_SITE_TITLE`, and
+the `LOUPE_SUBSCRIPTION_` lines from `.env`, so the two pages match.
+
+1. Run `cp .env.public.example .env.public` and fill in the values.
+2. Run `docker compose up -d --build`.
+3. Check with `curl -s http://127.0.0.1:8788/healthz`. The body is `{"status":"ok"}`.
 
 ## Open work
 

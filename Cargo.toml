@@ -446,3 +446,7 @@ path = "tests/serve.role.imports.rs"
 [[test]]
 name = "mirror_readonly"
 path = "tests/mirror.readonly.rs"
+
+[[test]]
+name = "compose_public"
+path = "tests/compose.public.rs"

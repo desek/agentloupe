@@ -1,4 +1,4 @@
-# @agents-index Runs the loupe container with the port on 127.0.0.1 only, a named volume at /data, and secrets from .env.
+# @agents-index Runs loupe (role full, 127.0.0.1:8787, secrets from .env) and loupe-public (role public, 127.0.0.1:8788, mirror read-only).
 services:
   loupe:
     build: .
@@ -8,9 +8,40 @@ services:
       - "127.0.0.1:8787:8787"
     volumes:
       - loupe-data:/data
+      - loupe-public:/data/public
     env_file: .env
     environment:
       LOUPE_ENV: container
 
+  # loupe-public must never get the volume loupe-data or the file .env, because they hold the raw
+  # requests and the key that opens them. It reads only the public mirror, read-only.
+  loupe-public:
+    image: agent-loupe:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8788:8787"
+    volumes:
+      - loupe-public:/data/public:ro
+      - loupe-public-logs:/data
+    env_file:
+      - path: .env.public
+        required: false
+    environment:
+      LOUPE_ENV: container
+      LOUPE_ROLE: public
+    # The same check and values as the HEALTHCHECK of the image.
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8787 && printf 'GET /healthz HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '\"status\":\"ok\"' <&3"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      start_interval: 1s
+      retries: 3
+    depends_on:
+      loupe:
+        condition: service_healthy
+
 volumes:
   loupe-data:
+  loupe-public:
+  loupe-public-logs:
