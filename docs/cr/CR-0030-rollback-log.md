@@ -32,4 +32,9 @@ The rewrite is reversible until the fresh repository becomes public. The history
 
 ## Record
 
-Filled in after the change.
+* Head before the rewrite: `7a5a50143e4522994985fcc87b076273befd00e6`, 367 commits on `main`, pushed to `desek/agentloupe` (now `desek/agentloupe-tmp`) at 2026-10-25 22:21 CET.
+* Bundle: `~/Repo/backups/agentloupe-before-cr0030.bundle`, 11 289 591 bytes, `git bundle verify` printed "is okay".
+* Rewrite: 2026-10-25 22:22:01 CET, `git filter-repo --path prototype/ --invert-paths`, finished in 0.38 seconds. 366 commits: the commit `9a13499` became empty and was dropped. The tree of `main` stayed `688dd43f0ce6cca5414a0be8d8dac01e756886b1`. Each kept commit has the same author and date.
+* Hash commit: 119 hashes in the tracked files; `bootstrap-sha` names a commit of the new history. The new `main` has 367 commits.
+* GitHub, 2026-10-25 22:22:34 CET: `desek/agentloupe` renamed to `desek/agentloupe-tmp`, private; fresh private `desek/agentloupe`; variable `LOUPE_TELEMETRY_HOST` and secret `CLAUDE_CODE_OAUTH_TOKEN` set; `main` pushed at 22:22:46; `git ls-remote` listed only `refs/heads/main`.
+* A fresh clone of the new repository: 367 commits; 0 commits that touch `prototype` or the early prototype archive; 0 trees, messages, and file objects with the old zone name.

@@ -2,7 +2,7 @@
 name: "CR-0030 Remove the prototype"
 description: "prototype/, the offline browser simulation that explored the requirements, leaves the tree and the whole git history before the first public release. The npm lane of the dependency flows, which only kept the prototype up to date, goes with it. The rewritten history goes to a fresh private repository desek/agentloupe."
 id: "CR-0030"
-status: "approved"
+status: "implemented"
 date: 2026-10-25
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, owner of the GitHub account), reviewer agent (approver), readers of the public repository
@@ -258,4 +258,8 @@ The second reviewer found one more blocking finding: `tests/deps.autofix.rs` and
 ### Hashes in this record
 
 Each commit hash in this CR and in `CR-0030-rollback-log.md` names a commit of the history before this rewrite, which `desek/agentloupe-tmp` and the bundle keep. The rewrite dropped `9a13499`, which changed only `prototype/`. The hash commit of requirement 11 does not change these two files. The other tracked files name the new hashes; `bootstrap-sha` is `8611e9a`.
+
+### Verification, 2026-10-25
+
+The targets, measured: `prototype/` in the tree 0 files, in the history 0 commits on a fresh clone; the grep of the npm lane 0 lines (85 before); 367 commits before the rewrite, 366 after it (one empty commit dropped), 367 with the hash commit; the fresh remote listed only `refs/heads/main`; the verdict passed before the rewrite (741.4 seconds, under heavy load of the machine) and on the new `main` (314.6 seconds). The binary and `web/` did not change. The scenario `.agents/scenarios/public.repository.md` passed with the prototype check added.
 
