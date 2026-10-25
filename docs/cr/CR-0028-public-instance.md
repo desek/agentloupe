@@ -2,12 +2,12 @@
 name: "CR-0028 Public instance"
 description: "A public, read-only role of loupe serve, selected by LOUPE_ROLE=public, that has no access to non-public data. The role full writes a public mirror database that holds only the published days and the live counters. The public role runs as a second container that mounts only that mirror, read-only, with no secret in its environment. It serves only the dashboard, its files, the public API, the live route, and the health route. A Cloudflare Tunnel in front of it is later work that this CR only prepares for."
 id: "CR-0028"
-status: "approved"
+status: "implemented"
 date: 2026-10-25
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, operator of the machine, owner of the Cloudflare account), reviewer agent (approver), public readers of the dashboard
 priority: "medium"
-target-version: 0.2.0
+target-version: 0.1.0
 source-branch: main
 source-commit: 09b877b
 ---
@@ -766,7 +766,7 @@ None. The owner's point 4 answers open question 2 of the first version (the secr
 18. **Telemetry in the two roles.** Two services send two requests per start, and the count stays a signal.
 19. **The live feed switch.** `LOUPE_LIVE_ENABLED=false` removes `/live` in the role `public` too, and no poller starts. The mirror still writes `live_state` in the role `full`, with the hub values 0 when the hub is off.
 20. **The import test.** A test on the import list of the modules of the role `public`, so a later change that reaches private data fails early.
-21. **Target version.** `0.2.0`, the next minor version after `0.1.0` in `Cargo.toml`.
+21. **Target version.** `0.1.0`. No version is released yet, and the owner chose to release this change in the first release, `0.1.0`, on 2026-10-25.
 
 ## Notes
 
@@ -800,4 +800,8 @@ The row "Resident memory of the public process" of "Measurable Targets" changed 
 * Reason: the 50 percent clause assumed that the workers of the role `full` hold more than half of its memory. The measurement shows a shared floor of about 13.8 MiB in each role and about 2.7 MiB of worker memory. The ratio also depends on the age of the full process: 44.8 percent against the full container of 55 minutes with real data, 84.5 percent against a fresh one. The new form matches non-functional requirement 4 and AC-16, and the 32 MiB cap stops a regression that doubles the footprint.
 * Evidence, 2026-10-25, Apple silicon, Docker Desktop, fresh volumes: `docker stats` full 17.66 MiB, public 14.93 MiB with no client, public 21.03 MiB with 32 live clients. `/proc/1/status` of a fresh public container: RssAnon 13.2 MB, the same with `MALLOC_ARENA_MAX=2` and with `TOKIO_WORKER_THREADS=2`. The binary is 11.4 MB.
 * A smaller base footprint of the binary is a separate change, not part of this CR.
+
+### Verification, 2026-10-25
+
+A reviewer agent, separate from each author, approved the implementation note and the target change. It checked AC-1 to AC-16 against the code, the tests, and the scenario, and checked the outcome against the intent: the public process has no access to raw requests, session data, or secrets. It found no blocking finding. It rated AC-7 partly met, because no test showed the absence of the workers. A test now shows that the role `public` logs no start line of a worker and starts with an upstreams file that is not valid TOML. The Given of AC-7 with a provider credential and a GitHub token cannot occur any more, because the secret guard stops that start. The container scenario `.agents/scenarios/public.instance.md` passed in 2 of 2 product runs. The verdict passed on the final tree.
 
