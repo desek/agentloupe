@@ -1,0 +1,5 @@
+# @agents-index Nextest settings: wall-clock latency tests run alone, so parallel load from other tests does not decide their p95.
+
+[[profile.default.overrides]]
+filter = "test(private_config_read_is_cached)"
+threads-required = "num-cpus"
