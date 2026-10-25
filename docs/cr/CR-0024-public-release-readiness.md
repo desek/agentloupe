@@ -28,7 +28,7 @@ Two audits are in the explore cache. Each was made at commit `d93de7d`, while th
 The owner decided on 2026-10-23:
 
 1. **D1, scope.** This CR covers the four blocking gaps (governance rows 1 to 4) and the nine should-fix gaps (governance rows 5 to 13).
-2. **D2, mockup archive.** A normal commit removes `brainstorm/dashboard.grenemark.se-html.zip` from the tree. The README row that cites it says that the design values came from a mockup. The history keeps the archive (history finding 2).
+2. **D2, mockup archive.** A normal commit removes the mockup archive (an early prototype archive, removed) from the tree. The README row that cites it says that the design values came from a mockup. The history keeps the archive (history finding 2).
 3. **D3, commit author email.** The commit author email stays as it is (history finding 5).
 4. **D4, time zone.** The default of `LOUPE_TZ` changes from `Europe/Stockholm` to `UTC` in the code, the README, the env example, and the specification. An install keeps its own value in `.env` (history finding 7).
 5. **D5, extension path.** `.agents/scripts/pi.session.sh` reads the path of the pi-cc-auth extension from an environment variable. A missing variable gives an actionable error (history finding 3).
@@ -77,7 +77,7 @@ Where a decision or a fact leaves a detail open, this CR states a rule and names
 * `release.build.sh` packs `loupe`, `upstreams.toml`, `config/`, `LICENSE`, and `README.md` into each archive. The binary embeds about 291 crates of `Cargo.lock`, the LiteLLM price file of `vendor/litellm/` (license in `vendor/litellm/LICENSE`, upstream commit in `vendor/litellm/SOURCE.md`), and the Geist fonts of `web/assets/fonts/` (license in `web/assets/fonts/OFL.txt`).
 * No `deny.toml` exists. No script, workflow, or specification runs `cargo deny` or `cargo audit`.
 * The repository has no `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, pull request template, or issue template.
-* `README.md`, section "Status", says "Thirteen change requests" (24 exist after this CR) and names two archives in `brainstorm/`. The row of `brainstorm/dashboard.grenemark.se-html.zip` calls it "The source of the design values of the dashboard". Section "Open work" says "Write the `loupe` binary from scratch". The README has no pointer to a contributing guide or a security policy.
+* `README.md`, section "Status", says "Thirteen change requests" (24 exist after this CR) and names two early prototype archives, removed. The row of the mockup archive calls it "The source of the design values of the dashboard". Section "Open work" says "Write the `loupe` binary from scratch". The README has no pointer to a contributing guide or a security policy.
 * The default `Europe/Stockholm` of `LOUPE_TZ` is in `src/config/vars.rs`, in the unit tests `default_when_unset` (`src/config/loader.rs`) and `masks_every_secret` (`src/config/show.rs`), in the fallback of `.agents/scripts/summary.threshold.sh`, in `README.md` (the variable table and "How it works" step 8), in `.env.example`, and in `docs/specification/configuration.md` (section "Variables") and `docs/specification/days.md` (section "Day boundaries"). The owner's local `.env` has no `LOUPE_TZ` line, so the owner's install uses the default today.
 * `.agents/scripts/pi.session.sh` sets the extension path to a fixed path under the owner's home directory, line 20.
 * The remote has three branches: `main`, `release-please--branches--main--components--agent-loupe` (pull request #2), and `feat/cr-0022-release` with 8 pre-squash `checkpoint(CR-0022)` commits that are not on `main`.
@@ -199,7 +199,7 @@ sequenceDiagram
 **README (F7, D2, governance row 12)**
 
 25. `README.md`, section "Status", **MUST** state: 24 change requests in `docs/cr/`, the `loupe` binary exists and runs in the container, and the release flow (release-please, the tag, the release assets, the image), with links to the section "Install" and to `docs/specification/release.md`. The word "Thirteen" **MUST NOT** remain.
-26. In the section "Status", the row of the mockup archive **MUST** go. One sentence **MUST** state that the design values of the dashboard came from a design mockup with sample data. The README **MUST NOT** name the archive file or the domain in it. The row of `brainstorm/agent-ledger.zip` stays.
+26. In the section "Status", the row of the mockup archive **MUST** go. One sentence **MUST** state that the design values of the dashboard came from a design mockup with sample data. The README **MUST NOT** name the archive file or the domain in it. The row of the other early prototype archive, removed, stays.
 27. `README.md`, section "Open work", **MUST** list only open work (judgement call 17). The item "Write the `loupe` binary from scratch" **MUST** go.
 28. `README.md` **MUST** get a short section "Contributing" before the section "License", with links to `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, and `SECURITY.md`.
 29. `README.md`, section "Install", step 3 of "From a release asset", and section "License" **MUST** name `THIRD-PARTY-NOTICES`.
@@ -246,7 +246,7 @@ sequenceDiagram
 
 **History decisions (D2, D5, D6)**
 
-54. A normal commit **MUST** remove `brainstorm/dashboard.grenemark.se-html.zip` from the tree. `docs/cr/CR-0008-dashboard-spa.md` **MUST NOT** change (judgement call 21).
+54. A normal commit **MUST** remove the mockup archive, an early prototype archive, removed, from the tree. `docs/cr/CR-0008-dashboard-spa.md` **MUST NOT** change (judgement call 21).
 55. `pi.session.sh` **MUST** read the path of the extension entry file from the environment variable `PI_CC_AUTH_EXT` (judgement call 19). The script **MUST NOT** hold a default path.
 56. When `PI_CC_AUTH_EXT` is unset or empty, `pi.session.sh` **MUST** exit with code 3 and an error that names the variable, the fix, and a verify step. When the variable names a file that does not exist, it **MUST** exit with code 3 and an error that names the variable and the path. This **MUST** also apply with `--dry-run`. The docstring and `--help` **MUST** name the variable.
 57. After requirement 55, `git grep -n "Repo/[d]esek" -- .agents/scripts` **MUST** return no match.
@@ -312,7 +312,7 @@ The baseline column holds the value at the source commit or on 2026-10-23. "None
 | Idempotence of the settings script | the count of writes on the last line of a second `repo.settings.sh` run, and the exit code of `repo.settings.sh --check` | none, no script | 0 writes, exit code 0 |
 | Length of the community files | `wc -l` of `CONTRIBUTING.md`, `SECURITY.md`, the pull request template, and each issue template | none, no file | at most 80, 60, 30, and 40 lines |
 | Verdict workflow time | the CR-0022 method: `createdAt` to `updatedAt` of `gh run view <run id>` on a pull request that changes one Rust file | 5 min 13 s and 6 min 39 s (runs 39997262577 and 39997205916) | at most 20 minutes cold, 12 minutes warm |
-| Owner paths and mockup | `git grep -nE "/Users/[d]esek"`, `git grep -n "Repo/[d]esek" -- .agents/scripts`, and `git ls-files brainstorm` | 5 matches, 1 match, 2 archives | 0, 0, only `brainstorm/agent-ledger.zip` |
+| Owner paths and mockup | `git grep -nE "/Users/[d]esek"`, `git grep -n "Repo/[d]esek" -- .agents/scripts`, and the tracked files of the early prototype archives, removed | 5 matches, 1 match, 2 archives | 0, 0, 1 archive |
 | Remote branches | `git ls-remote --heads origin` | `main`, the release-please branch, `feat/cr-0022-release` | no `feat/cr-0022-release` |
 | Default time zone | `loupe config show` with no `LOUPE_TZ` set | `Europe/Stockholm` | `UTC` with the source default |
 
@@ -343,7 +343,7 @@ Changed files:
 
 Removed files:
 
-* `brainstorm/dashboard.grenemark.se-html.zip`.
+* The mockup archive, an early prototype archive, removed.
 
 Repository settings (not files): the main ruleset, the tag ruleset, the merge settings, the actions policy, secret scanning and push protection, Dependabot alerts, and private vulnerability reporting. The remote branch `feat/cr-0022-release`.
 
@@ -352,7 +352,7 @@ Not changed:
 * `pipeline.verdict.sh`, the fingerprint script, and the stage entry points other than lint and image.
 * `release-please-config.json` and `.release-please-manifest.json` (requirement 64).
 * `compose.yaml`, `rust-toolchain.toml`, the public API, the dashboard, and the day record.
-* `docs/cr/CR-0001` to `docs/cr/CR-0022`, `brainstorm/agent-ledger.zip`, `prototype/`, and the scenarios other than `release.first.md`.
+* `docs/cr/CR-0001` to `docs/cr/CR-0022`, the other early prototype archive (removed), `prototype/`, and the scenarios other than `release.first.md`.
 
 ## Scope Boundaries
 
@@ -383,7 +383,7 @@ Also out of scope:
 * A rewrite of the history, a change of a past commit email, or a `.mailmap` (D3).
 * The Dependabot `docker` ecosystem for the base images (judgement call 8).
 * Dependabot security updates (judgement call 15). CR-0023 owns the dependency flow.
-* A change to `brainstorm/agent-ledger.zip`, to `prototype/`, or to the records of earlier CRs and scenarios.
+* A change to the other early prototype archive (removed), to `prototype/`, or to the records of earlier CRs and scenarios.
 * A migration of the stored days of an install to another time zone.
 * The scenario screenshots, the commit message style, and the other notes of the history audit.
 
@@ -744,7 +744,7 @@ Given the tree after the CR
 When the agent runs git grep -nE "/Users/[d]esek"
 Then there is no match
 And git grep -n "Repo/[d]esek" -- .agents/scripts has no match
-And git ls-files brainstorm lists only brainstorm/agent-ledger.zip
+And the tracked files list only one early prototype archive, removed
 And docs/cr/CR-0008-dashboard-spa.md is unchanged
 And git ls-remote --heads origin does not list feat/cr-0022-release
 ```
@@ -997,7 +997,7 @@ Verify at the first release that release-please makes the tag `v0.1.0` through t
 18. **Scope of the time zone change.** Only the default and its copies change. The example value `Europe/Stockholm` in the error and in the specification stays, as do the test fixtures that need a zone with daylight saving time, the scenarios, the CRs, and `prototype/`.
 19. **Variable name.** `PI_CC_AUTH_EXT`, the path of the extension entry file, as the history audit proposed. `--dry-run` also needs it, because the printed command holds the path.
 20. **Home path in the audits.** The two audit files are tracked and break CR-0022, requirement 3. A normal commit replaces the literal path with a placeholder. The owner did not state this.
-21. **Records of earlier work.** `docs/cr/CR-0008-dashboard-spa.md` keeps its citation of the archive as a record. `brainstorm/agent-ledger.zip` stays.
+21. **Records of earlier work.** `docs/cr/CR-0008-dashboard-spa.md` keeps its citation of the archive as a record. The other early prototype archive, removed, stays.
 22. **Form of the CR-0023 amendment.** One section "Amendment by CR-0024" plus one short marker on each changed item. A fix of the script in `prototype/` uses `chore(deps)` too, because the reason of D8 applies. The ruleset of CR-0023, requirement 45, is the ruleset of this CR.
 23. **Specification layout.** No new specification file. The settings and the notices go into `release.md`; the dependency check goes into `operations.md`, section "Pipeline".
 24. **Implemented commit.** `feat(release): Public release readiness (CR-0024)`. The type is `feat`, because the CR adds assets and changes a default. It has no breaking change footer, because no release exists yet.

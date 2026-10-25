@@ -37,7 +37,7 @@ The repository is on branch `main` at commit `81755b6`. It contains:
 * `README.md`: the master document and the authority for intent.
 * `vendor/litellm/`: the price file, its schema, `SOURCE.md`, and `LICENSE`.
 * `.agents/scripts/prices.vendor.sh` and `.agents/scripts/domain.check.sh`.
-* `brainstorm/`: two archives for reference only.
+* Two early prototype archives, removed, for reference only.
 
 No Cargo manifest, no source code, no container files, no `docs/` directory, and no `.taxonomy` exist.
 
@@ -48,7 +48,7 @@ flowchart TD
     subgraph Current["Current State"]
         R[README.md] --- V[vendor/litellm]
         R --- S[.agents/scripts: prices.vendor.sh, domain.check.sh]
-        R --- B[brainstorm archives]
+        R --- B["early prototype archives, removed"]
     end
 ```
 

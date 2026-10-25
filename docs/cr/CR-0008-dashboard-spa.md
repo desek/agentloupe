@@ -582,7 +582,7 @@ Chosen approach: "plain HTML, CSS, and ES modules with no build step, inline SVG
 * Earlier CRs: CR-0001 to CR-0007.
 * Later CRs: CR-0009 (GitHub counts), CR-0010 (end-to-end acceptance).
 * README sections: "Dashboard", "The `loupe` binary", "Privacy model".
-* Mockup: `Main.dc.html` in `brainstorm/dashboard.grenemark.se-html.zip`.
+* Mockup: `Main.dc.html` in an early prototype archive, removed.
 
 ## Approval
 

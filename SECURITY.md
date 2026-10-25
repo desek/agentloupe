@@ -40,5 +40,5 @@ details private until the advisory is public.
 ## Scope
 
 In scope: the `loupe` binary, the container image `ghcr.io/desek/agentloupe`, and the release
-assets of this repository. The prototype under `prototype/` and the archive under `brainstorm/` are
+assets of this repository. The prototype under `prototype/` and the early prototype archive (removed) are
 not shipped and are out of scope.
