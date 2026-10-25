@@ -8,6 +8,7 @@ use std::process::ExitCode;
 pub fn run(args: &ConfigArgs, human: bool) -> ExitCode {
     match crate::provider::legacy::check_process()
         .and_then(|()| loader::load_from_process(&args.as_flags()))
+        .and_then(|c| c.role().map(|_| c))
     {
         Ok(cfg) => {
             let table = human || std::io::stdout().is_terminal();

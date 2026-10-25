@@ -37,6 +37,12 @@ fn derived(cfg: &Loaded) -> Vec<(String, String, &'static str)> {
             crate::price::index::Index::embedded().len().to_string(),
             "build",
         ),
+        (
+            "role".to_string(),
+            cfg.get("LOUPE_ROLE").map_or("full".into(), shown),
+            cfg.get("LOUPE_ROLE")
+                .map_or("default", |e| source_name(&e.source.to_string())),
+        ),
         // The build state only; the line reads no run-time variable.
         (
             "telemetry".to_string(),

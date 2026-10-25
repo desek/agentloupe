@@ -47,6 +47,12 @@ fn start_log_lists_providers_without_credential() {
         "{line}"
     );
     assert!(clean(&text) && clean(&l.log()));
+    let first = text
+        .lines()
+        .find(|x| x.contains("loupe serve starting"))
+        .unwrap();
+    assert!(first.contains("\"role\":\"full\""), "{first}");
+    assert!(first.contains("\"version\""), "{first}");
 }
 
 #[test]

@@ -3,6 +3,7 @@
 pub mod error;
 pub mod key;
 pub mod loader;
+pub mod role;
 pub mod secret;
 pub mod show;
 mod validate;
@@ -11,9 +12,11 @@ pub mod vars;
 /// The validated values that the running binary reads. Values for later product areas are
 /// validated by the loader but not kept, so they cannot change behaviour yet.
 pub struct Config {
+    /// What serve runs; the other subcommands always read full.
+    pub role: role::Role,
     pub listen: std::net::SocketAddr,
     pub data_dir: std::path::PathBuf,
-    /// Seals the captured bodies and the spill files.
+    /// Seals the captured bodies and the spill files; all zero in the role public when unset.
     pub data_key: [u8; key::KEY_LEN],
     /// Keys the HMAC of a credential and of an account ID header.
     pub account_key: [u8; key::KEY_LEN],

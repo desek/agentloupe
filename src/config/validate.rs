@@ -4,6 +4,7 @@ use super::Config;
 use super::error::ConfigError;
 use super::key::parse_key;
 use super::loader::{Entry, Loaded};
+use super::role::Role;
 use super::vars::{GITHUB_TOKEN_PREFIX, SUBSCRIPTION_PREFIX};
 
 fn bad(name: &str, problem: &str, expected: &str) -> ConfigError {
@@ -23,11 +24,12 @@ fn text(e: &Entry) -> Option<&str> {
 
 use crate::provider::endpoint::allowed as https_or_loopback;
 
-/// Checks one entry; secrets never appear in the problem text.
-fn check(e: &Entry) -> Result<(), ConfigError> {
+/// Checks one entry; secrets never appear in the problem text. The role public needs no keys.
+fn check(e: &Entry, role: Role) -> Result<(), ConfigError> {
     let n = e.name.as_str();
     let v = text(e);
     match (n, v) {
+        ("LOUPE_DATA_KEY" | "LOUPE_ACCOUNT_KEY", None) if role == Role::Public => Ok(()),
         ("LOUPE_DATA_KEY" | "LOUPE_ACCOUNT_KEY", None) => Err(ConfigError::key(n, "is missing")),
         ("LOUPE_DATA_KEY" | "LOUPE_ACCOUNT_KEY", Some(v)) => parse_key(v)
             .map(|_| ())
@@ -167,14 +169,20 @@ fn check(e: &Entry) -> Result<(), ConfigError> {
 }
 
 impl Loaded {
-    /// Validates every value and returns the first actionable error, or the typed configuration.
+    /// Validates every value for the role full; the subcommands other than serve ignore the role.
     pub fn validate(&self) -> Result<Config, ConfigError> {
+        self.validate_for(Role::Full)
+    }
+
+    /// Validates every value for one role and returns the first actionable error, or the typed configuration.
+    pub fn validate_for(&self, role: Role) -> Result<Config, ConfigError> {
         for e in &self.entries {
-            check(e)?;
+            check(e, role)?;
         }
         let get = |n: &str| self.get(n).and_then(text).unwrap_or_default().to_string();
         let num = |n: &str| get(n).parse::<u64>().expect("checked above");
-        let key = |n: &str| parse_key(&get(n)).expect("checked above");
+        // An unset key passes the check only in the role public, which never seals or keys a value.
+        let key = |n: &str| parse_key(&get(n)).unwrap_or([0; super::key::KEY_LEN]);
         let opt = |n: &str| self.get(n).and_then(text);
         let model = get("LOUPE_SUMMARY_MODEL");
         let model_set = self
@@ -188,6 +196,7 @@ impl Loaded {
             model_set,
         )?;
         Ok(Config {
+            role,
             listen: get("LOUPE_LISTEN").parse().expect("checked above"),
             data_dir: get("LOUPE_DATA_DIR").into(),
             data_key: key("LOUPE_DATA_KEY"),

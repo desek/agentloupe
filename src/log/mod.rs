@@ -1,4 +1,4 @@
-//! @agents-index Starts the global logger that writes JSON lines to stderr and to <data dir>/logs/loupe.log.
+//! @agents-index Starts the global logger that writes JSON lines to stderr and to <data dir>/logs/, one file per role.
 
 mod format;
 
@@ -28,14 +28,19 @@ impl<'a> MakeWriter<'a> for FileWriter {
     }
 }
 
-/// Opens the log file and installs the global subscriber. Call once, after the configuration passed.
+/// Starts the logger on `<data dir>/logs/loupe.log`, the file of every subcommand other than a public serve.
 pub fn init(data_dir: &Path) -> std::io::Result<()> {
+    init_file(data_dir, "loupe.log")
+}
+
+/// Opens `<data dir>/logs/<file>` and installs the global subscriber. Call once, after the configuration passed.
+pub fn init_file(data_dir: &Path, file: &str) -> std::io::Result<()> {
     let dir = data_dir.join("logs");
     std::fs::create_dir_all(&dir)?;
     let file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open(dir.join("loupe.log"))?;
+        .open(dir.join(file))?;
     let subscriber = tracing_subscriber::registry()
         .with(
             tracing_subscriber::fmt::layer()

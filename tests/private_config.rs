@@ -79,6 +79,7 @@ fn private_config_route_shape_and_auth() {
     assert_eq!(got["summary_provider"].0, "anthropic");
     assert!(got["provider.openai"].0.starts_with("credential=api_key "));
     assert_eq!(got["LOUPE_ADMIN_TOKEN"].0, "set");
+    assert_eq!(got["role"], ("full".to_string(), "default".to_string()));
     // The verdict build holds no telemetry host.
     assert_eq!(
         got["telemetry"],

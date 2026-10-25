@@ -18,6 +18,7 @@ const fn var(name: &'static str, default: Option<&'static str>, secret: bool) ->
 /// Every fixed variable, in the order that config show prints them.
 pub const VARS: &[Var] = &[
     var("LOUPE_ENV", Some("local"), false),
+    var("LOUPE_ROLE", Some("full"), false),
     var("LOUPE_LISTEN", Some("127.0.0.1:8787"), false),
     var("LOUPE_DATA_DIR", Some("./data"), false),
     var("LOUPE_DATA_KEY", None, true),

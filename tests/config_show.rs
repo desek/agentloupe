@@ -98,3 +98,16 @@ fn config_show_stops_on_a_legacy_name() {
         "{err}"
     );
 }
+
+#[test]
+fn config_show_prints_the_role_and_its_source() {
+    let out = show(&[], false);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(values(&out)["role"], "full");
+    let out = show(&[("LOUPE_ROLE", "public")], false);
+    assert_eq!(values(&out)["role"], "public");
+}

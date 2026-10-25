@@ -346,6 +346,10 @@ name = "healthz"
 path = "tests/healthz.rs"
 
 [[test]]
+name = "config_role"
+path = "tests/config.role.rs"
+
+[[test]]
 name = "config_show"
 path = "tests/config_show.rs"
 
