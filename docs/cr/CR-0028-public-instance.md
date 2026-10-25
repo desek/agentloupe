@@ -179,7 +179,7 @@ sequenceDiagram
 **Public mirror in the role `full`**
 
 33. In the role `full`, `loupe serve` **MUST** make the directory `<LOUPE_DATA_DIR>/public/` when it is absent, and open or make `<LOUPE_DATA_DIR>/public/public.db` before the port opens.
-34. The mirror **MUST** hold exactly two tables. `days` holds, for each published day, the columns `day`, `record`, `content_hash`, and `built_at` of the table `days` of `loupe.db`. `live_state` holds one row with the date of the current day in `LOUPE_TZ`, the call count, the five token counts and the cost of that day, the open segment count, the ended counter, the in-flight count, and `updated_at`. The mirror **MUST NOT** hold another table, a column of another table of `loupe.db`, an identifier, a hash, a path, a header, a body, a model name, an agent label, or a day record that is not published.
+34. The mirror **MUST** hold exactly two tables. `days` holds, for each published day, the columns `day`, `record`, `content_hash`, `built_at`, and `state` of the table `days` of `loupe.db`. A check constraint on `state` lets only the value `published`, so the statements of the API stay the same. `live_state` holds one row with the date of the current day in `LOUPE_TZ`, the call count, the five token counts and the cost of that day, the open segment count, the ended counter, the in-flight count, and `updated_at`. The mirror **MUST NOT** hold another table, a column of another table of `loupe.db`, an identifier, a hash, a path, a header, a body, a model name, an agent label, or a day record that is not published.
 35. The role `full` **MUST** set `PRAGMA user_version` of the mirror to the mirror version of the binary. When the file holds another version or another table, the role `full` **MUST** drop the tables of the mirror and make them again in one transaction, then fill them from `loupe.db`. The mirror is derived data, so this loses nothing.
 36. The role `full` **MUST** set the journal mode `DELETE` on the mirror, so a reader on a read-only mount can read it with no shared-memory file.
 37. The mirror task **MUST** reconcile the table `days` at start and then every 5 seconds through an injected clock: it reads the day, the content hash, and `built_at` of each published row of `loupe.db`, writes each day that is new or changed, and deletes each day that is no longer published. It **MUST** write only when a difference exists, in one transaction. Thus a write of `loupe aggregate` or `loupe day` in another process reaches the mirror within 5 seconds.
@@ -454,7 +454,7 @@ Then no module imports the capture, proxy, token, private, account, session, par
 Given loupe.db with days in the states published, pending_review, and deleted, and exchanges, calls, sessions, and accounts
 When the mirror task runs a pass
 Then public.db holds only the tables days and live_state
-And days holds only the published days, with day, record, content_hash, and built_at
+And days holds only the published days, with day, record, content_hash, built_at, and state published
 And live_state holds only the counters of requirement 34
 And the journal mode of public.db is delete and user_version is the mirror version of the binary
 
@@ -786,3 +786,7 @@ The owner added point 4 after the approval. The first version gave the public co
 4. Replaces the schema check of `loupe.db` with the version check of the mirror, and the WAL rules with the journal mode `DELETE`.
 5. Changes the live delay targets from 1.1 to 2.1 seconds, because a frame now waits for one mirror write and one poll.
 6. Sets the status back to `proposed` for a new review. The new review approved it with no finding.
+
+### Implementation note, 2026-10-25
+
+The statements of `src/api/days.list.rs` and `src/api/days.get.rs` filter on `state = 'published'`, and requirement 16 keeps them. Requirement 34 gave the mirror table `days` no column `state`, so the two requirements could not both hold. Edit: requirement 34 and AC-3 add the column `state`, with a check constraint that lets only `published`. The column holds no data that is not public.
