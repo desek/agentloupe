@@ -2,7 +2,7 @@
 name: "CR-0028 Public instance"
 description: "A public, read-only role of loupe serve, selected by LOUPE_ROLE=public, that has no access to non-public data. The role full writes a public mirror database that holds only the published days and the live counters. The public role runs as a second container that mounts only that mirror, read-only, with no secret in its environment. It serves only the dashboard, its files, the public API, the live route, and the health route. A Cloudflare Tunnel in front of it is later work that this CR only prepares for."
 id: "CR-0028"
-status: "proposed"
+status: "approved"
 date: 2026-10-25
 requestor: Daniel Grenemark
 stakeholders: Daniel Grenemark (owner, operator of the machine, owner of the Cloudflare account), reviewer agent (approver), public readers of the dashboard
@@ -738,7 +738,7 @@ Medium to large: one configuration variable, one mirror with a reconcile and a l
 
 ## Decision Outcome
 
-Pending: a new review by a reviewer agent, separate from the author, after the amendment of 2026-10-25.
+Approved on 2026-10-25, after the amendment, by a reviewer agent in a dynamic workflow, separate from the author. The reviewer found no blocking finding. It checked the mounts, the environment, the mirror contents, the code paths, the routes, the read-only access, the volume ownership, the optional env file, and the coverage of each requirement by an acceptance criterion.
 
 ## Open Questions
 
@@ -785,4 +785,4 @@ The owner added point 4 after the approval. The first version gave the public co
 3. Changes the compose service: the mirror volume read-only, a log volume, `.env.public`, no `loupe-data`, and no `.env`. The `Dockerfile` gets `/data/public`.
 4. Replaces the schema check of `loupe.db` with the version check of the mirror, and the WAL rules with the journal mode `DELETE`.
 5. Changes the live delay targets from 1.1 to 2.1 seconds, because a frame now waits for one mirror write and one poll.
-6. Sets the status back to `proposed` for a new review.
+6. Sets the status back to `proposed` for a new review. The new review approved it with no finding.
