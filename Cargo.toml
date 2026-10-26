@@ -215,7 +215,7 @@ tracing-subscriber = { version = "0.3", features = ["fmt", "registry"] }
 jsonschema = { version = "0.59.0", default-features = false }
 tempfile = "3"
 tokio = { version = "1", features = ["test-util"] }
-tokio-tungstenite = "0.29"
+tokio-tungstenite = "0.30"
 
 [[test]]
 name = "web_serve"
