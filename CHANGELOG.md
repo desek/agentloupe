@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.1](https://github.com/desek/agentloupe/compare/v0.1.0...v0.1.1) (2026-10-26)
+
+
+### Bug Fixes
+
+* **deps:** bump jsonschema to 0.60.0 ([271a0aa](https://github.com/desek/agentloupe/commit/271a0aa0a06c537997762bab4f4e877fc78767c7))
+* **deps:** bump jsonschema to 0.60.0 ([#7](https://github.com/desek/agentloupe/issues/7)) ([271a0aa](https://github.com/desek/agentloupe/commit/271a0aa0a06c537997762bab4f4e877fc78767c7))
+* **deps:** bump rusqlite from 0.37.0 to 0.40.2 ([#1](https://github.com/desek/agentloupe/issues/1)) ([7accf1e](https://github.com/desek/agentloupe/commit/7accf1e258cf25e8e0f6465ffca74419cb28fddf))
+* **deps:** bump tokio-tungstenite from 0.29.0 to 0.30.0 ([#3](https://github.com/desek/agentloupe/issues/3)) ([507b0eb](https://github.com/desek/agentloupe/commit/507b0eba17b5adec4eaaa50cf7b00b1497151bd2))
+
 ## [0.1.0](https://github.com/desek/agentloupe/compare/v0.1.0...v0.1.0) (2026-10-26)
 
 
