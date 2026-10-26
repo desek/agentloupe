@@ -47,6 +47,11 @@ jobs:
 
   verdict:
     needs: visibility
+    # GitHub checks the permissions of each job of the called workflow before the run starts, also of the
+    # job reuse, which a call skips. The caller must give each of them, or the run fails to start.
+    permissions:
+      contents: read
+      actions: read
     uses: ./.github/workflows/verdict.yml
     with:
       ref: refs/tags/${{ inputs.tag || github.ref_name }}
