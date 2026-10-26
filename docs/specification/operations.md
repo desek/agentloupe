@@ -308,6 +308,8 @@ The verdict workflow:
 7. A new push to a pull request cancels the older verdict run of that pull request. A run for a push to `main` and a release run are never cancelled.
 8. The hosted runners do not use the verdict cache of `pipeline.verdict.sh`. The job `reuse` reads the run records of the repository instead (see "Hosted verdict reuse"). The jobs cache the cargo registry and the target directory with a key from `Cargo.lock` and `rust-toolchain.toml`.
 
+The job `verdict` of the release workflow gives the called verdict workflow `contents: read` and `actions: read`. GitHub checks the permissions of each called job before the run starts, also of the job `reuse`, which a call skips, so a caller with fewer permissions stops the release at start.
+
 The release-please workflow gives its `GITHUB_TOKEN` no permission. release-please itself uses the release token of `release.md`. The release workflow logs in to the registry with its `GITHUB_TOKEN`, with the permissions `contents: write` and `packages: write`. The build jobs and the image jobs of the release workflow install cargo-about with mise from `.tool-versions`, for the third-party notices.
 
 Each job that runs on a runner has a timeout. A job with no timeout can run for 360 minutes.

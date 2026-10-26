@@ -172,3 +172,25 @@ fn release_calls_full_verdict() {
     assert_eq!(job_key(job(&all, "build"), "needs"), Some("verdict"));
     assert_eq!(job_key(job(&all, "image"), "needs"), Some("verdict"));
 }
+
+/// The call gives each permission that a job of the verdict workflow asks for, because GitHub refuses to
+/// start the release run when a called job asks for more than the caller gives.
+#[test]
+fn release_call_gives_the_verdict_permissions() {
+    let caller = read(".github/workflows/release.yml");
+    let all = jobs(&caller);
+    let given: Vec<String> = job(&all, "verdict")
+        .lines()
+        .map(|l| l.trim().replace(' ', ""))
+        .filter(|l| l.ends_with(":read") || l.ends_with(":write"))
+        .collect();
+    let callee = read(".github/workflows/verdict.yml");
+    for l in callee.lines().map(|l| l.trim().replace(' ', "")) {
+        if l.ends_with(":read") || l.ends_with(":write") {
+            assert!(
+                given.contains(&l),
+                "the verdict job of release.yml must give {l}"
+            );
+        }
+    }
+}
