@@ -22,8 +22,6 @@
     { "type": "style", "section": "Styles", "hidden": true }
   ],
   "packages": {
-    ".": {
-      "release-as": "0.1.0"
-    }
+    ".": {}
   }
 }
