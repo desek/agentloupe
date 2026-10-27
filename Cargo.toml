@@ -199,7 +199,7 @@ futures-util = "0.3"
 getrandom = "0.4"
 hex = "0.4"
 hmac = "0.13"
-reqwest = { version = "0.12", default-features = false, features = ["stream", "rustls-tls", "json", "blocking"] }
+reqwest = { version = "0.13", default-features = false, features = ["stream", "rustls", "query", "json", "blocking"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
 rust_decimal = { version = "1.43.0", features = ["serde-with-str"] }
 serde = { version = "1", features = ["derive"] }
