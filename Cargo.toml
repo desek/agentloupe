@@ -1,7 +1,7 @@
 # @agents-index Cargo manifest of the agent-loupe crate, which builds the single loupe binary.
 [package]
 name = "agent-loupe"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 publish = false
 license = "MIT"

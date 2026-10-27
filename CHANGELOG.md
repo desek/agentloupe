@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.2](https://github.com/desek/agentloupe/compare/v0.1.1...v0.1.2) (2026-10-27)
+
+
+### Bug Fixes
+
+* **deps:** bump reqwest to 0.13.5 ([42d555d](https://github.com/desek/agentloupe/commit/42d555d1d5225daf13cb21c1f4663571672afc6f))
+* **deps:** bump reqwest to 0.13.5 ([#17](https://github.com/desek/agentloupe/issues/17)) ([42d555d](https://github.com/desek/agentloupe/commit/42d555d1d5225daf13cb21c1f4663571672afc6f))
+
 ## [0.1.1](https://github.com/desek/agentloupe/compare/v0.1.0...v0.1.1) (2026-10-26)
 
 
