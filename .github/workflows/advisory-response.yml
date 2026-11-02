@@ -39,7 +39,7 @@ jobs:
       - name: Install the Rust toolchain of rust-toolchain.toml
         run: rustup toolchain install
       - name: Install cargo-deny of .tool-versions
-        uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
+        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           install_args: aqua:EmbarkStudios/cargo-deny
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1

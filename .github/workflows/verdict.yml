@@ -91,7 +91,7 @@ jobs:
             target
           key: cargo-lint-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
       - name: Install cargo-deny of .tool-versions
-        uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
+        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           install_args: aqua:EmbarkStudios/cargo-deny
       - run: .agents/scripts/pipeline.lint.sh
@@ -109,7 +109,7 @@ jobs:
       - name: Install the Rust toolchain of rust-toolchain.toml
         run: rustup toolchain install
       - name: Install cargo-nextest of .tool-versions
-        uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
+        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           install_args: aqua:nextest-rs/nextest/cargo-nextest
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -132,7 +132,7 @@ jobs:
           ref: ${{ env.HEAD_REF }}
           persist-credentials: false
       - name: Install Node of .tool-versions
-        uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
+        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           install_args: nodejs
       - run: .agents/scripts/pipeline.web.sh

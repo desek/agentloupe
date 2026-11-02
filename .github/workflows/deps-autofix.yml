@@ -53,7 +53,7 @@ jobs:
       - name: Install the Rust toolchain of rust-toolchain.toml
         run: rustup toolchain install
       - name: Install Node, cargo-nextest, cargo-deny, and Claude Code of .tool-versions
-        uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
+        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
         with:
           install_args: nodejs aqua:nextest-rs/nextest/cargo-nextest aqua:EmbarkStudios/cargo-deny npm:@anthropic-ai/claude-code
       - name: Make the Claude Code binary runnable
