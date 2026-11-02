@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.3](https://github.com/desek/agentloupe/compare/v0.1.2...v0.1.3) (2026-11-02)
+
+
+### Bug Fixes
+
+* **deps:** bump jsonschema ([ab264c8](https://github.com/desek/agentloupe/commit/ab264c8df3b79378d1abef876398cf571cc436f2))
+* **deps:** bump jsonschema from 0.60.1 to 0.60.2 in the cargo-minor-patch group ([#20](https://github.com/desek/agentloupe/issues/20)) ([ab264c8](https://github.com/desek/agentloupe/commit/ab264c8df3b79378d1abef876398cf571cc436f2))
+* **deps:** bump rusqlite from 0.40.2 to 0.41.1 ([#21](https://github.com/desek/agentloupe/issues/21)) ([eb4101b](https://github.com/desek/agentloupe/commit/eb4101b2ccbecbf53ffa37d091841e9e23320d87))
+
 ## [0.1.2](https://github.com/desek/agentloupe/compare/v0.1.1...v0.1.2) (2026-10-27)
 
 
