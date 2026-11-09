@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.4](https://github.com/desek/agentloupe/compare/v0.1.3...v0.1.4) (2026-11-09)
+
+
+### Bug Fixes
+
+* **deps:** bump toml ([d380b86](https://github.com/desek/agentloupe/commit/d380b8659b3dcaeab1526c100df99f3d45107a64))
+* **deps:** bump toml from 1.1.8+spec-1.1.0 to 1.2.0+spec-1.1.0 in the cargo-minor-patch group ([#24](https://github.com/desek/agentloupe/issues/24)) ([d380b86](https://github.com/desek/agentloupe/commit/d380b8659b3dcaeab1526c100df99f3d45107a64))
+
 ## [0.1.3](https://github.com/desek/agentloupe/compare/v0.1.2...v0.1.3) (2026-11-02)
 
 
