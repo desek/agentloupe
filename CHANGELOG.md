@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.5](https://github.com/desek/agentloupe/compare/v0.1.4...v0.1.5) (2026-11-16)
+
+
+### Bug Fixes
+
+* **deps:** bump jsonschema from 0.60.2 to 0.61.2 ([#28](https://github.com/desek/agentloupe/issues/28)) ([c565d40](https://github.com/desek/agentloupe/commit/c565d40a8767edd6a69510777de6d385f6207ed6))
+* **deps:** bump rusqlite from 0.41.1 to 0.42.0 ([#29](https://github.com/desek/agentloupe/issues/29)) ([889a862](https://github.com/desek/agentloupe/commit/889a862c789d121614195aef99d02735821b048d))
+* **deps:** bump toml ([9ac9cc0](https://github.com/desek/agentloupe/commit/9ac9cc0d20677a39c10a33a220e8f5b739f495e1))
+* **deps:** bump toml from 1.2.0+spec-1.1.0 to 1.2.1+spec-1.1.0 in the cargo-minor-patch group ([#27](https://github.com/desek/agentloupe/issues/27)) ([9ac9cc0](https://github.com/desek/agentloupe/commit/9ac9cc0d20677a39c10a33a220e8f5b739f495e1))
+
 ## [0.1.4](https://github.com/desek/agentloupe/compare/v0.1.3...v0.1.4) (2026-11-09)
 
 
